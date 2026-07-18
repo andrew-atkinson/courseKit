@@ -18,6 +18,7 @@ load_dotenv(override=True)
 
 import hardware
 import pipeline
+import qti
 
 
 def _build_client() -> OpenAI:
@@ -53,6 +54,38 @@ def _print_summary(results, *, dry_run: bool) -> None:
     print(f"\n{len(results)} unit(s).")
 
 
+def _run_bundle(path) -> int:
+    out, included, skipped = qti.bundle(path)
+    for bank_json, reason in skipped:
+        print(f"  [skip] {bank_json.parent.name}: {reason}")
+    if out is None:
+        print(f"No usable bank.json found under {path}")
+        return 1
+    print(f"Bundled {len(included)} quiz(zes) into one package:")
+    for bj in included:
+        print(f"  - {bj.parent.name}")
+    print(f"\n-> {out}")
+    print("Import in Canvas via Content Type: \"QTI .zip file\".")
+    return 0
+
+
+def _run_to_qti(path) -> int:
+    results = qti.reemit(path)
+    if not results:
+        print(f"No bank.json found under {path}")
+        return 1
+    print("Canvas QTI:")
+    wrote = 0
+    for bank_json, imscc, reason in results:
+        if imscc is not None:
+            print(f"  [OK]   {imscc}")
+            wrote += 1
+        else:
+            print(f"  [skip] {bank_json.parent.name}: {reason}")
+    print(f"\n{wrote}/{len(results)} package(s) written.")
+    return 0 if wrote else 1
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Generate question banks from lecture transcripts.")
     parser.add_argument("path", nargs="?", default=os.getenv("TRANSCRIPTION"),
@@ -64,8 +97,16 @@ def main(argv=None) -> int:
                         help="override: write under DIR/<course>/<week> instead of with the course")
     parser.add_argument("--dry-run", action="store_true",
                         help="list the units that would be processed, without calling the model")
+    parser.add_argument("--to-qti", metavar="PATH",
+                        help="model-free: write a Canvas QTI .zip beside every bank.json under PATH")
+    parser.add_argument("--bundle", action="store_true",
+                        help="with --to-qti: write ONE package containing every quiz, "
+                             "so a single Canvas import brings them all in")
     parser.add_argument("--max-iters", type=int, default=pipeline.DEFAULT_MAX_ITERS)
     args = parser.parse_args(argv)
+
+    if args.to_qti:
+        return _run_bundle(args.to_qti) if args.bundle else _run_to_qti(args.to_qti)
 
     if not args.path:
         parser.error("no PATH given and TRANSCRIPTION is not set")
