@@ -28,7 +28,8 @@ groups, so if it were the working format the randomization would be lost before 
 ## Requirements
 
 - **Python 3.12+** and [uv](https://docs.astral.sh/uv/)
-- **[LM Studio](https://lmstudio.ai/)** running its local server with a tool-calling model loaded
+- A **tool-calling model** behind one of the supported providers — by default
+  [LM Studio](https://lmstudio.ai/) running its local server
 - macOS for the RAM pre-flight check (it degrades to a no-op elsewhere)
 
 ## Install
@@ -41,12 +42,13 @@ uv sync --group dev
 Create a `.env` in the project root:
 
 ```bash
-MODEL_NAME=unsloth-gemma-4-26b-a4b-it-qat-oq4   # must match an id from LM Studio
+MODEL_NAME=unsloth-gemma-4-26b-a4b-it-qat-oq4   # must match an id the provider serves
 LOCAL_HOST_URL=http://localhost:1234/v1/
 TRANSCRIPTION=/path/to/a/week-3.md              # optional default input
+PROVIDER=lm_studio                              # optional; lm_studio | ollama | openai
 ```
 
-`MODEL_NAME` must match a model id LM Studio actually serves:
+`MODEL_NAME` must match a model id the provider actually serves:
 
 ```bash
 curl -s http://localhost:1234/v1/models | grep '"id"'
@@ -55,8 +57,23 @@ curl -s http://localhost:1234/v1/models | grep '"id"'
 Verify the install:
 
 ```bash
-uv run pytest -q        # 271 tests, all offline — no model needed
+uv run pytest -q        # 297 tests, all offline — no model needed
 ```
+
+### Choosing a provider
+
+Model access goes through `coursekit.providers`, so the endpoint is configuration rather than
+code. `PROVIDER` selects it:
+
+| `PROVIDER` | Endpoint | Notes |
+|---|---|---|
+| `lm_studio` *(default)* | `http://localhost:1234/v1/` | local; what this was built and tested against |
+| `ollama` | `http://localhost:11434/v1/` | local |
+| `openai` | OpenAI | needs `OPENAI_API_KEY` |
+
+`LOCAL_HOST_URL` overrides the endpoint for whichever provider is selected. Only providers
+speaking the OpenAI tool-calling format are implemented today; Anthropic uses a different
+`tool_use` shape and would need its own implementation behind the same interface.
 
 ## Generating quizzes
 
@@ -142,14 +159,19 @@ Exit codes: `0` success · `1` a week failed to finalize · `2` the model could 
 
 ## Layout
 
-| File          | Role                                                          |
-| ------------- | ------------------------------------------------------------- |
-| `app.py`      | CLI only — arg parsing and summaries                          |
-| `pipeline.py` | The reusable driver: `run_unit`, `run_course`, the model loop |
-| `discover.py` | Finds transcripts, resolves output paths                      |
-| `context.py`  | Prompt construction (pure function)                           |
-| `tools.py`    | The tool schemas the model calls, and dispatch                |
-| `bank.py`     | The canonical data model and its guardrails                   |
+Quizbot is a *generator* sitting on a shared spine. `coursekit/` is the spine — it imports
+nothing from the generator, so future generators (pages, assignments, rubrics) reuse it rather
+than re-copying it.
+
+| File / package        | Role                                                          |
+| --------------------- | ------------------------------------------------------------- |
+| `coursekit/providers` | Model access: the tool-calling `Provider` contract            |
+| `app.py`              | CLI only — arg parsing and summaries                          |
+| `pipeline.py`         | The reusable driver: `run_unit`, `run_course`, the model loop |
+| `discover.py`         | Finds transcripts, resolves output paths                      |
+| `context.py`          | Prompt construction (pure function)                           |
+| `tools.py`            | The tool schemas the model calls, and dispatch                |
+| `bank.py`             | The canonical data model and its guardrails                   |
 | `gift.py`     | GIFT emitter                                                  |
 | `qti.py`      | Canvas QTI emitter and packaging                              |
 | `hardware.py` | RAM pre-flight for model loading                              |
