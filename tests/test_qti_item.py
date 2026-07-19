@@ -117,12 +117,18 @@ def test_response_lid_is_single_cardinality():
     assert root.find(".//response_lid").get("rcardinality") == "Single"
 
 
-def test_numerical_type_is_still_gated():
-    from bank import NumVariant
-    n = NumVariant(group_id="c1", label="A", variant_summary="Count",
-                   question_text="How many sides has a triangle?", answer=3)
-    with pytest.raises(NotImplementedError, match="numerical"):
-        qti.emit_item(n, "run")
+def test_every_modelled_question_type_can_emit():
+    # bank.py's QuestionType and qti.py's emitters must not drift apart.
+    from typing import get_args
+    from bank import QuestionType
+    assert set(get_args(QuestionType)) == set(qti._ITEM_EMITTERS)
+
+
+def test_unknown_kind_raises_a_clear_error():
+    class _Fake:
+        kind = "sonnet_question"
+    with pytest.raises(NotImplementedError, match="sonnet_question"):
+        qti.emit_item(_Fake(), "run")
 
 
 # ------------------------------------------------- objectbank

@@ -1,5 +1,6 @@
-"""Phase B item emitters, checked against the Classic sample's structure
-(docs/Classic-Quiz-Sample). true_false is inferred (no sample); numerical is gated."""
+"""Item emitters, checked against real Canvas exports: docs/Classic-Quiz-Sample for
+short-answer / multiple-answer / matching, and docs/'numeric quiz' for numerical.
+true_false is inferred (no sample) but confirmed working on a live import."""
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -130,15 +131,6 @@ def test_matching_scores_sum_to_about_100():
     assert 99.9 <= total <= 100.1  # 3 x 33.33
 
 
-# ----------------------------------------------------------- numerical (gated)
-
-def test_numerical_still_gated_with_a_clear_message():
-    v = NumVariant(group_id="c1", label="A", variant_summary="Count",
-                   question_text="How many sides has a triangle?", answer=3)
-    with pytest.raises(NotImplementedError, match="numerical"):
-        qti.emit_item(v, "r")
-
-
 # ----------------------------------------------- all supported types in a bank
 
 def test_objectbank_with_mixed_supported_types_is_well_formed():
@@ -148,5 +140,64 @@ def test_objectbank_with_mixed_supported_types_is_well_formed():
         g.variants[lbl] = TFVariant(group_id="c1", label=lbl, variant_summary=f"Claim {lbl}",
                                     question_text=f"Statement {lbl} is correct here.",
                                     correct_answer=ans)
+    root = ET.fromstring(qti.emit_objectbank(g, "r"))
+    assert len(liter(root, "item")) == 4
+
+
+# ----------------------------------------------------------- numerical
+
+def _num(answer=2.718, tolerance=0.0005, label="A"):
+    return NumVariant(group_id="c1", label=label, variant_summary="Constant",
+                      question_text="What is Euler's number?",
+                      answer=answer, tolerance=tolerance)
+
+
+def test_numerical_structure():
+    root = ET.fromstring(qti.emit_item(_num(), "r"))
+    assert qtype(root) == "numerical_question"
+    fib = liter(root, "render_fib")[0]
+    assert fib.get("fibtype") == "Decimal"          # the numerical marker
+    assert liter(root, "response_str")
+
+
+def test_numerical_with_margin_matches_canvas_bounds():
+    # 2.718 +/- 0.0005 -> exact OR (gt 2.7175 AND lte 2.7185), as Canvas writes it.
+    root = ET.fromstring(qti.emit_item(_num(), "r"))
+    assert liter(root, "varequal")[0].text == "2.718"
+    assert liter(root, "vargt")[0].text == "2.7175"   # strictly-greater when there IS a margin
+    assert liter(root, "varlte")[0].text == "2.7185"
+    assert not liter(root, "vargte")
+
+
+def test_numerical_without_margin_uses_inclusive_lower_bound():
+    # tolerance 0 must use vargte, or the exact answer falls outside its own bounds.
+    root = ET.fromstring(qti.emit_item(_num(answer=4, tolerance=0), "r"))
+    assert liter(root, "vargte")[0].text == "4.0"
+    assert liter(root, "varlte")[0].text == "4.0"
+    assert not liter(root, "vargt")
+    assert liter(root, "varequal")[0].text == "4.0"
+
+
+def test_numerical_decimals_are_clean():
+    # Float arithmetic must not leak 2.7174999999999998 into the XML.
+    root = ET.fromstring(qti.emit_item(_num(), "r"))
+    for txt in (liter(root, "vargt")[0].text, liter(root, "varlte")[0].text):
+        assert "999999" not in txt and "000000" not in txt
+    assert qti._dec(4) == "4.0"
+    assert qti._dec(0) == "0.0"
+    assert qti._dec(3.1415) == "3.1415"
+
+
+def test_numerical_scores_100():
+    root = ET.fromstring(qti.emit_item(_num(), "r"))
+    sv = liter(root, "setvar")[0]
+    assert sv.get("action") == "Set" and sv.text == "100"
+
+
+def test_numerical_group_emits_as_a_bank():
+    from bank import Group
+    g = Group(group_id="c1", concept_title="Constants", question_type="numerical")
+    for i, lbl in enumerate("ABCD"):
+        g.variants[lbl] = _num(answer=i + 1, tolerance=0.5, label=lbl)
     root = ET.fromstring(qti.emit_objectbank(g, "r"))
     assert len(liter(root, "item")) == 4

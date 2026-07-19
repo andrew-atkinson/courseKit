@@ -184,8 +184,12 @@ def test_reemit_synthesises_quiz_when_quiz_json_missing(tmp_path):
     assert reason is None and imscc.exists()
 
 
-def test_reemit_skips_unsupported_types_without_aborting(tmp_path):
-    # An MC week and a numerical week; numerical is still gated, the MC one still emits.
+def test_reemit_skips_unsupported_types_without_aborting(tmp_path, monkeypatch):
+    # Every modelled type emits now, so simulate an unsupported one to exercise the skip path.
+    def _unsupported(v, run_id):
+        raise NotImplementedError("QTI emit for 'numerical' is not supported here")
+    monkeypatch.setitem(qti._ITEM_EMITTERS, "numerical", _unsupported)
+
     bankmod.reset()
     mc, mcq = _mc_bank(run_id="mc")
     (tmp_path / "week-3").mkdir()
@@ -255,7 +259,10 @@ def test_bundle_quizzes_keep_separate_folders_and_ids(tmp_path):
     assert len(folders) == 2  # one folder per quiz, no collision
 
 
-def test_bundle_skips_unsupported_without_losing_the_rest(tmp_path):
+def test_bundle_skips_unsupported_without_losing_the_rest(tmp_path, monkeypatch):
+    def _unsupported(v, run_id):
+        raise NotImplementedError("QTI emit for 'numerical' is not supported here")
+    monkeypatch.setitem(qti._ITEM_EMITTERS, "numerical", _unsupported)
     _write_week(tmp_path, "week-3", "r3")
     bankmod.reset()
     bankmod.init("rnum", None, title="Numerical week")

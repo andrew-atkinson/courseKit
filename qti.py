@@ -376,11 +376,47 @@ def _match_item(v, run_id):
 </item>'''
 
 
+def _dec(x) -> str:
+    """Canvas writes numeric answers as decimals ('4.0', '2.7175'). Round first so float
+    arithmetic on the margin doesn't leak 2.7174999999999998 into the XML."""
+    s = f"{round(float(x), 10):.10f}".rstrip("0")
+    return s + "0" if s.endswith(".") else s
+
+
 def _num_item(v, run_id):
-    raise NotImplementedError(
-        "QTI emit for 'numerical' still needs a Canvas sample — the Classic export you provided "
-        "had no numerical_question. Add one to a Classic quiz and re-export."
-    )
+    """numerical_question: render_fib fibtype='Decimal', answer matched exactly or within a
+    margin. Canvas uses <vargt> for the lower bound when there IS a margin, but <vargte> when
+    the margin is zero (otherwise an exact answer would fall outside its own bounds)."""
+    ans_id = _num_id(run_id, v.group_id, v.label, "a0")
+    lo_tag = "vargt" if v.tolerance > 0 else "vargte"
+    return f'''<item ident="{item_id(run_id, v.group_id, v.label)}" title="{attr(v.variant_summary)}">
+{_itemmeta("numerical_question", [ans_id], run_id, v)}
+  <presentation>
+{_stem(v)}
+    <response_str ident="response1" rcardinality="Single">
+      <render_fib fibtype="Decimal">
+        <response_label ident="answer1"/>
+      </render_fib>
+    </response_str>
+  </presentation>
+  <resprocessing>
+    <outcomes>
+      <decvar maxvalue="100" minvalue="0" varname="SCORE" vartype="Decimal"/>
+    </outcomes>
+    <respcondition continue="No">
+      <conditionvar>
+        <or>
+          <varequal respident="response1">{_dec(v.answer)}</varequal>
+          <and>
+            <{lo_tag} respident="response1">{_dec(v.answer - v.tolerance)}</{lo_tag}>
+            <varlte respident="response1">{_dec(v.answer + v.tolerance)}</varlte>
+          </and>
+        </or>
+      </conditionvar>
+      <setvar action="Set" varname="SCORE">100</setvar>
+    </respcondition>
+  </resprocessing>
+</item>'''
 
 
 _ITEM_EMITTERS = {
