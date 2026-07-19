@@ -60,3 +60,11 @@ class OpenAICompatProvider(Provider):
     def append_tool_results(self, messages, results):
         for call_id, content in results:
             messages.append({"role": "tool", "tool_call_id": call_id, "content": content})
+
+    def check_fit(self, model):
+        """Local endpoints get a RAM pre-flight; hosted ones have no local budget to check,
+        so asking would produce a nonsense warning about the caller's own machine."""
+        if not self.is_local:
+            return None, ""
+        from ..hardware import check_fit
+        return check_fit(model)

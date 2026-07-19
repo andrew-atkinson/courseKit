@@ -71,3 +71,12 @@ class Provider(ABC):
     def append_user(self, messages: list, text: str) -> None:
         """Append a plain user turn — the same shape everywhere, so not abstract."""
         messages.append({"role": "user", "content": text})
+
+    def check_fit(self, model: str) -> tuple[bool | None, str]:
+        """Can this endpoint serve the model? -> (verdict, message).
+
+        True/False/None, where None means "can't tell" — which is the honest answer for a
+        hosted endpoint, since there is no local RAM budget to measure. Advisory only: the
+        authoritative signal is the endpoint actually refusing to load.
+        """
+        return None, ""
