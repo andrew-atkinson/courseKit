@@ -57,7 +57,7 @@ curl -s http://localhost:1234/v1/models | grep '"id"'
 Verify the install:
 
 ```bash
-uv run pytest -q        # 297 tests, all offline — no model needed
+uv run pytest -q        # 315 tests, all offline — no model needed
 ```
 
 ### Choosing a provider
@@ -166,15 +166,30 @@ than re-copying it.
 | File / package        | Role                                                          |
 | --------------------- | ------------------------------------------------------------- |
 | `coursekit/providers` | Model access: the tool-calling `Provider` contract            |
+| `coursekit/prompts.py`| Prompt library loader — project overrides beat shipped files  |
+| `coursekit/hardware.py`| RAM pre-flight for model loading                             |
+| `prompts/quiz/`       | The shipped prompts, as editable Markdown                     |
 | `app.py`              | CLI only — arg parsing and summaries                          |
 | `pipeline.py`         | The reusable driver: `run_unit`, `run_course`, the model loop |
 | `discover.py`         | Finds transcripts, resolves output paths                      |
-| `context.py`          | Prompt construction (pure function)                           |
+| `context.py`          | Assembles the messages from the prompt library                |
 | `tools.py`            | The tool schemas the model calls, and dispatch                |
 | `bank.py`             | The canonical data model and its guardrails                   |
-| `gift.py`     | GIFT emitter                                                  |
-| `qti.py`      | Canvas QTI emitter and packaging                              |
-| `hardware.py` | RAM pre-flight for model loading                              |
+| `gift.py`             | GIFT emitter                                                  |
+| `qti.py`              | Canvas QTI emitter and packaging                              |
+
+### Changing the prompts
+
+The prompts are files, not strings in code — `prompts/quiz/system.md` (the rules governing how the
+model records questions) and `prompts/quiz/task.md` (the brief: how many concepts, what mix of
+types). Edit them in place to change behaviour everywhere.
+
+To change them for **one course only**, drop a replacement next to that course's content and
+quizbot prefers it, falling back to the shipped file for anything you don't override:
+
+```
+<course root>/.vtconfig/prompts/quiz/task.md
+```
 
 ## Notes
 
