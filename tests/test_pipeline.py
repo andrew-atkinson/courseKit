@@ -55,9 +55,12 @@ class _ScriptedRaw:
         self.chat = self
         self.completions = self
         self.calls = 0
+        self.first_messages = None   # the prompts as actually sent
 
     def create(self, **kwargs):
         self.calls += 1
+        if self.first_messages is None:
+            self.first_messages = kwargs["messages"]
         if len(kwargs["messages"]) == 2:  # fresh conversation
             self._i = 0
         turn = self._script[self._i]
@@ -374,3 +377,42 @@ def test_nudge_is_appended_as_content_not_a_nested_message(fresh_bank):
 
     for m in _nudged(messages):
         assert isinstance(m["content"], str)
+
+
+# ------------------------------------------- per-course prompt overrides
+
+def _course_with_transcript(tmp_path, *, override=None):
+    """A course tree with a .vtconfig marker, so discover sets course_root."""
+    root = tmp_path / "a course"
+    (root / ".vtconfig").mkdir(parents=True)
+    f = root / "output" / "week-3.md"
+    f.parent.mkdir(parents=True)
+    f.write_text("a transcript", encoding="utf-8")
+    if override:
+        d = root / ".vtconfig" / "prompts" / "quiz"
+        d.mkdir(parents=True)
+        (d / "task.md").write_text(override, encoding="utf-8")
+    return find_units(f)[0]
+
+
+def test_run_unit_honours_a_courses_prompt_override(tmp_path):
+    """Regression: run_unit built messages without project_root, so the override mechanism
+    existed but nothing in the CLI could reach it."""
+    unit = _course_with_transcript(tmp_path, override="ONLY-TRUE-FALSE-BRIEF")
+    provider = FakeClient()
+
+    run_unit(unit, provider, "fake-model")
+
+    sent = provider._raw.first_messages
+    assert "ONLY-TRUE-FALSE-BRIEF" in sent[1]["content"]
+
+
+def test_run_unit_uses_shipped_prompts_when_a_course_overrides_nothing(tmp_path):
+    unit = _course_with_transcript(tmp_path)
+    provider = FakeClient()
+
+    run_unit(unit, provider, "fake-model")
+
+    sent = provider._raw.first_messages
+    assert "Start by calling create_checklist." in sent[1]["content"]
+    assert "THE ONLY WAY TO RECORD A QUESTION IS A TOOL CALL." in sent[0]["content"]

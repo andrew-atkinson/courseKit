@@ -162,8 +162,11 @@ def run_unit(unit: Unit, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS)
     tools.set_call_log(out / "calls.jsonl")
 
     transcript = unit.transcript_path.read_text(encoding="utf-8")
+    # course_root is what makes a course's own .vtconfig/prompts/quiz/ override reachable.
+    # Without it the override mechanism exists but nothing can get to it.
     messages = build_messages(transcript, course_title=unit.course_title,
-                              week_label=unit.week_label, module=unit.module)
+                              week_label=unit.week_label, module=unit.module,
+                              project_root=unit.course_root)
     reply = loop(messages, provider, model, max_iters=max_iters)
     (out / "reply.txt").write_text(reply, encoding="utf-8")
 
