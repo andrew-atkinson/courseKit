@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import bank
-import hardware
 import tools
 from context import build_messages
 from coursekit.providers import Reply
@@ -32,13 +31,13 @@ def _looks_like_model_error(exc: Exception) -> bool:
     return getattr(exc, "status_code", None) == 404
 
 
-def _model_error_message(model: str, exc: Exception) -> str:
-    lines = [f"LM Studio could not use model '{model}'."]
-    verdict, msg = hardware.check_fit(model)
+def _model_error_message(provider, model: str, exc: Exception) -> str:
+    lines = [f"Could not use model '{model}'."]
+    verdict, msg = provider.check_fit(model)
     if verdict is False:
         lines.append(msg)
-    lines.append(f"LM Studio said: {exc}")
-    lines.append("Fix: free memory in LM Studio (eject other models), pick a smaller model, "
+    lines.append(f"The endpoint said: {exc}")
+    lines.append("Fix: free memory (eject other models), pick a smaller model, "
                  "or correct MODEL_NAME.")
     return "\n".join(lines)
 
@@ -105,7 +104,7 @@ def loop(messages, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS,
             # Translate LM Studio's opaque model-load failure into an actionable message,
             # and abort the whole batch rather than failing identically on every unit.
             if _looks_like_model_error(exc):
-                raise ModelLoadError(_model_error_message(model, exc)) from exc
+                raise ModelLoadError(_model_error_message(provider, model, exc)) from exc
             raise
 
         if reply.wants_tools:

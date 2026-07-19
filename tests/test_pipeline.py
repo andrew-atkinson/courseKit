@@ -325,14 +325,15 @@ def test_looks_like_model_error_ignores_unrelated():
 
 
 def test_loop_translates_model_load_failure(fresh_bank, monkeypatch):
-    # Don't shell out during the message build.
-    monkeypatch.setattr("hardware.check_fit", lambda m: (False, "won't fit"))
     exc = Exception('Failed to load model "big". Error: insufficient system resources')
     client = RaisingClient(exc)
+    # Stub the provider's own fit check so the message build doesn't shell out to `lms`.
+    monkeypatch.setattr(client, "check_fit", lambda m: (False, "won't fit"))
     with pytest.raises(ModelLoadError) as ei:
         loop(_msgs(), client, "big")
     text = str(ei.value)
-    assert "could not use model 'big'" in text
+    assert "Could not use model 'big'" in text
+    assert "won't fit" in text          # the fit advisory is folded into the error
     assert "Fix:" in text
 
 
@@ -340,3 +341,36 @@ def test_loop_reraises_non_model_errors(fresh_bank):
     client = RaisingClient(ValueError("bad json in a tool, unrelated"))
     with pytest.raises(ValueError):
         loop(_msgs(), client, "m")
+
+
+def test_stop_turn_is_reappended_as_a_plain_dict_not_the_native_message(fresh_bank):
+    """Pins a subtle, easily-'cleaned-up' decision in loop().
+
+    On the stop-then-nudge path the loop deliberately builds a fresh Reply *without*
+    raw_message, so the provider synthesises a plain assistant dict. Passing the original
+    reply instead would re-append the native message — which carries tool_calls=None and is
+    rejected by some servers. Simplifying that line would silently reintroduce the bug.
+    """
+    client = ScriptedClient([("stop", "<tool_call|>"),
+                             ("tools", BUILD),
+                             ("tools", FINALIZE)])
+    messages = _msgs()
+    loop(messages, client, "m")
+
+    assistants = [m for m in messages if isinstance(m, dict) and m.get("role") == "assistant"]
+    assert assistants, "the stopped turn must stay in context"
+    for m in assistants:
+        assert set(m) == {"role", "content"}      # a plain dict…
+        assert isinstance(m["content"], str)       # …never a null content
+        assert "tool_calls" not in m
+
+
+def test_nudge_is_appended_as_content_not_a_nested_message(fresh_bank):
+    """_nudge() returns text; the provider wraps it. Returning a dict would nest a message
+    inside a message — the bug this refactor actually introduced once."""
+    client = ScriptedClient([("stop", "stopped"), ("tools", BUILD), ("tools", FINALIZE)])
+    messages = _msgs()
+    loop(messages, client, "m")
+
+    for m in _nudged(messages):
+        assert isinstance(m["content"], str)
