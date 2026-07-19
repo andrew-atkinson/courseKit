@@ -1,9 +1,11 @@
 """Local-model RAM fit checks.
 
-Adapted from the videotranscriber's vt_common (get_memory_info / recommend_model). Copied
-rather than imported: the two projects should not be coupled at the source level, and this
-is ~40 self-contained lines. macOS-only (sysctl + vm_stat + the `lms` CLI); everything
-degrades to "unknown" elsewhere rather than raising.
+Extracted from quizbot (which had copied it from the videotranscriber's vt_common) so both
+tools share one implementation instead of drifting. macOS-only (sysctl + vm_stat + the `lms`
+CLI); everything degrades to "unknown" elsewhere rather than raising.
+
+Reached through `Provider.check_fit()` rather than called directly: a hosted endpoint has no
+local RAM budget, so the question is only meaningful for a local provider.
 
 We only *advise* on fit — LM Studio's real load threshold depends on context size and
 overhead we can't see, so the authoritative signal is LM Studio actually refusing the load
