@@ -15,7 +15,6 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-import hardware
 import pipeline
 import qti
 from coursekit.providers import get_provider
@@ -119,7 +118,7 @@ def main(argv=None) -> int:
     model = os.getenv("MODEL_NAME")
 
     if not args.dry_run:
-        verdict, msg = hardware.check_fit(model)
+        verdict, msg = provider.check_fit(model)
         if verdict is False:
             print(f"Warning: {msg}\n")
 
