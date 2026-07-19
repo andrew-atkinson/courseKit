@@ -23,8 +23,7 @@ week-3.md  ──►  local LLM (tool calls)  ──►  bank.json  ──►  C
 GIFT and QTI are outputs, never inputs. That split is deliberate — GIFT can't express question
 groups, so if it were the working format the randomization would be lost before it started.
 
-**Question types:** multiple choice, true/false, multiple-answer, short answer, matching.
-(Numerical is modelled but not yet emitted to QTI — see [Limitations](#limitations).)
+**Question types:** multiple choice, true/false, multiple-answer, short answer, numerical, matching.
 
 ## Requirements
 
@@ -171,8 +170,6 @@ failure into a readable message.
 
 ## Limitations
 
-- **Numerical questions** are modelled and emit to GIFT, but not yet to QTI — that needs a Canvas
-  sample containing one. Weeks using the type are skipped with a message; nothing else is affected.
 - **Module placement** isn't supported. Quizzes import into the Quizzes list, not into weekly
   modules.
 - **GIFT output is unverified** against a live Moodle. It's there as readable plain text; Canvas QTI
