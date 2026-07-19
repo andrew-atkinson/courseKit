@@ -381,8 +381,12 @@ def test_nudge_is_appended_as_content_not_a_nested_message(fresh_bank):
 
 # ------------------------------------------- per-course prompt overrides
 
-def _course_with_transcript(tmp_path, *, override=None):
-    """A course tree with a .vtconfig marker, so discover sets course_root."""
+def _course_with_transcript(tmp_path, *, override=None, quiz_yaml=None, override_name="task"):
+    """A course tree with a .vtconfig marker, so discover sets course_root.
+
+    override      body of a prompt file dropped at .vtconfig/prompts/quiz/<override_name>.md
+    quiz_yaml     raw text for .vtconfig/quiz.yaml (quizbot's own config)
+    """
     root = tmp_path / "a course"
     (root / ".vtconfig").mkdir(parents=True)
     f = root / "output" / "week-3.md"
@@ -391,7 +395,9 @@ def _course_with_transcript(tmp_path, *, override=None):
     if override:
         d = root / ".vtconfig" / "prompts" / "quiz"
         d.mkdir(parents=True)
-        (d / "task.md").write_text(override, encoding="utf-8")
+        (d / f"{override_name}.md").write_text(override, encoding="utf-8")
+    if quiz_yaml:
+        (root / ".vtconfig" / "quiz.yaml").write_text(quiz_yaml, encoding="utf-8")
     return find_units(f)[0]
 
 
@@ -416,3 +422,51 @@ def test_run_unit_uses_shipped_prompts_when_a_course_overrides_nothing(tmp_path)
     sent = provider._raw.first_messages
     assert "Start by calling create_checklist." in sent[1]["content"]
     assert "THE ONLY WAY TO RECORD A QUESTION IS A TOOL CALL." in sent[0]["content"]
+
+
+# ----------------------------- quiz.yaml selects a named prompt (step 3)
+
+def test_quiz_yaml_selects_a_named_task_prompt(tmp_path):
+    """The capability courseconfig exists to deliver: a course names its brief in quiz.yaml,
+    with no CLI flag and no code edit."""
+    unit = _course_with_transcript(
+        tmp_path,
+        quiz_yaml="task_prompt: exam\n",
+        override="EXAM-STYLE BRIEF", override_name="exam",
+    )
+    provider = FakeClient()
+
+    run_unit(unit, provider, "fake-model")
+
+    sent = provider._raw.first_messages
+    assert "EXAM-STYLE BRIEF" in sent[1]["content"]
+
+
+def test_quiz_yaml_absent_falls_back_to_shipped_prompts(tmp_path):
+    # No quiz.yaml: system_prompt/task_prompt resolve to the shipped system.md/task.md,
+    # NOT to a nonexistent default.md.
+    unit = _course_with_transcript(tmp_path)  # marker, no quiz.yaml
+    provider = FakeClient()
+
+    run_unit(unit, provider, "fake-model")  # would raise PromptNotFound on the default.md bug
+
+    sent = provider._raw.first_messages
+    assert "Start by calling create_checklist." in sent[1]["content"]
+
+
+# --------------------------- week filter: non-numeric refs match by slug
+
+def _filter(path, week, tmp):
+    return run_course(path, weeks=[week], provider=FakeClient(script=[]),
+                      model="fake", dry_run=True)
+
+
+def test_non_numeric_week_filter_matches_by_slug_not_by_none(tmp_path):
+    # A single-file input yields a non-numeric slug. week_key returns None for it, so the
+    # matcher must compare slugs literally — not let None == None match anything numeric-less.
+    f = tmp_path / "intro.md"
+    f.write_text("body", encoding="utf-8")
+
+    assert len(_filter(f, "intro", tmp_path)) == 1       # slug matches
+    assert len(_filter(f, "syllabus", tmp_path)) == 0     # different slug: no match
+    assert len(_filter(f, "3", tmp_path)) == 0            # numeric ref vs non-numeric unit: no match

@@ -5,15 +5,15 @@ handles a path (one file or a whole course). The LLM client is injected, so the 
 is testable with a fake and carries no env or network assumptions of its own.
 """
 
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import bank
 import tools
 from context import build_messages
+from coursekit import courseconfig
 from coursekit.providers import Reply
-from discover import Unit, find_units
+from discover import Unit, find_units, slugify
 from tools import show
 
 
@@ -162,11 +162,15 @@ def run_unit(unit: Unit, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS)
     tools.set_call_log(out / "calls.jsonl")
 
     transcript = unit.transcript_path.read_text(encoding="utf-8")
-    # course_root is what makes a course's own .vtconfig/prompts/quiz/ override reachable.
-    # Without it the override mechanism exists but nothing can get to it.
+    # A course selects its prompts two ways, both via its quiz.yaml: by *name* (system_prompt /
+    # task_prompt keys, resolved here) and by *file* (a .vtconfig/prompts/quiz/ override, reached
+    # through project_root). Absent config, prompt_name returns "default" and nothing changes.
+    cfg = unit.config or courseconfig.load(unit.transcript_path, config_name="quiz.yaml")
     messages = build_messages(transcript, course_title=unit.course_title,
                               week_label=unit.week_label, module=unit.module,
-                              project_root=unit.course_root)
+                              project_root=unit.course_root,
+                              system_prompt=cfg.prompt_name("system_prompt", default="system"),
+                              task_prompt=cfg.prompt_name("task_prompt", default="task"))
     reply = loop(messages, provider, model, max_iters=max_iters)
     (out / "reply.txt").write_text(reply, encoding="utf-8")
 
@@ -182,10 +186,18 @@ def run_unit(unit: Unit, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS)
     )
 
 
-def _week_key(w) -> str:
-    """Normalise a week reference so '3', 'week-3', 'week 3' all match."""
-    m = re.search(r"\d+", str(w))
-    return m.group(0) if m else str(w).strip().lower()
+def _week_matches(ref, unit: Unit) -> bool:
+    """Does a `--week` reference select this unit?
+
+    Numeric references ('3', 'week-3', 'week 3', 3) match on the week number via the shared
+    normaliser. A non-numeric reference (a slug like 'intro') has no week number, so it matches
+    the unit's slug literally — never a bare `None == None`, which would select every
+    non-numeric week at once.
+    """
+    k = courseconfig.week_key(ref)
+    if k is not None:
+        return courseconfig.week_key(unit.week_slug) == k
+    return slugify(str(ref)) == unit.week_slug
 
 
 def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
@@ -196,8 +208,7 @@ def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
     """
     units = find_units(path, output_root=output_root)
     if weeks:
-        wanted = {_week_key(w) for w in weeks}
-        units = [u for u in units if _week_key(u.week_slug) in wanted]
+        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
 
     if dry_run:
         return [RunResult(u, finalized=False, n_groups=0, n_variants=0, output_dir=u.output_dir)
