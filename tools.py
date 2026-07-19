@@ -497,7 +497,11 @@ _SCHEMAS = {
     "finalize_bank": finalize_bank_json,
 }
 
-tools = [{"type": "function", "function": _SCHEMAS[name]} for name in TOOL_REGISTRY]
+# Neutral specs — {name, description, parameters}. The provider wraps them for the wire, so
+# this stays vendor-agnostic. `tools` is the pre-wrapped OpenAI form, kept for anything still
+# talking to the SDK directly.
+TOOL_SPECS = [_SCHEMAS[name] for name in TOOL_REGISTRY]
+tools = [{"type": "function", "function": spec} for spec in TOOL_SPECS]
 
 
 def _fmt_errors(e: ValidationError) -> str:
@@ -533,19 +537,23 @@ def _dispatch_one(name: str, raw_args: str | None) -> str:
         return f"ERROR: {name} failed: {type(e).__name__}: {e}"
 
 
-def handle_tool_calls(tool_calls):
+def run_tool_calls(tool_calls) -> list[tuple[str, str]]:
+    """Dispatch neutral ToolCalls -> [(tool_call_id, content)].
+
+    Returns pairs rather than provider-shaped messages: how a tool result is represented in a
+    conversation is the provider's business (OpenAI keys it by tool_call_id, Anthropic uses
+    tool_result blocks), while what the tool *did* is ours.
+
+    Content is a plain string, never json.dumps'd — wrapping an ack in quotes and escaping it
+    costs tokens on every subsequent turn and reads worse to a small model.
+    """
     results = []
-    for tool_call in tool_calls:
-        name = tool_call.function.name
-        raw = tool_call.function.arguments
+    for tc in tool_calls:
         if _call_log is not None:
             _call_log.parent.mkdir(parents=True, exist_ok=True)
             with open(_call_log, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"name": name, "arguments": raw}) + "\n")
-        # Plain string, not json.dumps: wrapping an ack in quotes and escaping it costs
-        # tokens on every subsequent turn and reads worse to a small model.
-        results.append({"role": "tool", "content": _dispatch_one(name, raw),
-                        "tool_call_id": tool_call.id})
+                f.write(json.dumps({"name": tc.name, "arguments": tc.arguments}) + "\n")
+        results.append((tc.id, _dispatch_one(tc.name, tc.arguments)))
     return results
 
 

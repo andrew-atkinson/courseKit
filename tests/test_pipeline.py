@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from coursekit.providers import OpenAICompatProvider
 from discover import find_units
 from pipeline import run_course, run_unit
 
@@ -44,9 +45,9 @@ SCRIPT = [
 ]
 
 
-class FakeClient:
-    """Replays SCRIPT once per conversation. A new conversation is detected by the message
-    list being back to just system+user, so it works across multiple run_unit calls."""
+class _ScriptedRaw:
+    """A scripted OpenAI-shaped endpoint. A new conversation is detected by the message list
+    being back to just system+user, so it works across multiple run_unit calls."""
 
     def __init__(self, script=SCRIPT):
         self._script = script
@@ -55,14 +56,28 @@ class FakeClient:
         self.completions = self
         self.calls = 0
 
-    def create(self, *, model, messages, tools):
+    def create(self, **kwargs):
         self.calls += 1
-        if len(messages) == 2:  # fresh conversation
+        if len(kwargs["messages"]) == 2:  # fresh conversation
             self._i = 0
         turn = self._script[self._i]
         self._i += 1
         tcs = [_ToolCall(n, a) for n, a in turn]
         return _Response(_Choice(_Message(content=None, tool_calls=tcs), "tool_calls"))
+
+
+def FakeClient(script=SCRIPT):
+    """A real coursekit Provider over a scripted endpoint — so tests exercise the actual
+    provider code, not a stand-in for it."""
+    raw = _ScriptedRaw(script)
+    p = OpenAICompatProvider(client=raw, name="fake")
+    p.calls = raw.calls  # placeholder; see _calls() helper
+    p._raw = raw
+    return p
+
+
+def _calls(provider):
+    return provider._raw.calls
 
 
 # ------------------------------------------------------------- run_unit
@@ -101,7 +116,7 @@ def test_two_units_do_not_bleed(tmp_path):
     (tmp_path / "week 4").mkdir()
     (tmp_path / "week 4" / "week-4.md").write_text("t4", encoding="utf-8")
 
-    results = run_course(tmp_path, client=FakeClient(), model="fake")
+    results = run_course(tmp_path, provider=FakeClient(), model="fake")
 
     assert len(results) == 2
     # Each week sees exactly its own single group — no accumulation from the previous week.
@@ -122,10 +137,10 @@ def test_dry_run_does_not_touch_the_client_or_disk(tmp_path):
     (tmp_path / "week 4" / "week-4.md").write_text("t4", encoding="utf-8")
 
     client = FakeClient(script=[])  # would IndexError if create() were called
-    results = run_course(tmp_path, client=client, model="fake", dry_run=True)
+    results = run_course(tmp_path, provider=client, model="fake", dry_run=True)
 
     assert len(results) == 2
-    assert client.calls == 0
+    assert _calls(client) == 0
     assert all(not r.finalized for r in results)
     for r in results:
         assert not r.output_dir.exists()  # nothing written
@@ -138,7 +153,7 @@ def test_weeks_filter_selects_matching_units(tmp_path):
         (tmp_path / f"week {n}").mkdir()
         (tmp_path / f"week {n}" / f"week-{n}.md").write_text(f"t{n}", encoding="utf-8")
 
-    results = run_course(tmp_path, weeks=["4"], client=FakeClient(script=[]),
+    results = run_course(tmp_path, weeks=["4"], provider=FakeClient(script=[]),
                          model="fake", dry_run=True)
     assert [r.unit.week_slug for r in results] == ["week-4"]
 
@@ -147,7 +162,7 @@ def test_weeks_filter_selects_matching_units(tmp_path):
 def test_week_filter_accepts_various_references(tmp_path, ref):
     (tmp_path / "week 3").mkdir()
     (tmp_path / "week 3" / "week-3.md").write_text("t3", encoding="utf-8")
-    results = run_course(tmp_path, weeks=[ref], client=FakeClient(script=[]),
+    results = run_course(tmp_path, weeks=[ref], provider=FakeClient(script=[]),
                          model="fake", dry_run=True)
     assert len(results) == 1
 
@@ -159,7 +174,7 @@ import tools as toolsmod
 from pipeline import loop
 
 
-class ScriptedClient:
+class _ScriptedRawResponses:
     """Yields canned responses in order. With repeat_last, the final response repeats
     forever — for simulating a model that never recovers."""
 
@@ -171,7 +186,7 @@ class ScriptedClient:
         self.completions = self
         self.calls = 0
 
-    def create(self, *, model, messages, tools):
+    def create(self, **kwargs):
         self.calls += 1
         if self._responses:
             self._last = self._responses.pop(0)
@@ -182,6 +197,14 @@ class ScriptedClient:
             tcs = [_ToolCall(n, a) for n, a in payload]
             return _Response(_Choice(_Message(content=None, tool_calls=tcs), "tool_calls"))
         return _Response(_Choice(_Message(content=payload), "stop"))
+
+
+def ScriptedClient(responses, repeat_last=False):
+    """The scripted endpoint behind a real Provider."""
+    raw = _ScriptedRawResponses(responses, repeat_last)
+    p = OpenAICompatProvider(client=raw, name="scripted")
+    p._raw = raw
+    return p
 
 
 # A minimal valid, finalizable bank: one MC group, one variant.
@@ -219,7 +242,7 @@ def test_happy_path_finalizes_with_no_nudges(fresh_bank):
     messages = _msgs()
     loop(messages, client, "m")
     assert bankmod.is_finalized()
-    assert client.calls == 2
+    assert _calls(client) == 2
     assert _nudged(messages) == []
 
 
@@ -251,7 +274,7 @@ def test_bails_on_persistent_rejections_without_burning_max_iters(fresh_bank):
     messages = _msgs()
     loop(messages, client, "m", max_iters=80, max_nudges=2, stall_limit=3)
     assert not bankmod.is_finalized()
-    assert client.calls < 80  # bailed early, did not grind to the cap
+    assert _calls(client) < 80  # bailed early, did not grind to the cap
 
 
 def test_gives_up_when_model_never_calls_tools(fresh_bank):
@@ -260,7 +283,7 @@ def test_gives_up_when_model_never_calls_tools(fresh_bank):
     messages = _msgs()
     loop(messages, client, "m", max_iters=80, max_nudges=3, stall_limit=4)
     assert not bankmod.is_finalized()
-    assert client.calls <= 5  # initial + 3 nudges + the terminating check
+    assert _calls(client) <= 5  # initial + 3 nudges + the terminating check
 
 
 def test_nudge_reports_real_bank_state(fresh_bank):
@@ -278,14 +301,18 @@ def test_nudge_reports_real_bank_state(fresh_bank):
 from pipeline import ModelLoadError, _looks_like_model_error
 
 
-class RaisingClient:
+class _RaisingRaw:
     def __init__(self, exc):
         self._exc = exc
         self.chat = self
         self.completions = self
 
-    def create(self, *, model, messages, tools):
+    def create(self, **kwargs):
         raise self._exc
+
+
+def RaisingClient(exc):
+    return OpenAICompatProvider(client=_RaisingRaw(exc), name="raising")
 
 
 def test_looks_like_model_error_matches_lmstudio_message():

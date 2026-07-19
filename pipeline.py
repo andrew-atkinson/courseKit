@@ -13,8 +13,9 @@ import bank
 import hardware
 import tools
 from context import build_messages
+from coursekit.providers import Reply
 from discover import Unit, find_units
-from tools import handle_tool_calls, show
+from tools import show
 
 
 class ModelLoadError(RuntimeError):
@@ -56,9 +57,12 @@ class RunResult:
 DEFAULT_MAX_ITERS = 80
 
 
-def _nudge(stalled: bool) -> dict:
-    """A corrective user message. Reports real bank state so the model has ground truth
-    rather than its own (possibly confused) sense of progress."""
+def _nudge(stalled: bool) -> str:
+    """The text of a corrective user turn. Reports real bank state so the model has ground
+    truth rather than its own (possibly confused) sense of progress.
+
+    Returns content, not a message: shaping it into a turn is the provider's job.
+    """
     b = bank.get()
     n_groups = len(b.groups)
     n_variants = sum(len(g.variants) for g in b.groups.values())
@@ -72,10 +76,10 @@ def _nudge(stalled: bool) -> dict:
         state += "Still to fix: " + "; ".join(problems[:3]) + ". "
     tail = ("Keep going with tool calls only: work through your checklist, add any missing "
             "variants, then call finalize_bank. Do not reply in prose.")
-    return {"role": "user", "content": head + state + tail}
+    return head + state + tail
 
 
-def loop(messages, client, model, *, max_iters: int = DEFAULT_MAX_ITERS,
+def loop(messages, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS,
          max_nudges: int = 4, stall_limit: int = 4) -> str:
     """Drive one conversation to a finalized bank.
 
@@ -84,15 +88,18 @@ def loop(messages, client, model, *, max_iters: int = DEFAULT_MAX_ITERS,
     like `<tool_call|>` as prose — and it spins on a rejected call until the turn budget
     is gone. Neither means the work is done, so instead of trusting finish_reason we check
     the bank itself and nudge the model back on track within a bounded budget.
+
+    `provider` is a coursekit Provider: it owns how a turn is represented in the conversation,
+    which is what lets this same loop drive a vendor whose tool-result shape differs.
     """
-    choice = None
+    reply = None
     nudges = 0
     error_streak = 0
 
     for _ in range(max_iters):
         try:
-            response = client.chat.completions.create(
-                model=model, messages=messages, tools=tools.tools
+            reply = provider.chat_with_tools(
+                model=model, messages=messages, tools=tools.TOOL_SPECS
             )
         except Exception as exc:
             # Translate LM Studio's opaque model-load failure into an actionable message,
@@ -100,18 +107,17 @@ def loop(messages, client, model, *, max_iters: int = DEFAULT_MAX_ITERS,
             if _looks_like_model_error(exc):
                 raise ModelLoadError(_model_error_message(model, exc)) from exc
             raise
-        choice = response.choices[0]
 
-        if choice.finish_reason == "tool_calls":
-            messages.append(choice.message)
-            results = handle_tool_calls(choice.message.tool_calls)
-            messages.extend(results)
+        if reply.wants_tools:
+            provider.append_assistant(messages, reply)
+            results = tools.run_tool_calls(reply.tool_calls)
+            provider.append_tool_results(messages, results)
             if bank.is_finalized():
                 break
 
             # Runaway-rejection loop: a whole turn's calls all failed. A few in a row means
             # the model is stuck (it burned 31 turns on rejected mark_complete once).
-            if results and all(r["content"].startswith("ERROR") for r in results):
+            if results and all(content.startswith("ERROR") for _, content in results):
                 error_streak += 1
             else:
                 error_streak = 0
@@ -121,7 +127,7 @@ def loop(messages, client, model, *, max_iters: int = DEFAULT_MAX_ITERS,
                     break
                 nudges += 1
                 error_streak = 0
-                messages.append(_nudge(stalled=True))
+                provider.append_user(messages, _nudge(stalled=True))
             continue
 
         # The model stopped calling tools. Not the same as finishing the bank.
@@ -131,19 +137,20 @@ def loop(messages, client, model, *, max_iters: int = DEFAULT_MAX_ITERS,
             show("[yellow]Model stopped without finalizing; nudge budget spent.[/yellow]")
             break
         nudges += 1
-        # Keep its reply in context (a plain dict avoids a null-tool_calls object some
-        # servers reject), then correct it.
-        messages.append({"role": "assistant",
-                         "content": (choice.message.content or "").strip() or "(stopped)"})
-        messages.append(_nudge(stalled=False))
+        # Re-append without raw_message on purpose: the provider then synthesises a plain
+        # assistant dict, avoiding the null-tool_calls object some servers reject on a
+        # stop turn. Then correct it.
+        provider.append_assistant(messages, Reply(finish_reason=reply.finish_reason,
+                                                  content=reply.content))
+        provider.append_user(messages, _nudge(stalled=False))
     else:
         show(f"[yellow]Reached the {max_iters}-turn limit without finalizing.[/yellow]")
 
     # LM Studio returns content=None after a tool-heavy run; downstream writes need a str.
-    return (choice.message.content or "") if choice else ""
+    return (reply.content or "") if reply else ""
 
 
-def run_unit(unit: Unit, client, model, *, max_iters: int = DEFAULT_MAX_ITERS) -> RunResult:
+def run_unit(unit: Unit, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS) -> RunResult:
     """Generate and finalize one week's bank, writing artifacts to unit.output_dir."""
     out = Path(unit.output_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -158,7 +165,7 @@ def run_unit(unit: Unit, client, model, *, max_iters: int = DEFAULT_MAX_ITERS) -
     transcript = unit.transcript_path.read_text(encoding="utf-8")
     messages = build_messages(transcript, course_title=unit.course_title,
                               week_label=unit.week_label, module=unit.module)
-    reply = loop(messages, client, model, max_iters=max_iters)
+    reply = loop(messages, provider, model, max_iters=max_iters)
     (out / "reply.txt").write_text(reply, encoding="utf-8")
 
     b = bank.get()
@@ -179,7 +186,7 @@ def _week_key(w) -> str:
     return m.group(0) if m else str(w).strip().lower()
 
 
-def run_course(path, *, weeks=None, output_root=None, client=None, model=None,
+def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
                dry_run: bool = False, max_iters: int = DEFAULT_MAX_ITERS) -> list[RunResult]:
     """Discover units under `path`, optionally filter to `weeks`, and run each.
 
@@ -194,4 +201,4 @@ def run_course(path, *, weeks=None, output_root=None, client=None, model=None,
         return [RunResult(u, finalized=False, n_groups=0, n_variants=0, output_dir=u.output_dir)
                 for u in units]
 
-    return [run_unit(u, client, model, max_iters=max_iters) for u in units]
+    return [run_unit(u, provider, model, max_iters=max_iters) for u in units]

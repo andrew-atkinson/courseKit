@@ -12,17 +12,20 @@ import os
 import sys
 
 from dotenv import load_dotenv
-from openai import OpenAI
 
 load_dotenv(override=True)
 
 import hardware
 import pipeline
 import qti
+from coursekit.providers import get_provider
 
 
-def _build_client() -> OpenAI:
-    return OpenAI(base_url=os.getenv("LOCAL_HOST_URL"), api_key="lmstudio")
+def _build_provider():
+    """Which endpoint serves the model is config, not code — institutional policy may dictate
+    on-prem inference or a specific vendor."""
+    return get_provider(os.getenv("PROVIDER", "lm_studio"),
+                        base_url=os.getenv("LOCAL_HOST_URL"))
 
 
 def _parse_weeks(args) -> list[str] | None:
@@ -112,7 +115,7 @@ def main(argv=None) -> int:
         parser.error("no PATH given and TRANSCRIPTION is not set")
 
     weeks = _parse_weeks(args)
-    client = None if args.dry_run else _build_client()
+    provider = None if args.dry_run else _build_provider()
     model = os.getenv("MODEL_NAME")
 
     if not args.dry_run:
@@ -123,7 +126,7 @@ def main(argv=None) -> int:
     try:
         results = pipeline.run_course(
             args.path, weeks=weeks, output_root=args.output_root,
-            client=client, model=model, dry_run=args.dry_run, max_iters=args.max_iters,
+            provider=provider, model=model, dry_run=args.dry_run, max_iters=args.max_iters,
         )
     except pipeline.ModelLoadError as e:
         print(str(e))

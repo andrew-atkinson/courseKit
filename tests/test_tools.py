@@ -184,25 +184,20 @@ def test_replay_reconstructs_a_run_with_no_model(tmp_path):
     log = tmp_path / "calls.jsonl"
     tools.set_call_log(log)
 
-    class _Fn:
-        def __init__(self, name, arguments):
-            self.name, self.arguments = name, arguments
+    from coursekit.providers import ToolCall
 
-    class _Call:
-        def __init__(self, name, arguments):
-            self.function, self.id = _Fn(name, arguments), "call_1"
-
-    handled = tools.handle_tool_calls([
-        _Call("create_question_group", json.dumps({
+    handled = tools.run_tool_calls([
+        ToolCall(id="call_1", name="create_question_group", arguments=json.dumps({
             "group_id": "c1", "concept_title": "Loops", "question_type": "multiple_choice"})),
-        _Call("add_multiple_choice_variant", json.dumps({
+        ToolCall(id="call_2", name="add_multiple_choice_variant", arguments=json.dumps({
             "group_id": "c1", "variant_label": "A",
             "question_text": "Question A about for loops?",
             "variant_summary": "Angle A",
             "options": ["a", "b", "c", "d"], "correct_index": 0})),
     ])
-    assert all(not r["content"].startswith("ERROR") for r in handled)
-    assert isinstance(handled[0]["content"], str)
+    # (tool_call_id, content) pairs — message shaping belongs to the provider.
+    assert [call_id for call_id, _ in handled] == ["call_1", "call_2"]
+    assert all(not content.startswith("ERROR") for _, content in handled)
 
     bankmod.reset()
     tools.set_call_log(None)
