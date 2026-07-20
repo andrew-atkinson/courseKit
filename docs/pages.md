@@ -1,23 +1,42 @@
-# Authoring course pages
+# Course pages
 
-A page has **two authors**, and keeping them apart is what keeps the page trustworthy:
+A page is the week's **narrative** — the page a student lands on, organising the week's material into
+a clear teaching outline. It has **two authors**, and keeping them apart is what keeps the page
+trustworthy:
 
 - **The model** writes the teaching outline from the week's transcript — headings, concept bullets,
   code, glossary, callouts. It never writes a link.
 - **You** supply everything that carries a URL — references, example works, and embeds (p5 sketches,
-  slideshows, videos) — in a small YAML file. These are merged in when the page is *rendered*, so
-  they survive a regeneration of the model's part and their URLs land exactly as you wrote them.
+  slideshows, videos) — in a small YAML file. These are merged in when the page is *rendered*, so they
+  survive a regeneration of the model's part and their URLs land exactly as you wrote them.
 
-The model's part is `page.json`; your part is a YAML file in `<course root>/.vtconfig/pages/`.
+The canonical artifact is `page.json` (typed blocks); the renderer turns it into Canvas-safe HTML.
 
-**You don't have to guess the exact slug.** The file is matched by **week identity**, not an exact
-name — any file in that folder whose name resolves to the same week works. For Week 3, all of these
-match: `week-3.yaml`, `week-3-repetition.yaml`, `week 3.yaml`. Name it whatever reads well to you.
+## Generate
 
-(The generated page itself is named from the week title — `Week 3: Repetition` →
-`week-3-repetition.html` — so it matches how the page appears in Canvas.)
+```bash
+uv run python app.py "/path/to/course export" --pages --week 3      # one week
+uv run python app.py "/path/to/course export" --pages               # every week
+```
+
+Output lands in a `pages/` tree beside the course, alongside `quizzes/`:
+
+```
+<course root>/pages/week-3/
+├── page.json              # canonical: the model's blocks
+├── week-3-repetition.html # rendered, Canvas-safe (named from the week title)
+├── calls.jsonl
+└── reply.txt
+```
+
+The HTML is named from the week *title* (`Week 3: Repetition` → `week-3-repetition.html`), so it
+matches how the page appears in Canvas.
 
 ## The supplements file
+
+Your part is a YAML file in `<course root>/.vtconfig/pages/`. **You don't have to guess the exact
+slug** — it's matched by *week identity*, so for Week 3 any of `week-3.yaml`, `week-3-repetition.yaml`,
+or `week 3.yaml` works. Name it whatever reads well.
 
 Every key is optional. A minimal file is just a couple of references.
 
@@ -81,8 +100,7 @@ Refresh the page in your browser to see the change.
 The model is prompted to build a **teaching outline**, not a transcript recap. A strong week page
 tends to run:
 
-1. A short **REVIEW** — what earlier weeks set up, as a few bullets (only when the week builds on
-   them).
+1. A short **REVIEW** — what earlier weeks set up, as a few bullets (only when the week builds on them).
 2. One **section per key concept** — a heading, a few concept bullets, and a code example where the
    week shows code.
 3. A **glossary** of the week's terms.
@@ -96,7 +114,8 @@ student sees is: the model's outline, then your curated links and embeds.
 The page prompts are files, and a course can override them. Drop a replacement at
 `<course root>/.vtconfig/prompts/page/task.md` (or `system.md`) to change the brief for that course
 only — heading house style, how much detail, which sections to include — without touching anyone
-else's pages. Anything you don't override falls back to the shipped prompt.
+else's pages. Anything you don't override falls back to the shipped prompt. (See
+[Configuration](configuration.md).)
 
 To keep the model in the right *knowledge* domain — the right language, framework, or vocabulary, and
 to correct a transcript that drifts out of it — write a **[domain profile](domain-profile.md)**
