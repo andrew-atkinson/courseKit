@@ -17,6 +17,7 @@ load_dotenv(override=True)
 from coursekit import pipeline
 from coursekit.emit import qti
 from coursekit import courseconfig
+from coursekit.emit import html as html_emit
 from coursekit.generate.page.generator import PageGenerator
 from coursekit.providers import get_provider
 
@@ -104,6 +105,9 @@ def main(argv=None) -> int:
                         help="generate course pages instead of quizzes")
     parser.add_argument("--to-qti", metavar="PATH",
                         help="model-free: write a Canvas QTI .zip beside every bank.json under PATH")
+    parser.add_argument("--to-html", metavar="PATH",
+                        help="model-free: re-render every page.json under PATH to HTML, merging "
+                             "the course's current supplements")
     parser.add_argument("--bundle", action="store_true",
                         help="with --to-qti: write ONE package containing every quiz, "
                              "so a single Canvas import brings them all in")
@@ -112,6 +116,17 @@ def main(argv=None) -> int:
 
     if args.to_qti:
         return _run_bundle(args.to_qti) if args.bundle else _run_to_qti(args.to_qti)
+
+    if args.to_html:
+        results = html_emit.reemit(args.to_html)
+        if not results:
+            print(f"No page.json found under {args.to_html}")
+            return 1
+        print("Pages re-rendered:")
+        for _, out in results:
+            print(f"  [OK]   {out}")
+        print(f"\n{len(results)} page(s).")
+        return 0
 
     if not args.path:
         parser.error("no PATH given and TRANSCRIPTION is not set")

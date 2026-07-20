@@ -93,16 +93,36 @@ def render_body(page, supplements: dict | None = None) -> str:
     return "\n".join(p for p in parts if p)
 
 
-def load_supplements(course_root, slug: str) -> dict:
-    """A course's instructor-authored supplements for one page, or {} when absent. Never raises."""
+def load_supplements(course_root, week_ref) -> dict:
+    """A course's instructor-authored supplements for one page, or {} when absent. Never raises.
+
+    Matched by **week identity, not an exact filename** — any `.vtconfig/pages/*.yaml` whose name
+    resolves to the same week number wins, so `week-3.yaml`, `week-3-repetition.yaml`, and
+    `week 3.yaml` all work. This is the same forgiving matching `courseconfig.week_key` gives
+    everywhere else, so a faculty member never has to guess the tool's internal slug.
+    """
     if not course_root:
         return {}
-    path = Path(course_root) / ".vtconfig" / "pages" / f"{slug}.yaml"
-    if not path.is_file():
+    d = Path(course_root) / ".vtconfig" / "pages"
+    if not d.is_dir():
         return {}
+
+    from coursekit.courseconfig import week_key
+    target = week_key(week_ref)
+    match = None
+    for f in sorted(list(d.glob("*.yaml")) + list(d.glob("*.yml"))):
+        if target is not None and week_key(f.stem) == target:
+            match = f
+            break
+    if match is None:                                   # non-week pages: fall back to exact stem
+        exact = d / f"{week_ref}.yaml"
+        match = exact if exact.is_file() else None
+    if match is None:
+        return {}
+
     try:
         import yaml
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = yaml.safe_load(match.read_text(encoding="utf-8"))
     except Exception:
         return {}
     return data if isinstance(data, dict) else {}

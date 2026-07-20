@@ -7,7 +7,7 @@ which is the whole point of the seam.
 
 from pathlib import Path
 
-from coursekit.discover import Unit
+from coursekit.discover import Unit, slugify
 from coursekit.generate.base import RunResult
 from coursekit.generate.page import page, tools
 from coursekit.generate.page.context import build_messages
@@ -18,9 +18,12 @@ class PageGenerator:
     artifacts_subdir = "pages"
 
     def reset(self, unit: Unit, out_dir: Path) -> None:
+        # The page slug comes from the week *title* (Week 3: Repetition -> week-3-repetition), so it
+        # matches how the page is named in Canvas, falling back to the bare week slug when untitled.
+        slug = slugify(unit.week_label) if unit.week_label else unit.week_slug
         page.init(page_id=f"{unit.course_slug}-{unit.week_slug}", out_dir=out_dir,
                   title=unit.week_label or unit.week_slug, page_type="week_intro",
-                  week_ref=unit.week_slug, slug=unit.week_slug)
+                  week_ref=unit.week_slug, slug=slug)
         tools.reset_state()
         tools.set_call_log(out_dir / "calls.jsonl")
 

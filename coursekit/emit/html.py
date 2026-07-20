@@ -47,3 +47,21 @@ def write_html(page, out_dir, supplements: dict | None = None) -> Path:
     path = out / f"{page.slug}.html"
     path.write_text(render_document(page, supplements), encoding="utf-8")
     return path
+
+
+def reemit(path) -> list[tuple[Path, Path]]:
+    """Re-render every `page.json` under `path` to HTML — model-free.
+
+    Reads each committed page and its course supplements (found by walking up to the `.vtconfig/`
+    root) and rewrites `<slug>.html`. This is how you iterate on a supplements file without paying
+    to re-run the model: edit the YAML, run this, refresh the page.
+    """
+    from coursekit.courseconfig import find_root
+    from coursekit.generate.page.page import Page
+
+    out = []
+    for pj in sorted(Path(path).rglob("page.json")):
+        page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
+        supplements = load_supplements(find_root(pj), page.week_ref or page.slug)
+        out.append((pj, write_html(page, pj.parent, supplements)))
+    return out
