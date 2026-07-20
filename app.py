@@ -17,6 +17,7 @@ load_dotenv(override=True)
 
 import pipeline
 import qti
+from coursekit import courseconfig
 from coursekit.providers import get_provider
 
 
@@ -115,7 +116,10 @@ def main(argv=None) -> int:
 
     weeks = _parse_weeks(args)
     provider = None if args.dry_run else _build_provider()
-    model = os.getenv("MODEL_NAME")
+    # MODEL_NAME (env) wins; otherwise the course's own quiz.yaml `model` key. Resolved from the
+    # input path's course root — one invocation targets one course in practice. (Per-unit model
+    # selection across mixed courses would move this into run_unit; not needed yet.)
+    model = os.getenv("MODEL_NAME") or courseconfig.load(args.path, config_name="quiz.yaml").value("model")
 
     if not args.dry_run:
         verdict, msg = provider.check_fit(model)

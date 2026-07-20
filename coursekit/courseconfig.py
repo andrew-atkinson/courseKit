@@ -58,12 +58,18 @@ class CourseConfig:
         v = self.config.get(key) if self.config else None
         return v if v is not None else fallback
 
-    def prompt_name(self, key: str, cli_arg: str | None = None) -> str:
-        """Which named prompt to use: CLI arg wins, then this tool's config, then 'default'."""
+    def prompt_name(self, key: str, cli_arg: str | None = None, *,
+                    default: str = "default") -> str:
+        """Which named prompt to use: CLI arg wins, then this tool's config, then `default`.
+
+        The fallback is caller-supplied because prompt naming is a per-tool convention — the
+        transcriber's categories default to 'default.md', but quizbot's quiz prompts are
+        'system.md'/'task.md'. A wrong default silently asks for a file that isn't there.
+        """
         if cli_arg:
             return cli_arg
         v = self.config.get(key) if self.config else None
-        return v if v else "default"
+        return v if v else default
 
     def week(self, week_ref) -> dict:
         """The shared context's entry for a week, keyed by its number. {} when unknown."""
