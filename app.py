@@ -10,13 +10,12 @@ Artifacts are written with the course (a sibling quizzes/ tree), never into this
 import argparse
 import os
 import sys
-
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-import pipeline
-import qti
+from coursekit import pipeline
+from coursekit.emit import qti
 from coursekit import courseconfig
 from coursekit.providers import get_provider
 

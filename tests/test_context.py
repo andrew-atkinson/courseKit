@@ -1,4 +1,4 @@
-from context import build_messages
+from coursekit.generate.quiz.context import build_messages
 
 
 def test_returns_system_then_user():

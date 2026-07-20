@@ -1,5 +1,4 @@
 import pytest
-
 from coursekit import prompts
 
 

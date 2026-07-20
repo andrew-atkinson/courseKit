@@ -1,9 +1,7 @@
 import xml.etree.ElementTree as ET
-
 import pytest
-
-import qti
-from bank import Group, MCVariant
+from coursekit.emit import qti
+from coursekit.generate.quiz.bank import Group, MCVariant
 
 HOSTILE = "for (let x = 0; x < 10; x++) & then <tag>"
 
@@ -120,7 +118,7 @@ def test_response_lid_is_single_cardinality():
 def test_every_modelled_question_type_can_emit():
     # bank.py's QuestionType and qti.py's emitters must not drift apart.
     from typing import get_args
-    from bank import QuestionType
+    from coursekit.generate.quiz.bank import QuestionType
     assert set(get_args(QuestionType)) == set(qti._ITEM_EMITTERS)
 
 

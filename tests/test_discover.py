@@ -1,9 +1,7 @@
 import textwrap
 from pathlib import Path
-
 import pytest
-
-from discover import Unit, find_units, slugify
+from coursekit.discover import Unit, find_units, slugify
 
 
 # ------------------------------------------------------------- slugify

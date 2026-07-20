@@ -7,14 +7,13 @@ is testable with a fake and carries no env or network assumptions of its own.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-
-import bank
-import tools
-from context import build_messages
+from coursekit.generate.quiz import bank
+from coursekit.generate.quiz import tools
+from coursekit.generate.quiz.context import build_messages
 from coursekit import courseconfig
 from coursekit.providers import Reply
-from discover import Unit, find_units, slugify
-from tools import show
+from coursekit.discover import Unit, find_units, slugify
+from coursekit.generate.quiz.tools import show
 
 
 class ModelLoadError(RuntimeError):

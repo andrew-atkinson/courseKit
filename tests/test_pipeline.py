@@ -1,10 +1,8 @@
 import json
-
 import pytest
-
 from coursekit.providers import OpenAICompatProvider
-from discover import find_units
-from pipeline import run_course, run_unit
+from coursekit.discover import find_units
+from coursekit.pipeline import run_course, run_unit
 
 
 # ------------------------------------------------------------- fake client
@@ -172,9 +170,9 @@ def test_week_filter_accepts_various_references(tmp_path, ref):
 
 # ------------------------------------------------- loop hardening
 
-import bank as bankmod
-import tools as toolsmod
-from pipeline import loop
+from coursekit.generate.quiz import bank as bankmod
+from coursekit.generate.quiz import tools as toolsmod
+from coursekit.pipeline import loop
 
 
 class _ScriptedRawResponses:
@@ -301,7 +299,7 @@ def test_nudge_reports_real_bank_state(fresh_bank):
 
 # ------------------------------------------------- model-load errors
 
-from pipeline import ModelLoadError, _looks_like_model_error
+from coursekit.pipeline import ModelLoadError, _looks_like_model_error
 
 
 class _RaisingRaw:

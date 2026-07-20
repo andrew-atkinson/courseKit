@@ -15,12 +15,10 @@ import json
 import os
 from pathlib import Path
 from typing import Callable
-
 from dotenv import load_dotenv
 from rich.console import Console
-
-import bank
-from bank import ValidationError
+from coursekit.generate.quiz import bank
+from coursekit.generate.quiz.bank import ValidationError
 
 load_dotenv(override=True)
 

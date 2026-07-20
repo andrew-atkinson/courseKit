@@ -1,11 +1,9 @@
 import inspect
 import json
-
 import pytest
-
-import bank as bankmod
-import tools
-from tools import _SCHEMAS, TOOL_REGISTRY, _dispatch_one
+from coursekit.generate.quiz import bank as bankmod
+from coursekit.generate.quiz import tools
+from coursekit.generate.quiz.tools import _SCHEMAS, TOOL_REGISTRY, _dispatch_one
 
 
 @pytest.fixture(autouse=True)

@@ -1,8 +1,7 @@
 import pytest
-
-import bank as bankmod
-import gift
-from bank import (Bank, Group, MAVariant, MatchVariant, MCVariant, NumVariant, Pair,
+from coursekit.generate.quiz import bank as bankmod
+from coursekit.emit import gift
+from coursekit.generate.quiz.bank import (Bank, Group, MAVariant, MatchVariant, MCVariant, NumVariant, Pair,
                   SAVariant, TFVariant)
 
 # Every text field below is hostile: '=' is a GIFT control char and every code question

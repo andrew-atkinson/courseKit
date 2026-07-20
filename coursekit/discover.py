@@ -12,7 +12,6 @@ course root. Artifacts live with the course (a sibling `quizzes/` tree), never i
 import re
 from dataclasses import dataclass
 from pathlib import Path
-
 from coursekit import courseconfig
 
 

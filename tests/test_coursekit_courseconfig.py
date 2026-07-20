@@ -1,7 +1,5 @@
 import builtins
-
 import pytest
-
 from coursekit import courseconfig as cc
 
 
