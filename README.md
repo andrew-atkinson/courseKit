@@ -57,7 +57,7 @@ curl -s http://localhost:1234/v1/models | grep '"id"'
 Verify the install:
 
 ```bash
-uv run pytest -q        # 315 tests, all offline — no model needed
+uv run pytest -q        # 342 tests, all offline — no model needed
 ```
 
 ### Choosing a provider
@@ -167,6 +167,7 @@ than re-copying it.
 | --------------------- | ------------------------------------------------------------- |
 | `coursekit/providers` | Model access: the tool-calling `Provider` contract            |
 | `coursekit/prompts.py`| Prompt library loader — project overrides beat shipped files  |
+| `coursekit/courseconfig.py`| Reads a course's `.vtconfig/` — structure, settings, week keys |
 | `coursekit/hardware.py`| RAM pre-flight for model loading                             |
 | `prompts/quiz/`       | The shipped prompts, as editable Markdown                     |
 | `app.py`              | CLI only — arg parsing and summaries                          |
@@ -190,6 +191,26 @@ quizbot prefers it, falling back to the shipped file for anything you don't over
 ```
 <course root>/.vtconfig/prompts/quiz/task.md
 ```
+
+### Per-course settings — `quiz.yaml`
+
+A course can also carry its own settings, in `<course root>/.vtconfig/quiz.yaml`. Every key is
+optional; anything absent falls back to the default. This file is quizbot's alone — it sits beside
+the transcriber's `config.yaml` but neither tool reads the other's.
+
+```yaml
+# <course root>/.vtconfig/quiz.yaml
+model: qwen2.5-32b-instruct   # used when MODEL_NAME is not set in the environment
+system_prompt: system         # which prompts/quiz/<name>.md to use for the rules…
+task_prompt: exam             # …and for the brief (default: system / task)
+```
+
+`task_prompt: exam` tells quizbot to load `exam.md` instead of `task.md` — resolved the same way as
+any prompt: the course's own `.vtconfig/prompts/quiz/exam.md` if present, otherwise the shipped one.
+So a course names a variant here and supplies the variant's file alongside it. `MODEL_NAME` in the
+environment still wins over `model` here; the file is the per-course default, not an override.
+
+Everything a course puts under `.vtconfig/` is read but never written by quizbot.
 
 ## Notes
 
