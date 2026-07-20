@@ -17,6 +17,7 @@ load_dotenv(override=True)
 from coursekit import pipeline
 from coursekit.emit import qti
 from coursekit import courseconfig
+from coursekit.generate.page.generator import PageGenerator
 from coursekit.providers import get_provider
 
 
@@ -48,8 +49,8 @@ def _print_summary(results, *, dry_run: bool) -> None:
             print(f"  [plan] {r.unit.week_label}")
         else:
             status = "OK" if r.finalized else "INCOMPLETE"
-            print(f"  [{status}] {r.unit.week_label}  "
-                  f"{r.n_groups} groups, {r.n_variants} variants")
+            counts = ", ".join(f"{v} {k}" for k, v in r.counts.items()) or "nothing"
+            print(f"  [{status}] {r.unit.week_label}  {counts}")
             for p in r.problems:
                 print(f"           - {p}")
         print(f"         -> {r.output_dir}")
@@ -99,6 +100,8 @@ def main(argv=None) -> int:
                         help="override: write under DIR/<course>/<week> instead of with the course")
     parser.add_argument("--dry-run", action="store_true",
                         help="list the units that would be processed, without calling the model")
+    parser.add_argument("--pages", action="store_true",
+                        help="generate course pages instead of quizzes")
     parser.add_argument("--to-qti", metavar="PATH",
                         help="model-free: write a Canvas QTI .zip beside every bank.json under PATH")
     parser.add_argument("--bundle", action="store_true",
@@ -114,11 +117,12 @@ def main(argv=None) -> int:
         parser.error("no PATH given and TRANSCRIPTION is not set")
 
     weeks = _parse_weeks(args)
+    generator = PageGenerator() if args.pages else None   # None → the default quiz generator
     provider = None if args.dry_run else _build_provider()
-    # MODEL_NAME (env) wins; otherwise the course's own quiz.yaml `model` key. Resolved from the
-    # input path's course root — one invocation targets one course in practice. (Per-unit model
-    # selection across mixed courses would move this into run_unit; not needed yet.)
-    model = os.getenv("MODEL_NAME") or courseconfig.load(args.path, config_name="quiz.yaml").value("model")
+    # MODEL_NAME (env) wins; otherwise the course's own <generator>.yaml `model` key. Resolved from
+    # the input path's course root — one invocation targets one course in practice.
+    config_name = "page.yaml" if args.pages else "quiz.yaml"
+    model = os.getenv("MODEL_NAME") or courseconfig.load(args.path, config_name=config_name).value("model")
 
     if not args.dry_run:
         verdict, msg = provider.check_fit(model)
@@ -129,6 +133,7 @@ def main(argv=None) -> int:
         results = pipeline.run_course(
             args.path, weeks=weeks, output_root=args.output_root,
             provider=provider, model=model, dry_run=args.dry_run, max_iters=args.max_iters,
+            generator=generator,
         )
     except pipeline.ModelLoadError as e:
         print(str(e))

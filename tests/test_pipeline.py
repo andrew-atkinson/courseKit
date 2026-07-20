@@ -468,3 +468,64 @@ def test_non_numeric_week_filter_matches_by_slug_not_by_none(tmp_path):
     assert len(_filter(f, "intro", tmp_path)) == 1       # slug matches
     assert len(_filter(f, "syllabus", tmp_path)) == 0     # different slug: no match
     assert len(_filter(f, "3", tmp_path)) == 0            # numeric ref vs non-numeric unit: no match
+
+
+# ------------------------------- the driver is generator-agnostic (the seam)
+
+class _FakeGenerator:
+    """A generator with nothing to do with quizzes — proves the driver drives the protocol,
+    not the quiz modules. Finalizes after a single tool turn."""
+    category = "fake"
+
+    def __init__(self):
+        self._final = False
+        self.reset_called = False
+
+    def reset(self, unit, out_dir):
+        self.reset_called = True
+        self._final = False
+
+    def tool_specs(self):
+        return [{"type": "function", "function": {"name": "commit", "parameters": {}}}]
+
+    def run_tool_calls(self, calls):
+        self._final = True
+        return [(c.id, "OK committed") for c in calls]
+
+    def build_messages(self, unit, transcript, cfg):
+        return [{"role": "user", "content": "go"}]
+
+    def is_finalized(self):
+        return self._final
+
+    def nudge(self, *, stalled):
+        return "keep going"
+
+    def result(self, unit, out_dir, reply):
+        from coursekit.generate.base import RunResult
+        return RunResult(unit=unit, finalized=self._final, output_dir=out_dir,
+                         counts={"blocks": 3}, reply=reply)
+
+
+def test_run_unit_drives_an_arbitrary_generator(tmp_path):
+    f = tmp_path / "week-3.md"
+    f.write_text("a transcript", encoding="utf-8")
+    unit = find_units(f)[0]
+    gen = _FakeGenerator()
+    client = ScriptedClient([("tools", [("commit", {})])])
+
+    res = run_unit(unit, client, "m", gen)
+
+    assert gen.reset_called                       # the driver reset per-unit state
+    assert res.finalized                          # …drove tools to the generator's finalized
+    assert res.counts == {"blocks": 3}            # …and reported the generator's own counts
+    assert (unit.output_dir / "reply.txt").exists()  # generic artifact write, no quiz code
+
+
+def test_default_generator_is_quiz(tmp_path):
+    # Omitting the generator must keep driving quizzes (back-compat for every existing caller).
+    f = tmp_path / "week-3.md"
+    f.write_text("a transcript", encoding="utf-8")
+    unit = find_units(f)[0]
+    res = run_unit(unit, FakeClient(), "fake-model")   # no generator passed
+    assert res.n_groups == 1 and res.n_variants == 1

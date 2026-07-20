@@ -57,7 +57,7 @@ curl -s http://localhost:1234/v1/models | grep '"id"'
 Verify the install:
 
 ```bash
-uv run pytest -q        # 342 tests, all offline — no model needed
+uv run pytest -q        # 383 tests, all offline — no model needed
 ```
 
 ### Choosing a provider
@@ -120,6 +120,35 @@ own files:
 
 Use `--output-root DIR` to redirect elsewhere (e.g. scratch during testing).
 
+## Generating pages
+
+The same tool builds **course pages** — the week's narrative page a student lands on — with
+`--pages`:
+
+```bash
+uv run python app.py "/path/to/course export" --pages --week 3
+```
+
+A page is a canonical `page.json` (blocks: headings, concept bullets, code, glossary, callouts)
+plus a rendered `pages/<week>/<slug>.html`, written beside the course like the quizzes. The model
+builds the teaching outline from the transcript; it **never writes a link** — a page's references,
+example works, and embeds (p5 sketches, slideshows, videos) come from an instructor-authored
+supplements file, merged in at render time so they survive regeneration:
+
+```yaml
+# <course root>/.vtconfig/pages/week-3-repetition.yaml
+references:
+  - label: "Casey Reas — Process Compendium"
+    url:   "https://reas.com/"
+examples:
+  - label: "Week 3 — Loops sketch"
+    embed: true                                    # renders as an <iframe> if the host is allowed
+    url:   "https://editor.p5js.org/…/full/…"
+```
+
+Page prompts live in `prompts/page/` and are overridable per course exactly like the quiz prompts
+(`.vtconfig/prompts/page/`); `page.yaml` is the page generator's sibling of `quiz.yaml`.
+
 ## Exporting to Canvas
 
 QTI generation is **model-free** — it reads `bank.json`, so you can re-export any time without
@@ -149,6 +178,7 @@ grading criteria.
 | `app.py PATH --week 3`          | Generate one week. Repeatable.              |
 | `app.py PATH --weeks 3-8`       | Generate an inclusive range.                |
 | `app.py PATH`                   | Generate every week found.                  |
+| `app.py PATH --pages`           | Generate course pages instead of quizzes.   |
 | `app.py PATH --output-root DIR` | Write elsewhere instead of with the course. |
 | `app.py PATH --max-iters N`     | Cap model turns per week (default 80).      |
 | `app.py --to-qti DIR`           | One Canvas `.zip` per week. Model-free.     |
@@ -159,25 +189,25 @@ Exit codes: `0` success · `1` a week failed to finalize · `2` the model could 
 
 ## Layout
 
-Quizbot is a *generator* sitting on a shared spine. `coursekit/` is the spine — it imports
-nothing from the generator, so future generators (pages, assignments, rubrics) reuse it rather
-than re-copying it.
+Everything is one package, `coursekit/`, with a **shared spine** and one subpackage per
+*generator*. The spine imports nothing from a generator; a generator is the quiz pattern with a
+different IR and emitter, so the second one (pages) reuses the driver, providers, prompts, and
+config rather than re-copying them.
 
-| File / package        | Role                                                          |
-| --------------------- | ------------------------------------------------------------- |
-| `coursekit/providers` | Model access: the tool-calling `Provider` contract            |
-| `coursekit/prompts.py`| Prompt library loader — project overrides beat shipped files  |
-| `coursekit/courseconfig.py`| Reads a course's `.vtconfig/` — structure, settings, week keys |
-| `coursekit/hardware.py`| RAM pre-flight for model loading                             |
-| `prompts/quiz/`       | The shipped prompts, as editable Markdown                     |
-| `app.py`              | CLI only — arg parsing and summaries                          |
-| `pipeline.py`         | The reusable driver: `run_unit`, `run_course`, the model loop |
-| `discover.py`         | Finds transcripts, resolves output paths                      |
-| `context.py`          | Assembles the messages from the prompt library                |
-| `tools.py`            | The tool schemas the model calls, and dispatch                |
-| `bank.py`             | The canonical data model and its guardrails                   |
-| `gift.py`             | GIFT emitter                                                  |
-| `qti.py`              | Canvas QTI emitter and packaging                              |
+| Path | Role |
+| --- | --- |
+| `coursekit/providers/` | Model access: the tool-calling `Provider` contract |
+| `coursekit/prompts.py` | Prompt library loader — project overrides beat shipped files |
+| `coursekit/courseconfig.py` | Reads a course's `.vtconfig/` — structure, settings, week keys |
+| `coursekit/hardware.py` | RAM pre-flight for model loading |
+| `coursekit/discover.py` | Finds transcripts, resolves output paths |
+| `coursekit/pipeline.py` | The generator-agnostic driver: `run_unit`, `run_course`, the model loop |
+| `coursekit/generate/base.py` | The `Generator` seam both generators implement, and `RunResult` |
+| `coursekit/generate/quiz/` | The quiz generator — `bank.py` (IR), `tools.py`, `context.py`, `generator.py` |
+| `coursekit/generate/page/` | The page generator — `page.py` (IR), `tools.py`, `renderer.py`, `components/` |
+| `coursekit/emit/` | Emitters: `gift.py`, `qti.py` (quizzes), `html.py` (pages) |
+| `prompts/quiz/` · `prompts/page/` | The shipped prompts, as editable Markdown |
+| `app.py` | CLI only — arg parsing and summaries |
 
 ### Changing the prompts
 

@@ -1,0 +1,5 @@
+<ul>
+{%- for e in b.entries %}
+<li><strong>{{ e.term }}</strong> — {{ e.definition | md_inline }}</li>
+{%- endfor %}
+</ul>

@@ -33,7 +33,8 @@ def slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "untitled"
 
 
-def _make_unit(transcript_path: Path, anchor_dir: Path, output_root: Path | None) -> Unit:
+def _make_unit(transcript_path: Path, anchor_dir: Path, output_root: Path | None,
+               subdir: str = "quizzes") -> Unit:
     stem = transcript_path.stem
     week_num = courseconfig.week_key(stem)
     week_slug = f"week-{week_num}" if week_num else slugify(stem)
@@ -65,13 +66,14 @@ def _make_unit(transcript_path: Path, anchor_dir: Path, output_root: Path | None
     else:
         course_slug = slugify(anchor_dir.name)
 
-    # Output lives with the course, never in the app.
+    # Output lives with the course, never in the app. `subdir` names the artifact tree
+    # (quizzes/, pages/, …) so each generator keeps its own, side by side under the course.
     if output_root is not None:
         output_dir = output_root / course_slug / week_slug
     elif course_root is not None:
-        output_dir = course_root / "quizzes" / week_slug
+        output_dir = course_root / subdir / week_slug
     else:
-        output_dir = anchor_dir / "quizzes" / week_slug
+        output_dir = anchor_dir / subdir / week_slug
 
     return Unit(
         transcript_path=transcript_path,
@@ -86,17 +88,18 @@ def _make_unit(transcript_path: Path, anchor_dir: Path, output_root: Path | None
     )
 
 
-def find_units(path, *, output_root=None) -> list[Unit]:
+def find_units(path, *, output_root=None, subdir: str = "quizzes") -> list[Unit]:
     """Discover work units from a file or a directory.
 
     A file yields one unit. A directory yields one unit per combined per-week transcript
-    (`week-*.md`); per-video files are excluded by the `week-` prefix.
+    (`week-*.md`); per-video files are excluded by the `week-` prefix. `subdir` names the artifact
+    tree under the course (default `quizzes`; the page generator uses `pages`).
     """
     path = Path(path).expanduser().resolve()
     output_root = Path(output_root).expanduser().resolve() if output_root else None
 
     if path.is_file():
-        return [_make_unit(path, path.parent, output_root)]
+        return [_make_unit(path, path.parent, output_root, subdir)]
 
     if path.is_dir():
         # The transcriber keeps combined docs under output/. When the input has one (e.g.
@@ -110,7 +113,7 @@ def find_units(path, *, output_root=None) -> list[Unit]:
             if rp not in seen:
                 seen.add(rp)
                 transcripts.append(rp)
-        units = [_make_unit(p, path, output_root) for p in transcripts]
+        units = [_make_unit(p, path, output_root, subdir) for p in transcripts]
         _guard_no_output_collision(units)
         return units
 

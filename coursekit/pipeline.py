@@ -1,19 +1,20 @@
-"""Driver: turn discovered units into finalized banks.
+"""Driver: turn discovered units into finalized artifacts.
 
-The reusable surface a larger course-maker imports. `run_unit` handles one week; `run_course`
-handles a path (one file or a whole course). The LLM client is injected, so the whole pipeline
-is testable with a fake and carries no env or network assumptions of its own.
+The reusable surface a larger course-maker imports. `run_unit` handles one unit (a week);
+`run_course` handles a path (one file or a whole course). The driver is **generator-agnostic**: it
+speaks the `Generator` seam (coursekit.generate.base) and knows nothing about quizzes or pages
+specifically. That is what lets a second generator reuse the whole thing — the loop, the nudging,
+the model-load handling, the per-unit reset — without copying it. The LLM client is injected, so the
+pipeline is testable with a fake and carries no env or network assumptions of its own.
 """
 
-from dataclasses import dataclass, field
 from pathlib import Path
-from coursekit.generate.quiz import bank
-from coursekit.generate.quiz import tools
-from coursekit.generate.quiz.context import build_messages
+
 from coursekit import courseconfig
-from coursekit.providers import Reply
+from coursekit.console import show
 from coursekit.discover import Unit, find_units, slugify
-from coursekit.generate.quiz.tools import show
+from coursekit.generate.base import Generator, RunResult
+from coursekit.providers import Reply
 
 
 class ModelLoadError(RuntimeError):
@@ -41,55 +42,31 @@ def _model_error_message(provider, model: str, exc: Exception) -> str:
     return "\n".join(lines)
 
 
-@dataclass
-class RunResult:
-    unit: Unit
-    finalized: bool
-    n_groups: int
-    n_variants: int
-    output_dir: Path
-    problems: list[str] = field(default_factory=list)
-    reply: str = ""
-
-
 DEFAULT_MAX_ITERS = 80
 
 
-def _nudge(stalled: bool) -> str:
-    """The text of a corrective user turn. Reports real bank state so the model has ground
-    truth rather than its own (possibly confused) sense of progress.
-
-    Returns content, not a message: shaping it into a turn is the provider's job.
-    """
-    b = bank.get()
-    n_groups = len(b.groups)
-    n_variants = sum(len(g.variants) for g in b.groups.values())
-    problems = bank.validate_final()
-
-    head = ("Several tool calls in a row failed; stop repeating the same call. "
-            if stalled else
-            "You stopped before the bank was finalized. ")
-    state = f"Recorded so far: {n_groups} group(s), {n_variants} variant(s). "
-    if problems:
-        state += "Still to fix: " + "; ".join(problems[:3]) + ". "
-    tail = ("Keep going with tool calls only: work through your checklist, add any missing "
-            "variants, then call finalize_bank. Do not reply in prose.")
-    return head + state + tail
+def _default_generator() -> Generator:
+    """The quiz generator is the default, so callers (and tests) that don't pass one keep driving
+    quizzes. Imported lazily to keep the spine free of a compile-time dependency on any concrete
+    generator — the seam points one way, generator → spine, never back."""
+    from coursekit.generate.quiz.generator import QuizGenerator
+    return QuizGenerator()
 
 
-def loop(messages, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS,
-         max_nudges: int = 4, stall_limit: int = 4) -> str:
-    """Drive one conversation to a finalized bank.
+def loop(messages, provider, model, generator: Generator | None = None, *,
+         max_iters: int = DEFAULT_MAX_ITERS, max_nudges: int = 4, stall_limit: int = 4) -> str:
+    """Drive one conversation to a finalized artifact.
 
     The local model is an unreliable driver. Two observed failure modes (see the run of
-    2026-07-17): it stops calling tools before finalizing — often emitting a stray token
-    like `<tool_call|>` as prose — and it spins on a rejected call until the turn budget
-    is gone. Neither means the work is done, so instead of trusting finish_reason we check
-    the bank itself and nudge the model back on track within a bounded budget.
+    2026-07-17): it stops calling tools before finalizing — often emitting a stray token like
+    `<tool_call|>` as prose — and it spins on a rejected call until the turn budget is gone.
+    Neither means the work is done, so instead of trusting finish_reason we ask the generator
+    whether its artifact is finalized and nudge the model back on track within a bounded budget.
 
-    `provider` is a coursekit Provider: it owns how a turn is represented in the conversation,
-    which is what lets this same loop drive a vendor whose tool-result shape differs.
+    `provider` is a coursekit Provider (it owns how a turn is represented); `generator` is the
+    Generator seam (it owns the tools, the finalized check, and the nudge vocabulary).
     """
+    gen = generator or _default_generator()
     reply = None
     nudges = 0
     error_streak = 0
@@ -97,7 +74,7 @@ def loop(messages, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS,
     for _ in range(max_iters):
         try:
             reply = provider.chat_with_tools(
-                model=model, messages=messages, tools=tools.TOOL_SPECS
+                model=model, messages=messages, tools=gen.tool_specs()
             )
         except Exception as exc:
             # Translate LM Studio's opaque model-load failure into an actionable message,
@@ -108,9 +85,9 @@ def loop(messages, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS,
 
         if reply.wants_tools:
             provider.append_assistant(messages, reply)
-            results = tools.run_tool_calls(reply.tool_calls)
+            results = gen.run_tool_calls(reply.tool_calls)
             provider.append_tool_results(messages, results)
-            if bank.is_finalized():
+            if gen.is_finalized():
                 break
 
             # Runaway-rejection loop: a whole turn's calls all failed. A few in a row means
@@ -125,11 +102,11 @@ def loop(messages, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS,
                     break
                 nudges += 1
                 error_streak = 0
-                provider.append_user(messages, _nudge(stalled=True))
+                provider.append_user(messages, gen.nudge(stalled=True))
             continue
 
-        # The model stopped calling tools. Not the same as finishing the bank.
-        if bank.is_finalized():
+        # The model stopped calling tools. Not the same as finishing the artifact.
+        if gen.is_finalized():
             break
         if nudges >= max_nudges:
             show("[yellow]Model stopped without finalizing; nudge budget spent.[/yellow]")
@@ -140,7 +117,7 @@ def loop(messages, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS,
         # stop turn. Then correct it.
         provider.append_assistant(messages, Reply(finish_reason=reply.finish_reason,
                                                   content=reply.content))
-        provider.append_user(messages, _nudge(stalled=False))
+        provider.append_user(messages, gen.nudge(stalled=False))
     else:
         show(f"[yellow]Reached the {max_iters}-turn limit without finalizing.[/yellow]")
 
@@ -148,41 +125,24 @@ def loop(messages, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS,
     return (reply.content or "") if reply else ""
 
 
-def run_unit(unit: Unit, provider, model, *, max_iters: int = DEFAULT_MAX_ITERS) -> RunResult:
-    """Generate and finalize one week's bank, writing artifacts to unit.output_dir."""
+def run_unit(unit: Unit, provider, model, generator: Generator | None = None, *,
+             max_iters: int = DEFAULT_MAX_ITERS) -> RunResult:
+    """Generate and finalize one unit's artifact, writing to unit.output_dir."""
+    gen = generator or _default_generator()
     out = Path(unit.output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    # Fresh per-week state. The module-level singletons in bank.py and tools.py would
-    # otherwise carry week N's groups, checklist, and call-log into week N+1.
-    bank.init(run_id=f"{unit.course_slug}-{unit.week_slug}", out_dir=out,
-              title=unit.week_label, source=unit.transcript_path.name)
-    tools.reset_state()
-    tools.set_call_log(out / "calls.jsonl")
-
+    gen.reset(unit, out)
+    # The course's own config for this generator (quiz.yaml, page.yaml, …) selects prompts by name
+    # and supplies the project root for file overrides. Absent config degrades to defaults.
+    cfg = unit.config or courseconfig.load(unit.transcript_path, config_name=f"{gen.category}.yaml")
     transcript = unit.transcript_path.read_text(encoding="utf-8")
-    # A course selects its prompts two ways, both via its quiz.yaml: by *name* (system_prompt /
-    # task_prompt keys, resolved here) and by *file* (a .vtconfig/prompts/quiz/ override, reached
-    # through project_root). Absent config, prompt_name returns "default" and nothing changes.
-    cfg = unit.config or courseconfig.load(unit.transcript_path, config_name="quiz.yaml")
-    messages = build_messages(transcript, course_title=unit.course_title,
-                              week_label=unit.week_label, module=unit.module,
-                              project_root=unit.course_root,
-                              system_prompt=cfg.prompt_name("system_prompt", default="system"),
-                              task_prompt=cfg.prompt_name("task_prompt", default="task"))
-    reply = loop(messages, provider, model, max_iters=max_iters)
+    messages = gen.build_messages(unit, transcript, cfg)
+
+    reply = loop(messages, provider, model, gen, max_iters=max_iters)
     (out / "reply.txt").write_text(reply, encoding="utf-8")
 
-    b = bank.get()
-    return RunResult(
-        unit=unit,
-        finalized=bank.is_finalized(),
-        n_groups=len(b.groups),
-        n_variants=sum(len(g.variants) for g in b.groups.values()),
-        output_dir=out,
-        problems=bank.validate_final(),
-        reply=reply,
-    )
+    return gen.result(unit, out, reply)
 
 
 def _week_matches(ref, unit: Unit) -> bool:
@@ -200,17 +160,20 @@ def _week_matches(ref, unit: Unit) -> bool:
 
 
 def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
-               dry_run: bool = False, max_iters: int = DEFAULT_MAX_ITERS) -> list[RunResult]:
-    """Discover units under `path`, optionally filter to `weeks`, and run each.
+               dry_run: bool = False, max_iters: int = DEFAULT_MAX_ITERS,
+               generator: Generator | None = None) -> list[RunResult]:
+    """Discover units under `path`, optionally filter to `weeks`, and run each with `generator`
+    (default: the quiz generator).
 
     `dry_run` returns the planned units (with resolved output dirs) without calling the model.
     """
-    units = find_units(path, output_root=output_root)
+    # The output tree (quizzes/, pages/, …) is the generator's, so a course can hold both.
+    subdir = getattr(generator, "artifacts_subdir", "quizzes")
+    units = find_units(path, output_root=output_root, subdir=subdir)
     if weeks:
         units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
 
     if dry_run:
-        return [RunResult(u, finalized=False, n_groups=0, n_variants=0, output_dir=u.output_dir)
-                for u in units]
+        return [RunResult(u, finalized=False, output_dir=u.output_dir) for u in units]
 
-    return [run_unit(u, provider, model, max_iters=max_iters) for u in units]
+    return [run_unit(u, provider, model, generator, max_iters=max_iters) for u in units]

@@ -93,9 +93,14 @@ its Apple-Silicon dependency; quizbot's runtime stays pydantic + stdlib. It also
 flowchart LR
     VT["videotranscriber"] -.->|"not yet"| CK
     QZ["quiz generator"] --> CK
-    PG["page generator<br/><i>next</i>"] -.-> CK
-    CK["<b>coursekit</b><br/>providers · prompts<br/>hardware · courseconfig"]
+    PG["page generator"] --> CK
+    CK["<b>coursekit</b><br/>providers · prompts<br/>hardware · courseconfig · <b>Generator seam</b>"]
 ```
+
+Both generators now depend on the spine through the same `Generator` seam
+(`coursekit/generate/base.py`): the driver (`run_unit`/`run_course`/`loop`) knows nothing about
+quizzes or pages, so the page generator reused it without touching it. Quiz = `bank.json` → GIFT/QTI;
+page = `page.json` → HTML (Jinja components), with instructor supplements merged at render time.
 
 One direction only, no cycle. **Quizbot depends on the spine today; the transcriber does not yet** —
 it still has its own copies. That's the migration debt, and it is measurable:
@@ -155,15 +160,18 @@ weeks of CC101 quizzes already emitted, so the paths stay as they are.
 
 Unchanged trigger for the rename (generator #2, not a date), but sharpened:
 
-1. ✅ **Wire the prompt override** — done, a defect in shipped work.
-2. ✅ **`courseconfig`, at spine level** — done. **The spine is now complete**: providers · prompts ·
-   hardware · courseconfig, all built and consumed by quizbot.
-3. **The rename** (quizbot → coursekit), one isolated commit, while there is still only one generator.
-   This is the next structural step; it waits on the trigger (generator #2), not on more spine work.
-4. **Migrate the transcriber onto the spine** — providers first, since that's where the divergence
-   costs most. Take the union of capabilities, not one side.
-5. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class: many
-   faculty cannot get a token, and a `.zip` is reviewable and archivable in a way an API call is not.
+1. ✅ **Wire the prompt override** — done.
+2. ✅ **`courseconfig`, at spine level** — done; the spine (providers · prompts · hardware ·
+   courseconfig) is complete.
+3. ✅ **The rename** (quizbot → coursekit) — done, one isolated commit, into the package layout above.
+4. ✅ **Generator #2 (pages)** — done: the `Generator` seam + `page.json` IR + Jinja renderer +
+   standalone-HTML emitter + a per-week supplements file for instructor links. **Still open in this
+   increment:** the Common Cartridge page emitter (`emit/cc.py`) — the format is fully ground-truthed
+   from the CC101 export (`type="webcontent"` + the wiki-page meta header + `module_meta.xml`), so
+   it is build-then-import-test; and a real-model page run through LM Studio (the offline slice is
+   proven with a fake provider).
+5. **Migrate the transcriber onto the spine** — providers first, taking the union of capabilities.
+6. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class.
 
 ## Not yet closed
 

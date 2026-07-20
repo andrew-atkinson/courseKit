@@ -1,0 +1,18 @@
+{%- if references %}
+<h4><strong>References</strong></h4>
+<ul>
+{%- for r in references %}
+<li><a href="{{ r.url }}" target="_blank">{{ r.label }}</a></li>
+{%- endfor %}
+</ul>
+{%- endif %}
+{%- if examples %}
+<h4><strong>Examples</strong></h4>
+{%- for e in examples %}
+{%- if e.embed %}
+<p><iframe src="{{ e.url }}" width="{{ e.width or 600 }}" height="{{ e.height or 400 }}" loading="lazy"></iframe></p>
+{%- else %}
+<p><a href="{{ e.url }}" target="_blank">{{ e.label }}</a></p>
+{%- endif %}
+{%- endfor %}
+{%- endif %}
