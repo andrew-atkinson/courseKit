@@ -8,7 +8,7 @@ The prompt text itself lives in `prompts/quiz/*.md` and is loaded through course
 an instructor or department can override the brief for a course without touching this code.
 """
 
-from coursekit import prompts
+from coursekit import courseconfig, prompts
 
 QUIZ_CATEGORY = "quiz"
 
@@ -34,7 +34,7 @@ def _context_line(course_title, week_label, module) -> str:
 def build_messages(transcript: str, *, course_title: str | None = None,
                    week_label: str | None = None, module: str | None = None,
                    project_root=None, system_prompt: str = "system",
-                   task_prompt: str = "task") -> list[dict]:
+                   task_prompt: str = "task", domain: str = "") -> list[dict]:
     """The chat messages for one lecture. Metadata is woven in only when supplied.
 
     `project_root` lets a course override either prompt from its own .vtconfig/prompts/quiz/.
@@ -44,9 +44,10 @@ def build_messages(transcript: str, *, course_title: str | None = None,
     system = prompts.load(QUIZ_CATEGORY, system_prompt, project_root=project_root)
     task = prompts.load(QUIZ_CATEGORY, task_prompt, project_root=project_root)
 
-    system_message = "\n" + system.body.format(
+    body = system.body.format(
         context_line=_context_line(course_title, week_label, module),
         transcript=transcript,
-    ) + "\n"
+    )
+    system_message = "\n" + courseconfig.domain_preface(domain) + body + "\n"
     return [{"role": "system", "content": system_message},
             {"role": "user", "content": "\n" + task.body + "\n"}]

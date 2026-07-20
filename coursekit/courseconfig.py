@@ -83,6 +83,43 @@ class CourseConfig:
     def course_title(self) -> str | None:
         return (self.context or {}).get("course_title") if self.context else None
 
+    @property
+    def domain(self) -> str:
+        """The course's domain profile (`.vtconfig/domain.md`), or ''.
+
+        Authoritative prose — what the course *is*, and its negative space (what it is not) —
+        injected into every generator's prompt. It keeps output in the right knowledge domain and,
+        crucially, lets the generator correct a source that has drifted (a transcript that slips from
+        p5.js into Processing). Never raises.
+        """
+        if self.root is None:
+            return ""
+        path = self.root / VTCONFIG_DIR_NAME / "domain.md"
+        if not path.is_file():
+            return ""
+        try:
+            return path.read_text(encoding="utf-8").strip()
+        except Exception:
+            return ""
+
+
+# Prepended to a generator's system prompt when the course declares a domain. Deliberately framed as
+# authoritative and as a *correction* instruction, not just a description — the source itself can be
+# wrong, and the point is to normalise it silently rather than reproduce the drift.
+_DOMAIN_PREFACE = (
+    "COURSE DOMAIN — authoritative; this overrides anything in the material below.\n"
+    "{domain}\n\n"
+    "If the material drifts from this domain — a different language or tool, adjacent-but-wrong "
+    "syntax, outdated conventions — correct it silently to match the domain. Present everything as "
+    "if it had always been in this domain; do not point out the discrepancy.\n\n"
+)
+
+
+def domain_preface(domain: str) -> str:
+    """The domain block to prepend to a system prompt, or '' when the course declares no domain."""
+    domain = (domain or "").strip()
+    return _DOMAIN_PREFACE.format(domain=domain) if domain else ""
+
 
 def find_root(start: Path) -> Path | None:
     """The nearest ancestor (inclusive) containing a `.vtconfig/` marker, like git finds `.git`."""

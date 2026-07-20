@@ -5,7 +5,7 @@ Mirrors the quiz `context.py`: a pure function that loads `prompts/page/*.md` th
 env or file I/O at import.
 """
 
-from coursekit import prompts
+from coursekit import courseconfig, prompts
 
 PAGE_CATEGORY = "page"
 
@@ -27,15 +27,16 @@ def _context_line(course_title, week_label, module) -> str:
 def build_messages(transcript: str, *, course_title: str | None = None,
                    week_label: str | None = None, module: str | None = None,
                    project_root=None, system_prompt: str = "system",
-                   task_prompt: str = "task") -> list[dict]:
+                   task_prompt: str = "task", domain: str = "") -> list[dict]:
     """The chat messages for one page. A course overrides either prompt from its own
-    .vtconfig/prompts/page/."""
+    .vtconfig/prompts/page/, and its domain profile is prepended when present."""
     system = prompts.load(PAGE_CATEGORY, system_prompt, project_root=project_root)
     task = prompts.load(PAGE_CATEGORY, task_prompt, project_root=project_root)
 
-    system_message = "\n" + system.body.format(
+    body = system.body.format(
         context_line=_context_line(course_title, week_label, module),
         transcript=transcript,
-    ) + "\n"
+    )
+    system_message = "\n" + courseconfig.domain_preface(domain) + body + "\n"
     return [{"role": "system", "content": system_message},
             {"role": "user", "content": "\n" + task.body + "\n"}]
