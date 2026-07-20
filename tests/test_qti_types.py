@@ -1,4 +1,4 @@
-"""Item emitters, checked against real Canvas exports: docs/Classic-Quiz-Sample for
+"""Item emitters, checked against real Canvas exports: reference/Classic-Quiz-Sample for
 short-answer / multiple-answer / matching, and docs/'numeric quiz' for numerical.
 true_false is inferred (no sample) but confirmed working on a live import."""
 import xml.etree.ElementTree as ET

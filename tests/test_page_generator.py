@@ -128,3 +128,20 @@ def test_pages_write_to_a_pages_tree_not_quizzes(tmp_path):
 
     assert results[0].output_dir.parent.name == "pages"   # not "quizzes"
     assert (results[0].output_dir / "page.json").exists()
+
+
+def test_page_slug_comes_from_the_week_title(tmp_path):
+    # A titled week yields a Canvas-style slug (week-3-repetition), not the bare filename slug.
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    (root / ".vtconfig" / "context.yaml").write_text(
+        "weeks:\n  week 3: {title: Repetition}\n", encoding="utf-8")
+    f = root / "output" / "week-3.md"
+    f.parent.mkdir(parents=True)
+    f.write_text("body", encoding="utf-8")
+    unit = find_units(f)[0]
+
+    run_unit(unit, _client(), "m", PageGenerator())
+
+    assert (unit.output_dir / "week-3-repetition.html").exists()
+    assert not (unit.output_dir / "week-3.html").exists()

@@ -585,7 +585,7 @@ def _quiz_resources(bank, quiz: dict) -> str:
 
 def _manifest(manifest_id: str, title: str, resources: str) -> str:
     """A QTI Quiz Export manifest. Quiz resources are plain `imsqti_xmlv1p2` pointing at the
-    inline-questions file — the shape that imports with questions (docs/Classic-Quiz-Sample).
+    inline-questions file — the shape that imports with questions (reference/Classic-Quiz-Sample).
     Any number of quizzes can be declared here, which is what makes a one-import bundle work."""
     return f'''<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="{manifest_id}" {MANIFEST_NS}>

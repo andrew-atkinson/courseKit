@@ -63,13 +63,45 @@ def _embed_allowed(url: str) -> bool:
     return any(h == a or h.endswith("." + a) for a in ALLOWED_EMBED_HOSTS)
 
 
+_IFRAME_SRC = re.compile(r"""src\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
+_IFRAME_W = re.compile(r"""width\s*=\s*["']?(\d+)""", re.IGNORECASE)
+_IFRAME_H = re.compile(r"""height\s*=\s*["']?(\d+)""", re.IGNORECASE)
+
+
+def _parse_iframe(snippet: str) -> dict | None:
+    """Pull src/width/height out of a pasted `<iframe …>` blob. We keep only those — the host
+    allowlist and our own template decide the rest, so a copied snippet can't inject attributes or
+    a script. Returns None when there is no usable src."""
+    m = _IFRAME_SRC.search(snippet or "")
+    if not m:
+        return None
+    out = {"url": m.group(1), "embed": True}
+    w, h = _IFRAME_W.search(snippet), _IFRAME_H.search(snippet)
+    if w:
+        out["width"] = int(w.group(1))
+    if h:
+        out["height"] = int(h.group(1))
+    return out
+
+
 def _prep_examples(examples) -> list[dict]:
-    """An example asking to embed from a non-allowlisted host degrades to a link, so a page never
-    emits an iframe Canvas would strip."""
+    """Normalise every example to {url, label, embed?, width?, height?}, whichever way it was
+    written — structured fields *or* a pasted `iframe:` snippet — then downgrade any embed from a
+    non-allowlisted host to a plain link, so a page never emits an iframe Canvas would strip."""
     out = []
     for e in examples or []:
         e = dict(e)
-        if e.get("embed") and not _embed_allowed(e.get("url", "")):
+        if e.get("iframe"):
+            parsed = _parse_iframe(e["iframe"])
+            if not parsed:                      # a malformed snippet: drop it rather than emit junk
+                continue
+            label = e.get("label")
+            e = dict(parsed)
+            if label:
+                e["label"] = label
+        if not e.get("url"):
+            continue
+        if e.get("embed") and not _embed_allowed(e["url"]):
             e["embed"] = False
         out.append(e)
     return out

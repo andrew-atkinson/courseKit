@@ -120,3 +120,72 @@ def test_write_html_produces_a_document(fresh, tmp_path):
     doc = path.read_text()
     assert doc.startswith("<!doctype html>")
     assert "<h4><strong>REVIEW</strong></h4>" in doc
+
+
+# ------------------------------- supplements matched by week identity
+
+def test_supplements_matched_by_week_number_not_exact_name(tmp_path):
+    # File is named for the Canvas page, but we look it up by the bare week ref — both must work.
+    d = tmp_path / ".vtconfig" / "pages"
+    d.mkdir(parents=True)
+    (d / "week-3-repetition.yaml").write_text(
+        "references:\n  - label: R\n    url: https://x.io\n", encoding="utf-8")
+
+    assert load_supplements(tmp_path, "week-3")["references"][0]["label"] == "R"
+    assert load_supplements(tmp_path, "3")["references"][0]["label"] == "R"
+    assert load_supplements(tmp_path, "week-9") == {}   # different week, no match
+
+
+# ----------------------------------------- model-free re-render (--to-html)
+
+def test_reemit_rerenders_page_json_with_current_supplements(tmp_path):
+    from coursekit.emit.html import reemit
+    # a course tree: a committed page.json under pages/, supplements under .vtconfig/
+    course = tmp_path / "course"
+    (course / ".vtconfig" / "pages").mkdir(parents=True)
+    (course / ".vtconfig" / "pages" / "week-3.yaml").write_text(
+        "references:\n  - label: Later Ref\n    url: https://late.io\n", encoding="utf-8")
+    pdir = course / "pages" / "week-3"
+    pdir.mkdir(parents=True)
+    P.reset()
+    P.init("c-week-3", pdir, title="Week 3", slug="week-3", week_ref="week-3")
+    P.put_block(P.build_block(kind="heading", block_id="h", text="REVIEW", level=4))
+    # (page.json now on disk via autosave)
+
+    results = reemit(course)
+
+    assert len(results) == 1
+    html = (pdir / "week-3.html").read_text()
+    assert "<h4><strong>REVIEW</strong></h4>" in html          # the model's block
+    assert '<a href="https://late.io"' in html                 # supplement merged at re-render
+
+
+# ------------------------------- pasted <iframe> snippets (slideshows etc.)
+
+def test_pasted_iframe_snippet_is_parsed_and_re_emitted(fresh):
+    page = _page_with(dict(kind="heading", block_id="h", text="X"))
+    supp = {"examples": [{
+        "label": "Lecture slides",
+        "iframe": '<iframe src="https://docs.google.com/presentation/d/e/ABC/embed?start=false" '
+                  'frameborder="0" width="960" height="569" allowfullscreen></iframe>',
+    }]}
+    body = render_body(page, supp)
+    # our clean iframe, with the extracted src + dimensions, not the pasted attributes
+    assert '<iframe src="https://docs.google.com/presentation/d/e/ABC/embed?start=false"' in body
+    assert 'width="960"' in body and 'height="569"' in body
+    assert "allowfullscreen" not in body and "frameborder" not in body
+
+
+def test_pasted_iframe_from_disallowed_host_degrades_to_link(fresh):
+    page = _page_with(dict(kind="heading", block_id="h", text="X"))
+    supp = {"examples": [{"label": "sketchy",
+                          "iframe": '<iframe src="https://evil.example.com/x" width="600"></iframe>'}]}
+    body = render_body(page, supp)
+    assert "<iframe" not in body
+    assert '<a href="https://evil.example.com/x"' in body
+
+
+def test_malformed_iframe_snippet_is_dropped(fresh):
+    page = _page_with(dict(kind="heading", block_id="h", text="X"))
+    body = render_body(page, {"examples": [{"label": "broken", "iframe": "<iframe no src here>"}]})
+    assert "broken" not in body   # nothing usable, so nothing emitted
