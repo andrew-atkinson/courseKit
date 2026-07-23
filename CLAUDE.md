@@ -35,8 +35,9 @@ converter per input. This is why QTI export needs no model.
 - **Canvas exports (ground truth for the emitters):** real `.imscc` course exports live in
   `reference/` (gitignored — large, real course content). These are the ground truth behind `qti.py`
   and the page CC emitter; the CC101 export has 32 real wiki pages. Format notes: `docs/canvasQuizStructure.md`.
-- **`docs/` holds tracked Markdown guides** (`*.md` is version-controlled: `authoring-pages.md`,
-  `canvasQuizStructure.md`, …); everything else there is gitignored. `reference/` (the heavy exports)
+- **`docs/` holds tracked Markdown guides** (`*.md` is version-controlled — user-facing guides:
+  `quizzes.md`, `pages.md`, `configuration.md`, `domain-profile.md`, `canvasQuizStructure.md`);
+  everything else there is gitignored. `reference/` (the heavy exports)
   is fully gitignored — don't rely on its contents surviving, and don't put the only copy of anything
   valuable there. `agent/` also holds tracked references (`architecture.md`, `GIFT_format_compact.md`).
 - **Course artifacts live with the course, never in this repo** — a `quizzes/` tree beside the

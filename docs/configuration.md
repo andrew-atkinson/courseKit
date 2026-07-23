@@ -48,6 +48,7 @@ videotranscriber uses. coursekit reads from it but never writes to it.
 | `quiz.yaml` | quizzes | the quiz generator's settings |
 | `page.yaml` | pages | the page generator's settings |
 | `domain.md` | shared | the [domain profile](domain-profile.md) — applies to every generator |
+| `style.yaml` | pages | the page [theme](design.md) — visual identity + accent + density |
 | `prompts/<gen>/…md` | shared | per-course prompt overrides |
 | `pages/<week>.yaml` | pages | a page's [supplements](pages.md) — references, examples, embeds |
 

@@ -117,6 +117,9 @@ only — heading house style, how much detail, which sections to include — wit
 else's pages. Anything you don't override falls back to the shipped prompt. (See
 [Configuration](configuration.md).)
 
+To change how pages **look** — the visual identity, colour, and per-section roles — see
+[Page design](design.md) (`.vtconfig/style.yaml`).
+
 To keep the model in the right *knowledge* domain — the right language, framework, or vocabulary, and
 to correct a transcript that drifts out of it — write a **[domain profile](domain-profile.md)**
 (`.vtconfig/domain.md`). It applies to pages and quizzes alike.

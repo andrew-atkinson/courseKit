@@ -1,0 +1,42 @@
+name: terminal
+voice: "The prompt — a Powerlevel10k reading of a page. Deep petrol ground, section headers as colored segment chips whose hue carries the section's role, the way a shell segment colors path, branch, and status."
+type:
+  heading_family: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+  body_family: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+  mono_family: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+  base_size: 16
+  heading_weight: 600
+  heading_prefix: ""
+  heading_sizes: { 2: 18, 3: 16, 4: 15 }
+color:
+  surface: "#12333d"           # the deep petrol-blue terminal ground; the whole page sits on it
+  ink: "#e7eef0"
+  muted: "#93a7ac"
+  accent: "#5ec8b0"            # bright terminal teal — links, inline emphasis; AA on the ground
+  segment_ink: "#ffffff"
+  frame_border: "#20505d"
+  segments:                    # role -> chip hue, the p10k segment language = the pedagogic signal
+    review:   "#3c5a63"        # slate — "where we were"
+    concept:  "#1f6a86"        # blue — the path segment: the main idea
+    practice: "#8a5a12"        # amber — the git segment: do something
+    example:  "#1f6f63"        # teal — a worked demonstration
+    summary:  "#4a6f33"        # green — the success segment: closure
+    default:  "#2f4f59"
+  tints:                       # dark panels on the dark ground, not pastel washes
+    note: "#1c3f49"
+    tip: "#1c473f"
+    warning: "#4a352a"
+  code_bg: "#0c262e"           # a darker well, like the editor pane behind the prompt
+  code_fg: "#e7eef0"
+glyphs:
+  roles: { review: "↺", concept: "❯", practice: "▶", example: "▸", summary: "✔" }
+  tones: { note: "i", tip: "+", warning: "!" }
+space:
+  unit: 8
+  section_gap: 22
+  density: comfortable
+shape:
+  section_frame: panel
+  heading_marker: segment
+  radius: 6
+  border_width: 1

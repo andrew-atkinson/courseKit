@@ -26,12 +26,13 @@ def _page_with(*blocks):
 
 def test_heading_matches_canvas_grammar(fresh):
     body = render_body(_page_with(dict(kind="heading", block_id="h", text="REVIEW", level=4)))
-    assert "<h4><strong>REVIEW</strong></h4>" in body
+    import re as _re
+    assert _re.search(r"<h4[^>]*>.*REVIEW.*</h4>", body, _re.S)   # styled now; structure + text hold
 
 
 def test_bullets_use_li_span(fresh):
     body = render_body(_page_with(dict(kind="bullets", block_id="b", items=["one", "two"])))
-    assert "<ul>" in body and "<li><span>one</span></li>" in body
+    assert "<ul" in body and "<span>one</span>" in body   # li/ul carry theme styles now
 
 
 def test_inline_markdown_in_prose(fresh):
@@ -50,10 +51,11 @@ def test_hostile_code_is_escaped_and_survives(fresh):
     # angle brackets and ampersands escaped, newlines become <br> — the Canvas <pre> convention
     assert "&lt; 10 &amp;&amp; y &gt; 2" in body
     assert "<br>" in body
-    assert "<pre><span>" in body
+    import re as _re
+    m = _re.search(r"<pre[^>]*><span>(.*?)</span></pre>", body, _re.S)
+    assert m, "styled pre/span block present"
     # and it round-trips: strip <br>, unescape entities, recover the original text
-    recovered = htmllib.unescape(body.split("<pre><span>")[1].split("</span></pre>")[0]
-                                 .replace("<br>", "\n"))
+    recovered = htmllib.unescape(m.group(1).replace("<br>", "\n"))
     assert recovered == code
 
 
@@ -70,8 +72,9 @@ def test_references_render_as_links(fresh):
     page = _page_with(dict(kind="heading", block_id="h", text="X"))
     supp = {"references": [{"label": "Reas — Process", "url": "https://example.com/reas"}]}
     body = render_body(page, supp)
-    assert '<a href="https://example.com/reas" target="_blank">Reas — Process</a>' in body
-    assert "<strong>References</strong>" in body
+    assert 'href="https://example.com/reas"' in body
+    assert ">Reas — Process</a>" in body   # link styled in theme accent now
+    assert ">References</h4>" in body   # heading weight is font-weight now, not <strong>
 
 
 def test_allowlisted_embed_becomes_iframe(fresh):
@@ -119,7 +122,8 @@ def test_write_html_produces_a_document(fresh, tmp_path):
     assert path.name == "page.html"    # default slug
     doc = path.read_text()
     assert doc.startswith("<!doctype html>")
-    assert "<h4><strong>REVIEW</strong></h4>" in doc
+    import re as _re
+    assert _re.search(r"<h4[^>]*>.*REVIEW.*</h4>", doc, _re.S)
 
 
 # ------------------------------- supplements matched by week identity
@@ -156,7 +160,8 @@ def test_reemit_rerenders_page_json_with_current_supplements(tmp_path):
 
     assert len(results) == 1
     html = (pdir / "week-3.html").read_text()
-    assert "<h4><strong>REVIEW</strong></h4>" in html          # the model's block
+    import re as _re
+    assert _re.search(r"<h4[^>]*>.*REVIEW.*</h4>", html, _re.S)   # the model's block, styled
     assert '<a href="https://late.io"' in html                 # supplement merged at re-render
 
 

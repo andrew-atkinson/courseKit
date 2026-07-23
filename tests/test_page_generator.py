@@ -115,8 +115,9 @@ def test_page_run_writes_html_and_merges_supplements(tmp_path):
 
     # the rendered HTML merges the supplement at render time
     doc = (unit.output_dir / "week-3.html").read_text()
-    assert "<h4><strong>REVIEW</strong></h4>" in doc
-    assert '<a href="https://example.com/reas" target="_blank">Casey Reas</a>' in doc
+    import re as _re
+    assert _re.search(r"<h4[^>]*>.*REVIEW.*</h4>", doc, _re.S)
+    assert 'href="https://example.com/reas"' in doc and ">Casey Reas</a>" in doc
 
 
 def test_pages_write_to_a_pages_tree_not_quizzes(tmp_path):

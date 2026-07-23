@@ -1,6 +1,6 @@
 # Toolkit architecture
 
-Source of truth for the structural diagrams. Kept in `agent/` because `docs/` is gitignored.
+Source of truth for the structural diagrams. Kept in `agent/` alongside the other tracked references.
 Presented version: <https://claude.ai/code/artifact/e0d099ed-016c-4911-a75d-7805d5dbffe0>
 
 Verified 19 July 2026 against quizbot branch `coursekit-spine` and the videotranscriber source at

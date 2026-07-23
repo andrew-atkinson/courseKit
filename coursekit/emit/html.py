@@ -36,32 +36,34 @@ _DOC = """<!doctype html>
 """
 
 
-def render_document(page, supplements: dict | None = None) -> str:
-    return _DOC.format(title=escape(page.title), body=render_body(page, supplements))
+def render_document(page, supplements: dict | None = None, style: dict | None = None) -> str:
+    return _DOC.format(title=escape(page.title), body=render_body(page, supplements, style))
 
 
-def write_html(page, out_dir, supplements: dict | None = None) -> Path:
+def write_html(page, out_dir, supplements: dict | None = None, style: dict | None = None) -> Path:
     """Write `<slug>.html` beside the page's other artifacts. Returns the path."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     path = out / f"{page.slug}.html"
-    path.write_text(render_document(page, supplements), encoding="utf-8")
+    path.write_text(render_document(page, supplements, style), encoding="utf-8")
     return path
 
 
 def reemit(path) -> list[tuple[Path, Path]]:
     """Re-render every `page.json` under `path` to HTML — model-free.
 
-    Reads each committed page and its course supplements (found by walking up to the `.vtconfig/`
-    root) and rewrites `<slug>.html`. This is how you iterate on a supplements file without paying
-    to re-run the model: edit the YAML, run this, refresh the page.
+    Reads each committed page, its course supplements, and the course's style (theme), all found by
+    walking up to the `.vtconfig/` root, and rewrites `<slug>.html`. This is how you iterate on a
+    supplements file or switch themes without paying for a model run.
     """
     from coursekit.courseconfig import find_root
     from coursekit.generate.page.page import Page
+    from coursekit.generate.page.style import load_style
 
     out = []
     for pj in sorted(Path(path).rglob("page.json")):
         page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
-        supplements = load_supplements(find_root(pj), page.week_ref or page.slug)
-        out.append((pj, write_html(page, pj.parent, supplements)))
+        root = find_root(pj)
+        supplements = load_supplements(root, page.week_ref or page.slug)
+        out.append((pj, write_html(page, pj.parent, supplements, load_style(root))))
     return out

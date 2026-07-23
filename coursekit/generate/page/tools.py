@@ -32,8 +32,9 @@ def reset_state() -> None:
 
 # ------------------------------------------------------------- block tools
 
-def add_heading(block_id: str, text: str, level: int = 2) -> str:
-    return page.put_block(page.build_block("heading", block_id=block_id, text=text, level=level))
+def add_heading(block_id: str, text: str, level: int = 2, role: str = "") -> str:
+    return page.put_block(page.build_block("heading", block_id=block_id, text=text, level=level,
+                                           role=role or None))
 
 
 def add_paragraph(block_id: str, text: str) -> str:
@@ -77,6 +78,9 @@ add_heading_json = {
         "block_id": _ID,
         "text": {"type": "string", "description": "the heading text"},
         "level": {"type": "integer", "description": "2, 3 or 4 (section depth); default 2"},
+        "role": {"type": "string", "enum": ["review", "concept", "practice", "example", "summary"],
+                 "description": "what kind of section this opens — lets students scan the page "
+                                "by section type (optional)"},
     }, "required": ["block_id", "text"], "additionalProperties": False},
 }
 

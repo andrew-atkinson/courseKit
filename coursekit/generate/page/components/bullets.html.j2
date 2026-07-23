@@ -1,5 +1,5 @@
-<ul>
+<ul style="font-family: {{ t.type.body_family }}; color: {{ t.color.ink }}; line-height: 1.7; margin: 0 0 {{ t.space.unit * 2 }}px 0; padding-left: 22px;">
 {%- for item in b['items'] %}
-<li><span>{{ item | md_inline }}</span></li>
+<li style="margin-bottom: {{ t.space.unit // 2 }}px;"><span>{{ item | md_inline }}</span></li>
 {%- endfor %}
 </ul>

@@ -48,6 +48,9 @@ class HeadingBlock(_Block):
     kind: Literal["heading"] = "heading"
     text: str = Field(min_length=1)
     level: int = Field(default=2, ge=1, le=4)
+    # Semantic section identity — what KIND of section this opens. The model assigns meaning;
+    # the theme decides its visual (glyph, framing). Never a style, always a meaning.
+    role: Literal["review", "concept", "practice", "example", "summary"] | None = None
 
     _nourl = field_validator("text")(staticmethod(_check_no_url))
 

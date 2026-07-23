@@ -41,7 +41,7 @@ Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint �
 [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest -q        # 395 tests, all offline — no model needed
+uv run pytest -q        # 423 tests, all offline — no model needed
 ```
 
 ## Quick start
@@ -92,6 +92,9 @@ The README is the high-level read; the detail lives in [`docs/`](docs/):
 - **[The domain profile](docs/domain-profile.md)** — one `.vtconfig/domain.md` per course that pins
   every generator to the right knowledge domain (p5.js, not Processing) and *corrects a transcript
   that drifts*. The main defence against plausible-but-wrong output.
+- **[Page design](docs/design.md)** — the four visual identities (bauhaus, terminal, plotter,
+  studio), the `style.yaml` a course picks a theme with, section roles (where design meets
+  pedagogy), and the guardrails (Canvas allowlist, WCAG, alt-text) that keep a theme shippable.
 - **[Configuration](docs/configuration.md)** — the `.env` environment, choosing a provider, the RAM
   pre-flight, and the per-course `.vtconfig/` files (`quiz.yaml` / `page.yaml`, prompt overrides).
 - **[Canvas QTI format](docs/canvasQuizStructure.md)** — the internals behind `qti.py`: the package

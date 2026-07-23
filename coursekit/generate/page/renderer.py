@@ -107,22 +107,102 @@ def _prep_examples(examples) -> list[dict]:
     return out
 
 
-def render_body(page, supplements: dict | None = None) -> str:
-    """The block sequence + merged supplements, as an HTML fragment (no <html>/<body> wrapper)."""
+def _prep_images(images) -> list[dict]:
+    """Accessibility gate: an image ships only with meaningful alt text (alt, else caption).
+    We cannot invent alt for an instructor's image, so an image with neither is dropped rather
+    than shipped inaccessible."""
+    out = []
+    for im in images or []:
+        im = dict(im)
+        if not im.get("url"):
+            continue
+        alt = im.get("alt") or im.get("caption")
+        if not alt:
+            continue
+        im["alt"] = alt
+        out.append(im)
+    return out
+
+
+def render_body(page, supplements: dict | None = None, style: dict | None = None) -> str:
+    """The block sequence + merged supplements, as an HTML fragment (no <html>/<body> wrapper).
+
+    `style` is a resolved theme (see style.load_style) — a full design identity whose tokens every
+    component template draws its inline styles from. Resolved at render time, like supplements, so
+    a theme change re-renders model-free and `page.json` stays neutral.
+    """
+    from coursekit.generate.page.style import load_style
     supplements = supplements or {}
-    parts = []
+    t = style or load_style(None)
+
+    # Topic grouping: a heading opens a topic that runs until the next heading. The grouping is
+    # already implicit in the block sequence, so framing it is purely a theme decision
+    # (shape.section_frame: card) — no IR or model involvement.
+    groups: list[list] = []
+    current: list = []
     for b in page.blocks.values():
-        tmpl = _env.get_template(f"{b.kind}.html.j2")
-        parts.append(tmpl.render(b=b.model_dump()).strip())
+        if b.kind == "heading" and current:
+            groups.append(current)
+            current = []
+        current.append(b)
+    if current:
+        groups.append(current)
+
+    shape = t.get("shape") or {}
+    color = t.get("color") or {}
+    # section_frame: none | card (a light card on the page) | panel (each section on the theme's
+    # own surface colour, so a dark identity breaks into separate petrol panels with white gaps
+    # between them, rather than one flowing slab).
+    frame = shape.get("section_frame", "none")
+    panels = frame == "panel"
+    frame_roles = shape.get("frame_roles")     # themes may frame only certain section roles
+    frame_style = shape.get("frame_style", "solid")
+    surface = color.get("surface")
+    unit = (t.get("space") or {}).get("unit", 8)
+    radius = shape.get("radius", 0)
+    gap = (t.get("space") or {}).get("section_gap", 40)
+    border_w = shape.get("border_width", 1)
+
+    def _panel(inner: str) -> str:
+        bg = surface if panels else color.get("frame_bg", "#ffffff")
+        border = color.get("frame_border", bg)
+        return (f'<div style="background-color: {bg}; border: {border_w}px {frame_style} {border}; '
+                f'border-radius: {radius}px; padding: {unit * 3}px; margin: 0 0 {gap}px 0;">\n'
+                f'{inner}\n</div>')
+
+    parts = []
+    for group in groups:
+        framed = frame in ("card", "panel") and group[0].kind == "heading"
+        if framed and frame_roles:
+            role = getattr(group[0], "role", None)
+            # a role outside the theme's frame list stays flat; role-less headings keep the default
+            framed = role is None or role in frame_roles
+        rendered = [
+            _env.get_template(f"{b.kind}.html.j2").render(
+                b=b.model_dump(), t=t, framed=framed, frame_pad=unit * 3).strip()
+            for b in group
+        ]
+        parts.append(_panel("\n".join(rendered)) if framed else "\n".join(rendered))
 
     supp = _env.get_template("supplements.html.j2").render(
         references=supplements.get("references") or [],
         examples=_prep_examples(supplements.get("examples")),
+        images=_prep_images(supplements.get("images")),
+        t=t,
     ).strip()
     if supp:
-        parts.append(supp)
+        # In panel mode the supplements are their own section, so they get their own panel — light
+        # ink would be unreadable on the white page gap otherwise.
+        parts.append(_panel(supp) if panels else supp)
 
-    return "\n".join(p for p in parts if p)
+    body = "\n".join(p for p in parts if p)
+
+    # A surface theme that does NOT panel per-section gets one full-bleed ground instead.
+    if surface and not panels and surface.lower() not in ("#fff", "#ffffff"):
+        body = (f'<div style="background-color: {surface}; padding: {unit * 4}px; '
+                f'border-radius: {radius}px;">\n{body}\n</div>')
+
+    return body
 
 
 def load_supplements(course_root, week_ref) -> dict:
