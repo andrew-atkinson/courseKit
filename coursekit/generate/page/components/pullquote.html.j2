@@ -1,0 +1,6 @@
+<div style="margin: {{ t.space.section_gap }}px 0; padding: {{ t.space.unit * 2 }}px 0; border-top: 2px solid {{ t.color.accent }}; border-bottom: 2px solid {{ t.color.accent }};">
+<p style="font-family: {{ t.type.heading_family }}; font-size: 22px; line-height: 1.4; color: {{ t.color.ink }}; margin: 0;">{{ b.text | md_inline }}</p>
+{%- if b.attribution %}
+<p style="font-family: {{ t.type.body_family }}; color: {{ t.color.muted }}; margin: {{ t.space.unit }}px 0 0 0;">— {{ b.attribution }}</p>
+{%- endif %}
+</div>

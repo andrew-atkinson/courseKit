@@ -1,0 +1,12 @@
+<div style="display: flex; flex-wrap: wrap; gap: {{ t.space.unit * 2 }}px; margin: 0 0 {{ t.space.unit * 2 }}px 0;">
+{%- for col in b.columns %}
+<div style="flex: 1; min-width: 220px;">
+<div style="font-family: {{ t.type.heading_family }}; font-weight: {{ t.type.heading_weight }}; color: {{ t.color.accent }}; margin-bottom: {{ t.space.unit }}px;">{{ col.title }}</div>
+<ul style="font-family: {{ t.type.body_family }}; color: {{ t.color.ink }}; line-height: 1.7; margin: 0; padding-left: 20px;">
+{%- for item in col['items'] %}
+<li style="margin-bottom: {{ t.space.unit // 2 }}px;">{{ item | md_inline }}</li>
+{%- endfor %}
+</ul>
+</div>
+{%- endfor %}
+</div>

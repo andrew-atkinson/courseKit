@@ -57,6 +57,24 @@ def add_callout(block_id: str, text: str, tone: str = "note") -> str:
     return page.put_block(page.build_block("callout", block_id=block_id, text=text, tone=tone))
 
 
+def add_columns(block_id: str, columns: list[dict]) -> str:
+    return page.put_block(page.build_block("columns", block_id=block_id, columns=columns))
+
+
+def add_pullquote(block_id: str, text: str, attribution: str = "") -> str:
+    return page.put_block(page.build_block("pullquote", block_id=block_id, text=text,
+                                           attribution=attribution or None))
+
+
+def add_card(block_id: str, title: str, text: str, card_kind: str = "concept") -> str:
+    return page.put_block(page.build_block("card", block_id=block_id, title=title, text=text,
+                                           card_kind=card_kind))
+
+
+def add_details(block_id: str, summary: str, text: str) -> str:
+    return page.put_block(page.build_block("details", block_id=block_id, summary=summary, text=text))
+
+
 def get_page_report() -> str:
     return page.report()
 
@@ -139,6 +157,58 @@ add_callout_json = {
     }, "required": ["block_id", "text"], "additionalProperties": False},
 }
 
+add_columns_json = {
+    "name": "add_columns",
+    "description": ("Two or three columns side by side — use this to COMPARE things: two approaches, "
+                    "before/after, correct vs incorrect. No links."),
+    "parameters": {"type": "object", "properties": {
+        "block_id": _ID,
+        "columns": {"type": "array", "minItems": 2, "maxItems": 3, "items": {
+            "type": "object", "properties": {
+                "title": {"type": "string", "description": "the column heading"},
+                "items": {"type": "array", "items": {"type": "string"},
+                          "description": "the points in this column"},
+            }, "required": ["title", "items"], "additionalProperties": False,
+        }, "description": "2–3 columns to compare"},
+    }, "required": ["block_id", "columns"], "additionalProperties": False},
+}
+
+add_pullquote_json = {
+    "name": "add_pullquote",
+    "description": ("Foreground the week's ONE key idea as a large pull quote. Use at most once per "
+                    "page — it only signals if it is rare. No links."),
+    "parameters": {"type": "object", "properties": {
+        "block_id": _ID,
+        "text": {"type": "string", "description": "the key idea, one or two sentences"},
+        "attribution": {"type": "string", "description": "optional source (a person, a text)"},
+    }, "required": ["block_id", "text"], "additionalProperties": False},
+}
+
+add_card_json = {
+    "name": "add_card",
+    "description": ("A titled, self-contained box whose TYPE is visible — for a worked example, a "
+                    "single concept, or a key takeaway a student should be able to point to. No links."),
+    "parameters": {"type": "object", "properties": {
+        "block_id": _ID,
+        "title": {"type": "string", "description": "the card's title"},
+        "text": {"type": "string", "description": "the card's content (Markdown, no links)"},
+        "card_kind": {"type": "string", "enum": ["concept", "example", "takeaway"],
+                      "description": "what kind of content this card holds"},
+    }, "required": ["block_id", "title", "text"], "additionalProperties": False},
+}
+
+add_details_json = {
+    "name": "add_details",
+    "description": ("A collapsible block: a visible prompt (summary) with content hidden until the "
+                    "student expands it. Use for 'predict before you reveal', an answer to a "
+                    "question, or optional depth. No links."),
+    "parameters": {"type": "object", "properties": {
+        "block_id": _ID,
+        "summary": {"type": "string", "description": "the always-visible prompt/question"},
+        "text": {"type": "string", "description": "the revealed content (Markdown, no links)"},
+    }, "required": ["block_id", "summary", "text"], "additionalProperties": False},
+}
+
 get_page_report_json = {
     "name": "get_page_report",
     "description": "List the blocks recorded so far. Call this when you think the page is done.",
@@ -164,6 +234,10 @@ TOOL_REGISTRY = {
     "add_code": add_code,
     "add_glossary": add_glossary,
     "add_callout": add_callout,
+    "add_columns": add_columns,
+    "add_pullquote": add_pullquote,
+    "add_card": add_card,
+    "add_details": add_details,
     "get_page_report": get_page_report,
     "finalize_page": finalize_page,
 }
@@ -175,6 +249,10 @@ _SCHEMAS = {
     "add_code": add_code_json,
     "add_glossary": add_glossary_json,
     "add_callout": add_callout_json,
+    "add_columns": add_columns_json,
+    "add_pullquote": add_pullquote_json,
+    "add_card": add_card_json,
+    "add_details": add_details_json,
     "get_page_report": get_page_report_json,
     "finalize_page": finalize_page_json,
 }

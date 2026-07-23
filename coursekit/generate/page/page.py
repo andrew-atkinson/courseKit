@@ -107,7 +107,71 @@ class CalloutBlock(_Block):
     _nourl = field_validator("text")(staticmethod(_check_no_url))
 
 
-Block = Union[HeadingBlock, ParagraphBlock, BulletsBlock, CodeBlock, GlossaryBlock, CalloutBlock]
+# ---- pedagogy devices: each maps to a documented learning function (see docs/design.md) ----
+
+class Column(BaseModel):
+    """One column of a comparison."""
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=1)
+    items: list[str] = Field(min_length=1)
+
+    _nourl_title = field_validator("title")(staticmethod(_check_no_url))
+
+    @field_validator("items")
+    @classmethod
+    def _items_ok(cls, v: list[str]) -> list[str]:
+        cleaned = [i.strip() for i in v if i and i.strip()]
+        if not cleaned:
+            raise ValueError("a column needs at least one non-empty item")
+        for item in cleaned:
+            _check_no_url(item)
+        return cleaned
+
+
+class ColumnsBlock(_Block):
+    """Side-by-side comparison — CLT: managing element interactivity, 'wrong way / right way'."""
+    kind: Literal["columns"] = "columns"
+    columns: list[Column] = Field(min_length=2, max_length=3)
+
+
+class PullquoteBlock(_Block):
+    """The week's single key idea, foregrounded — CLT: signalling."""
+    kind: Literal["pullquote"] = "pullquote"
+    text: str = Field(min_length=1)
+    attribution: str | None = None
+
+    _nourl = field_validator("text")(staticmethod(_check_no_url))
+
+    @field_validator("attribution")
+    @classmethod
+    def _attr_ok(cls, v):
+        return _check_no_url(v) if v else v
+
+
+class CardBlock(_Block):
+    """A titled, self-contained unit whose type is visible — UDL: representation; CLT: cutting the
+    'what am I reading?' load. `card_kind` names the content type, not a style."""
+    kind: Literal["card"] = "card"
+    card_kind: Literal["concept", "example", "takeaway"] = "concept"
+    title: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+
+    _nourl_title = field_validator("title")(staticmethod(_check_no_url))
+    _nourl_text = field_validator("text")(staticmethod(_check_no_url))
+
+
+class DetailsBlock(_Block):
+    """Progressive disclosure — 'predict before you reveal', optional depth. Native <details>, no JS."""
+    kind: Literal["details"] = "details"
+    summary: str = Field(min_length=1)   # the always-visible prompt
+    text: str = Field(min_length=1)      # the revealed content (markdown)
+
+    _nourl_summary = field_validator("summary")(staticmethod(_check_no_url))
+    _nourl_text = field_validator("text")(staticmethod(_check_no_url))
+
+
+Block = Union[HeadingBlock, ParagraphBlock, BulletsBlock, CodeBlock, GlossaryBlock, CalloutBlock,
+              ColumnsBlock, PullquoteBlock, CardBlock, DetailsBlock]
 
 _KINDS: dict[str, type[_Block]] = {
     "heading": HeadingBlock,
@@ -116,6 +180,10 @@ _KINDS: dict[str, type[_Block]] = {
     "code": CodeBlock,
     "glossary": GlossaryBlock,
     "callout": CalloutBlock,
+    "columns": ColumnsBlock,
+    "pullquote": PullquoteBlock,
+    "card": CardBlock,
+    "details": DetailsBlock,
 }
 
 

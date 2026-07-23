@@ -50,6 +50,7 @@ ALLOWED_CSS_PROPERTIES = frozenset({
     "text-align",                   # observed
     "text-decoration", "text-indent", "white-space",
     "list-style-type",              # observed
+    "cursor",                       # for action affordances (a control you press), not decoration
 })
 
 
