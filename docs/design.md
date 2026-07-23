@@ -45,6 +45,25 @@ themes may frame only certain roles (plotter boxes concepts, leaves review flat)
 a style; it is a semantic marker the theme interprets. This is the Cognitive-Load-Theory idea of
 *signalling* and *chunking* made visual.
 
+## Icons: meaning vs action
+
+Two visual languages, kept distinct so a student can tell them apart at a glance:
+
+- **Meaning icons** — the role and tone glyphs (`❯` concept, `▶` practice, `!` warning) — *label*
+  what a thing is. They are **bare**: an inline glyph in the accent colour, no border, no pointer.
+- **Action affordances** — anything you interact with, starting with the `details` disclosure — are
+  **enclosed**: the whole control is a bordered frame with a full-width header bar and a reveal
+  **native disclosure marker**, and the revealed content lives *inside* that frame so it reads as
+  part of the prompt's space. The native marker is kept deliberately: it is the only thing that
+  **rotates** on open/close (state feedback) without JS or a stylesheet, both of which Canvas
+  strips — the enclosing bar keeps it reading as a control, not a glyph. The full-width bar is the
+  affordance touch users recognise (an accordion); the
+  `cursor: pointer` is a desktop bonus, not the only signal. The native `<details>` triangle is
+  suppressed so it can't mimic a glyph.
+
+Bare = meaning; enclosed = action. Future interactive elements (buttons, links-as-buttons) follow the
+same rule.
+
 ## The guardrails (why a theme can't ship something broken)
 
 Three checks, in the same spirit as the no-URL rule — enforced by tests, not vibes:
