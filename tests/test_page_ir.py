@@ -104,3 +104,43 @@ def test_finalize_succeeds_with_a_heading(fresh):
 
 def test_empty_page_is_not_finalizable(fresh):
     assert "no blocks" in "; ".join(P.validate_final())
+
+
+# ------------------------------- pedagogy devices (columns/pullquote/card/details)
+
+def test_columns_needs_two_or_three(fresh):
+    with pytest.raises(ValidationError):
+        P.build_block("columns", block_id="c", columns=[{"title": "only one", "items": ["x"]}])
+    ok = P.build_block("columns", block_id="c", columns=[
+        {"title": "A", "items": ["a1"]}, {"title": "B", "items": ["b1"]}])
+    assert len(ok.columns) == 2
+
+
+def test_column_items_reject_urls(fresh):
+    with pytest.raises(ValidationError, match="links are not allowed"):
+        P.build_block("columns", block_id="c", columns=[
+            {"title": "A", "items": ["fine"]},
+            {"title": "B", "items": ["see https://x.io"]}])
+
+
+def test_pullquote_optional_attribution_and_url_guard(fresh):
+    b = P.build_block("pullquote", block_id="p", text="the key idea")
+    assert b.attribution is None
+    with pytest.raises(ValidationError, match="links are not allowed"):
+        P.build_block("pullquote", block_id="p", text="idea at https://x.io")
+
+
+def test_card_kind_and_url_guard(fresh):
+    b = P.build_block("card", block_id="c", card_kind="takeaway", title="T", text="body")
+    assert b.card_kind == "takeaway"
+    with pytest.raises(ValidationError):
+        P.build_block("card", block_id="c", card_kind="bogus", title="T", text="b")
+    with pytest.raises(ValidationError, match="links are not allowed"):
+        P.build_block("card", block_id="c", title="T", text="see www.x.io")
+
+
+def test_details_prompt_and_body(fresh):
+    b = P.build_block("details", block_id="d", summary="predict?", text="the answer")
+    assert b.summary == "predict?" and b.text == "the answer"
+    with pytest.raises(ValidationError, match="links are not allowed"):
+        P.build_block("details", block_id="d", summary="q", text="a [link](http://x.io)")

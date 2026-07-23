@@ -255,3 +255,77 @@ def test_terminal_segments_color_by_role(fresh):
     assert "background-color: #1f6a86" in html    # concept chip = blue (the "path" segment)
     assert "background-color: #8a5a12" in html    # practice chip = amber (the "git" segment)
     assert "$" not in html                         # the literal prompt gimmick is gone
+
+
+# --------------------------------------------- pedagogy devices, styled
+
+def _device_page():
+    P.reset()
+    P.put_block(P.build_block(kind="columns", block_id="c", columns=[
+        {"title": "A", "items": ["a1", "a2"]}, {"title": "B", "items": ["b1"]}]))
+    P.put_block(P.build_block(kind="pullquote", block_id="pq", text="the one idea", attribution="src"))
+    P.put_block(P.build_block(kind="card", block_id="cd", card_kind="example", title="Ex", text="body"))
+    P.put_block(P.build_block(kind="details", block_id="dt", summary="predict?", text="answer"))
+    return P.get()
+
+
+@pytest.mark.parametrize("theme_name", ["terminal", "bauhaus", "plotter", "studio"])
+def test_devices_stay_within_the_allowlist(fresh, theme_name):
+    html = render_body(_device_page(), style=dict(S.load_theme(theme_name), _name=theme_name))
+    rogue = _properties_used(html) - S.ALLOWED_CSS_PROPERTIES
+    assert not rogue, f"{theme_name} devices emit stripped properties: {sorted(rogue)}"
+
+
+def test_columns_render_side_by_side(fresh):
+    html = render_body(_device_page(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    assert "display: flex" in html and "flex-wrap: wrap" in html
+    assert ">A</div>" in html and ">B</div>" in html      # both column titles present
+
+
+def test_details_is_native_no_js(fresh):
+    html = render_body(_device_page(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    assert "<details" in html and "<summary" in html
+    assert "<script" not in html                          # progressive disclosure without JS
+
+
+# ------------------------- action affordances vs meaning icons (UI/UX rule)
+
+def test_disclosure_is_an_enclosed_control_not_a_bare_glyph(fresh):
+    # An interactive affordance must read as a control: enclosed (border) + pointer cursor.
+    # A descriptive role glyph must stay bare (no border, no pointer). This keeps "click me"
+    # graphically distinct from "this is what this section is".
+    P.reset()
+    P.put_block(P.build_block(kind="heading", block_id="h", text="Concept", level=3, role="concept"))
+    P.put_block(P.build_block(kind="details", block_id="d", summary="reveal?", text="answer"))
+    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+
+    import re as _re
+    details = _re.search(r"<details[^>]*>", html).group(0)
+    assert "border:" in details                                    # the FRAME encloses Q and A together
+    summary = _re.search(r"<summary[^>]*>", html).group(0)
+    assert "cursor: pointer" in summary and "background-color:" in summary  # a full-width tappable bar
+    # the answer lives inside the same frame (between summary and </details>)
+    assert html.index("answer") < html.index("</details>")
+    heading = _re.search(r"<h3[^>]*>.*?</h3>", html, _re.S).group(0)
+    assert "cursor: pointer" not in heading and "<details" not in heading  # meaning = bare, not a control
+
+
+def test_disclosure_uses_the_native_rotating_marker(fresh):
+    # The native <details> marker is kept (not suppressed) — it's the only thing that can rotate on
+    # open/close without JS or a stylesheet, both of which Canvas strips. The enclosing control bar
+    # keeps it reading as an action, so it no longer needs a hand-drawn chevron.
+    P.reset()
+    P.put_block(P.build_block(kind="details", block_id="d", summary="q", text="a"))
+    html = render_body(P.get(), style=dict(S.load_theme("terminal"), _name="terminal"))
+    summary = html[html.index("<summary"):html.index("</summary>")]
+    assert "list-style-type: none" not in summary   # marker NOT suppressed -> rotates natively
+    assert "▾" not in summary                   # and no static hand-drawn chevron
+
+
+def test_answers_are_hidden_by_default(fresh):
+    # retrieval practice = predict, then reveal. The answer is present (accessible) but collapsed.
+    P.reset()
+    P.put_block(P.build_block(kind="details", block_id="d", summary="predict?", text="the answer"))
+    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    assert "<details open" not in html and "<details  open" not in html   # no open attr -> collapsed
+    assert "the answer" in html                                           # but present in the DOM
