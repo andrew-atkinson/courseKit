@@ -440,6 +440,18 @@ def test_quiz_yaml_selects_a_named_task_prompt(tmp_path):
     assert "EXAM-STYLE BRIEF" in sent[1]["content"]
 
 
+def test_quiz_yaml_sets_the_question_and_variant_counts(tmp_path):
+    # the whole chain: quiz.yaml -> cfg.value -> QuizGenerator -> build_messages -> the brief
+    unit = _course_with_transcript(tmp_path, quiz_yaml="questions: 3\nvariants: 6\n")
+    provider = FakeClient()
+
+    run_unit(unit, provider, "fake-model")
+
+    sent = provider._raw.first_messages
+    assert "Write 3 question groups" in sent[1]["content"]
+    assert "6 variants per group" in sent[1]["content"]
+
+
 def test_quiz_yaml_absent_falls_back_to_shipped_prompts(tmp_path):
     # No quiz.yaml: system_prompt/task_prompt resolve to the shipped system.md/task.md,
     # NOT to a nonexistent default.md.

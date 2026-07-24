@@ -54,27 +54,22 @@ Somethings are just ideas and not necessarily to be implemented, this is just a 
      taste-skill's anti-slop rule and CLT signaling). The role→color system and code→color system
      should share one palette per theme.
 
-### Generalize quiz generation beyond coding (2026-07-24 — BLOCKER for non-coding quizzes)
+### Generalize quiz generation beyond coding
 
-The quiz half of "generalize beyond coding" (the page half shipped: de-biased prompts + content-shape
-domain profile). `prompts/quiz/task.md` is coding-shaped and hard-fails elsewhere: generating a quiz
-for the photo course could not complete question 5, which is hard-wired to be a code-completion
-question. This should land **before** the combined pages+quizzes cartridge (no point bundling quizzes
-that can't generate for the course). Infrastructure is already flexible (bank variants aren't
-hard-capped; the position rule is code, scoped to MC) — mostly a prompt + config change, mirroring the
-page work.
+✅ **CORE DONE 2026-07-24** (branch `quiz-generalization`). The quiz half of "generalize beyond
+coding": de-biased `prompts/quiz/task.md` (removed the hard-coded "c5 = code-completion"; subject-
+neutral default) and `system.md`; the **domain profile** carries subject specifics (coding →
+code-completion where code exists; art → visual analysis), same mechanism as pages. Counts are now
+`quiz.yaml` `questions` (default 5) + `variants` (default 4), templated into both prompts; the
+position rule generalizes to M. The original hard failure (couldn't complete the coding 5th question
+on the photo course) is fixed. Tests in test_context.py + test_pipeline.py; docs in
+configuration.md.
 
-1. **Question forms: generic default + domain-specific options.** Remove the hard-coded "c5 =
-   code-completion" from `task.md`; make the default subject-neutral (N concept groups, type mix suited
-   to each concept). The **domain profile** (already injected into the quiz prompt via
-   `domain_preface`) carries the specifics — a coding `domain.md` asks for a code-completion question
-   where code exists; a photo one steers to identify / compare / attribute / analyse. One mechanism,
-   consistent with pages. See [[content-shape-domain-profile]] equivalent for pages.
-2. **Number of questions + variations, parameterized.** `quiz.yaml` `questions: N` (default 5) and
-   `variants: M` (default 4); generalize the correct-answer-position rule from the hard 4 to M. Two
-   enhancements: (a) an *analysis-suggested* question count — a pass over the week's material proposes
-   how many concepts it can fairly assess; (b) variants driven by class size (more students → more
-   variants to reduce overlap) or simply professor-set.
+**Still deferred (enhancements, not built):**
+- **Analysis-suggested question count** — a pass over the week's material proposes how many concepts
+  it can fairly assess (instead of a fixed default).
+- **Class-size-driven variants** — derive `variants` from student count (more students → more
+  variants to reduce overlap) rather than a manual `quiz.yaml` value.
 
 ### Page design + summarisation (2026-07-24, from real art-course output — coursekit-test)
 

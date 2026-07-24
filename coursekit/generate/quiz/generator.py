@@ -41,6 +41,8 @@ class QuizGenerator:
             system_prompt=cfg.prompt_name("system_prompt", default="system"),
             task_prompt=cfg.prompt_name("task_prompt", default="task"),
             domain=cfg.domain,
+            n_questions=int(cfg.value("questions", 5) or 5),
+            n_variants=int(cfg.value("variants", 4) or 4),
         )
 
     def is_finalized(self) -> bool:

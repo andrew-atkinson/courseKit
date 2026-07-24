@@ -61,11 +61,19 @@ Each generator reads its own file. Every key is optional.
 model: qwen2.5-32b-instruct   # used when MODEL_NAME is not set in the environment
 system_prompt: system         # which prompts/<gen>/<name>.md to use for the rules…
 task_prompt: exam             # …and for the brief (default: system / task)
+questions: 5                  # quiz only: concept groups per quiz (default 5)
+variants: 4                   # quiz only: variants per group (default 4)
 ```
 
 `task_prompt: exam` tells the generator to load `exam.md` instead of `task.md` — resolved the same
 way as any prompt (the course's own override first, then the shipped file). `MODEL_NAME` in the
 environment still wins over `model` here; the file is the per-course default, not an override.
+
+`questions` / `variants` size the bank — a shorter quiz, or more variants for a larger class so two
+students rarely see the same one. The shipped brief is otherwise **subject-neutral**: it no longer
+assumes a coding question. What kinds of questions suit a course (a code-completion item for
+programming, a visual-analysis item for art) comes from the course's `domain.md` — see
+[domain-profile.md](domain-profile.md).
 
 ### Prompt overrides
 

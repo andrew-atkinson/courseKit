@@ -81,3 +81,41 @@ def test_named_prompt_variants_can_be_selected(tmp_path):
                                encoding="utf-8")
     msgs = build_messages("body", project_root=tmp_path, task_prompt="exam")
     assert msgs[1]["content"].strip() == "EXAM STYLE."
+
+
+# ------------------------------------------- bank size (questions x variants) + subject-neutrality
+
+def test_default_counts_appear_in_the_prompt():
+    msgs = build_messages("body")
+    user, system = msgs[1]["content"], msgs[0]["content"]
+    assert "Write 5 question groups" in user and "5 most important ideas" in user
+    assert "4 variants per group" in user
+    assert "4 per group" in system            # system step 3, templated too
+    assert "{n_questions}" not in user and "{n_variants}" not in (user + system)
+
+
+def test_counts_are_configurable():
+    msgs = build_messages("body", n_questions=3, n_variants=6)
+    user, system = msgs[1]["content"], msgs[0]["content"]
+    assert "Write 3 question groups" in user and "6 variants per group" in user
+    assert "6 per group" in system
+
+
+def test_task_brief_is_subject_neutral():
+    user = build_messages("body")[1]["content"]
+    assert "c5" not in user and "Five concepts" not in user   # no hard-coded coding question
+    # code is now conditional on the course's declared domain, not assumed
+    assert "comes from the COURSE DOMAIN above" in user
+
+
+def test_counts_use_replace_so_overrides_keep_literal_braces(tmp_path):
+    # counts are substituted with str.replace, not str.format, so a course's task override may
+    # contain literal { } without blowing up
+    d = tmp_path / ".vtconfig" / "prompts" / "quiz"
+    d.mkdir(parents=True)
+    (d / "task.md").write_text(
+        "---\nname: task\ncategory: quiz\n---\n\n"
+        "Make {n_questions} groups. Keep literal: {placeholder}.\n", encoding="utf-8")
+    user = build_messages("body", project_root=tmp_path, n_questions=7)[1]["content"]
+    assert "Make 7 groups" in user
+    assert "{placeholder}" in user            # untouched — not treated as a format field

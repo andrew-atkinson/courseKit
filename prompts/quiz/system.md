@@ -17,9 +17,9 @@ Re-calling is free and leaves no trace of the old version.
 Work in this order:
 1. create_checklist       - one item per concept you plan to write.
 2. create_question_group  - once per concept, before any of its variants.
-3. add_<type>_variant     - once per FINISHED variant, four per group, labels A, B, C, D.
+3. add_<type>_variant     - once per FINISHED variant, {n_variants} per group, labels A, B, C, …
                             Each reply tells you what is still missing. Read it.
-4. mark_complete          - once a group's four variants are all recorded.
+4. mark_complete          - once a group's {n_variants} variants are all recorded.
 5. get_bank_report        - once, when you believe you are done.
 6. finalize_bank          - last. If it reports problems, fix them with more add_ calls
                             and call it again.

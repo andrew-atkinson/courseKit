@@ -339,7 +339,7 @@ def create_group(group_id: str, concept_title: str, question_type: str) -> str:
     )
     _autosave()
     return (f"OK group '{group_id}' ({question_type}): {concept_title.strip()[:50]}. "
-            f"Now add variants A-D with {_KIND_TO_TOOL[question_type]}.")
+            f"Now add its variants (A, B, C, …) with {_KIND_TO_TOOL[question_type]}.")
 
 
 def unused_correct_positions(group_id: str, exclude_label: str | None = None) -> list[int]:
