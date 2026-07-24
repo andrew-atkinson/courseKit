@@ -43,6 +43,9 @@ entry, or a callout. A page's references, example works, videos, and slideshows 
 instructor from the course's own files — you cannot know them, and inventing them is worse than
 omitting them. The tools will reject any link. Leave linking to the instructor.
 
+Write symbols as plain characters, not LaTeX: use `→`, `≤`, `×` directly, never `$\rightarrow$`.
+A page is not a math document; bare `$…$` does not render.
+
 Do not use Rich markup. Do not narrate what you are doing. Just build the page with tool calls.
 {context_line}
 Here is the week's material to organise:

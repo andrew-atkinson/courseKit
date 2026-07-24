@@ -29,11 +29,59 @@ _BOLD = re.compile(r"\*\*(.+?)\*\*")
 _ITAL = re.compile(r"\*(.+?)\*")
 _CODE = re.compile(r"`(.+?)`")
 
+# ------------------------------------------------------------------- inline math
+#
+# Models trained on math-heavy text emit LaTeX (`$\rightarrow$`, `$a \leq b$`) even for an art
+# course; Canvas does NOT render bare `$…$`, so it would ship as literal source. The strategy here
+# is deliberately the *simple* one — map the handful of symbols that actually show up to their
+# Unicode glyph and drop the delimiters, so `$\rightarrow$` becomes `→` with no MathJax needed.
+#
+# `_render_math` is the single swap point. To add real typeset math later, replace it with a
+# strategy that wraps spans in Canvas's `\(…\)` MathJax delimiters (or emits equation markup); the
+# call site in `_md_inline` does not change. Crucially, this version is *information-preserving*: a
+# span whose LaTeX it cannot fully resolve is left untouched (still `$…\command…$`), which is
+# exactly what a future MathJax pass would look for — nothing is destroyed on the way through.
+_LATEX_UNICODE = {
+    r"\rightarrow": "→", r"\to": "→", r"\Rightarrow": "⇒", r"\implies": "⇒",
+    r"\leftarrow": "←", r"\gets": "←", r"\leftrightarrow": "↔", r"\mapsto": "↦",
+    r"\uparrow": "↑", r"\downarrow": "↓",
+    r"\leq": "≤", r"\le": "≤", r"\geq": "≥", r"\ge": "≥", r"\neq": "≠", r"\ne": "≠",
+    r"\times": "×", r"\div": "÷", r"\cdot": "·", r"\pm": "±", r"\mp": "∓",
+    r"\approx": "≈", r"\equiv": "≡", r"\propto": "∝", r"\infty": "∞", r"\partial": "∂",
+    r"\pi": "π", r"\tau": "τ", r"\theta": "θ", r"\alpha": "α", r"\beta": "β",
+    r"\gamma": "γ", r"\delta": "δ", r"\lambda": "λ", r"\mu": "μ", r"\sigma": "σ", r"\phi": "φ",
+    r"\degree": "°", r"\circ": "∘", r"\sum": "∑", r"\prod": "∏", r"\sqrt": "√",
+    r"\ldots": "…", r"\dots": "…", r"\cdots": "⋯",
+}
+_MATH_TOKEN = re.compile(r"\\[a-zA-Z]+")
+# $…$ only counts as math when it contains a \command — so prose like "$5 and $10" is left alone.
+_DOLLAR_MATH = re.compile(r"\$([^$]*\\[a-zA-Z][^$]*)\$")
+_PAREN_MATH = re.compile(r"\\\((.+?)\\\)")   # \(…\): an explicit LaTeX inline-math delimiter
+
+
+def _render_math(s: str) -> str:
+    """Resolve inline LaTeX math to Unicode; leave anything it can't fully resolve intact.
+
+    The one swap point for math rendering (see the note above). A span is converted only when
+    every `\\command` in it maps to a glyph; otherwise the original `$…$` / `\\(…\\)` is preserved
+    so no information is lost and a later MathJax strategy can pick it up.
+    """
+    def _resolve(inner: str):
+        converted = _MATH_TOKEN.sub(lambda t: _LATEX_UNICODE.get(t.group(0), t.group(0)), inner)
+        return converted, _MATH_TOKEN.search(converted) is None   # (text, fully_resolved?)
+
+    def _span(m):
+        converted, done = _resolve(m.group(1))
+        return converted if done else m.group(0)
+
+    return _PAREN_MATH.sub(_span, _DOLLAR_MATH.sub(_span, s))
+
 
 def _md_inline(value) -> Markup:
-    """Escape, then apply inline Markdown (**bold**, *italic*, `code`). Escaping first means the
-    Markdown markers act on safe text and a user's `<` is already `&lt;`."""
+    """Escape, resolve inline math, then apply inline Markdown (**bold**, *italic*, `code`).
+    Escaping first means every later pass acts on safe text and a user's `<` is already `&lt;`."""
     s = str(escape(value))
+    s = _render_math(s)
     s = _BOLD.sub(r"<strong>\1</strong>", s)
     s = _ITAL.sub(r"<em>\1</em>", s)
     s = _CODE.sub(r"<code>\1</code>", s)

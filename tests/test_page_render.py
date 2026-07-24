@@ -43,6 +43,38 @@ def test_inline_markdown_in_prose(fresh):
     assert "<em>em</em>" in body
 
 
+# --------------------------------------------- inline math (LaTeX → Unicode)
+
+def test_latex_arrow_becomes_a_unicode_glyph(fresh):
+    # the real bug: the model emitted `$\rightarrow$`, which Canvas ships as literal source.
+    body = render_body(_page_with(
+        dict(kind="bullets", block_id="b", items=[r"Rotate $\rightarrow$ Translate"])))
+    assert "→" in body
+    assert r"\rightarrow" not in body and "$" not in body
+
+
+def test_latex_resolves_inside_columns_too(fresh):
+    body = render_body(_page_with(dict(kind="columns", block_id="c", columns=[
+        {"title": "Correct", "items": [r"Translate $\rightarrow$ Rotate", r"$a \leq b$"]},
+        {"title": "Wrong", "items": [r"Rotate $\rightarrow$ Translate"]}])))
+    assert "→" in body and "≤" in body
+    assert "$" not in body
+
+def test_bare_dollar_amounts_are_not_treated_as_math(fresh):
+    # "$5 and $10" has no LaTeX command between the dollars — leave the prose alone.
+    body = render_body(_page_with(
+        dict(kind="paragraph", block_id="p", text="it costs $5 and $10 total")))
+    assert "$5 and $10" in body
+
+
+def test_unresolved_latex_is_left_intact_for_mathjax_later(fresh):
+    # a command we don't map (\frac) is preserved as a delimited span — the seam a future
+    # MathJax strategy targets; nothing is silently mangled or dropped.
+    body = render_body(_page_with(
+        dict(kind="paragraph", block_id="p", text=r"the ratio $\frac{a}{b}$ matters")))
+    assert r"$\frac{a}{b}$" in body
+
+
 # --------------------------------------------- the escaping round-trip
 
 def test_hostile_code_is_escaped_and_survives(fresh):
