@@ -3,10 +3,10 @@
 Source of truth for the structural diagrams. Kept in `agent/` alongside the other tracked references.
 Presented version: <https://claude.ai/code/artifact/e0d099ed-016c-4911-a75d-7805d5dbffe0>
 
-Verified 19 July 2026 against quizbot branch `coursekit-spine` and the videotranscriber source at
-`~/video_transcription` (6,542 lines, 15 modules). The test count lives only in `README.md`, where
-a meta-test (`tests/test_docs_facts.py`) keeps it honest — it is deliberately not repeated here,
-because a number stated in two places rots in one of them.
+Verified 23 July 2026 against quizbot branch `coursekit-spine`. The videotranscriber (separate repo
+at `~/video_transcription`) is unchanged since the 19 July pass. The test count lives only in
+`README.md`, where a meta-test (`tests/test_docs_facts.py`) keeps it honest — it is deliberately not
+repeated here, because a number stated in two places rots in one of them.
 
 ## Data flow
 
@@ -25,32 +25,43 @@ flowchart TB
     end
 
     subgraph CD [" COURSE DIRECTORY · the integration bus "]
-        CFG[".vtconfig/config.yaml<br/>model + prompt names"]
+        CFG[".vtconfig/config.yaml<br/>transcriber settings"]
         CTX[".vtconfig/context.yaml<br/>course · weeks · modules"]
+        QY[".vtconfig/quiz.yaml · page.yaml<br/>quizbot settings"]
+        SUPP[".vtconfig/pages/*.yaml supplements<br/>style.yaml theme"]
         TRANS["output/week N/week-N.md"]
     end
 
     subgraph QB [" GENERATE · text to structure "]
-        DISC["discover.py"] --> CONX["context.py"] --> PIPE["pipeline.py"] --> TOOLS["tools.py"] --> BANK["bank.py"]
+        DISC["discover.py"] --> PIPE["pipeline.py<br/>run_unit · run_course · loop"]
+        PIPE --> SEAM{{"Generator seam<br/>generate/base.py"}}
+        SEAM --> QG["quiz: tools.py → bank.py"]
+        SEAM --> PGN["page: tools.py → page.py<br/>renderer + components"]
     end
 
-    IR[("<b>bank.json</b><br/>canonical IR")]
+    IRB[("<b>bank.json</b><br/>canonical IR")]
+    IRP[("<b>page.json</b><br/>canonical IR")]
 
     subgraph EM [" EMIT · structure to artifacts "]
         GIFT["gift.py"]
         QTI["qti.py"]
+        HTML["html.py"]
+        CC["cc.py"]
         APIE["canvas API emitter"]
     end
 
     ZIP[/"QTI .zip"/]
     GF[/"bank.gift"/]
+    PHTML[/"page .html"/]
+    IMSCC[/"pages .imscc"/]
     CANVAS(["<b>Canvas</b>"])
 
     subgraph SPINE [" coursekit · THE SHARED SPINE "]
         PROV["providers/"]
-        PROM["prompts.py + prompts/quiz/"]
+        PROM["prompts.py + prompts/{quiz,page}/"]
         HW["hardware.py"]
-        CCFG["courseconfig<br/><i>not built</i>"]
+        CCFG["courseconfig.py"]
+        BASE["Generator seam · generate/base.py"]
     end
 
     MEDIA --> VTT
@@ -58,12 +69,18 @@ flowchart TB
     VTC --> CTX
     VTF --> TRANS
     CD -- "read by" --> DISC
-    BANK --> IR
-    IR --> GIFT & QTI
-    IR -.-> APIE
+    QG --> IRB
+    PGN --> IRP
+    IRB --> GIFT & QTI
+    IRB -.-> APIE
+    IRP --> HTML & CC
+    SUPP -- "merged at render" --> HTML & CC
     GIFT --> GF
     QTI --> ZIP
+    HTML --> PHTML
+    CC --> IMSCC
     ZIP -- "file import" --> CANVAS
+    IMSCC -- "course import" --> CANVAS
     APIE -.-> CANVAS
     SPINE -.- PIPE
     SPINE -.- ING
@@ -74,8 +91,12 @@ scan *plus a Canvas `imsmanifest.xml`* — which is why CC101's context.yaml rec
 `sources: [filesystem, canvas_manifest]`. Module and week titles come out of a course export and
 end up shaping quiz prompts. The loop closes.
 
-**The waist.** Every input converges on `bank.json`; every emitter reads only it. Adding a platform
-costs one emitter, not one converter per input. It is also why QTI export needs no model.
+**The waist.** Each artifact family has one canonical IR — quizzes converge on `bank.json`, pages on
+`page.json` — and every emitter reads only its IR (gift/qti from `bank.json`; html/cc from
+`page.json`). Adding a platform costs one emitter, not one converter per input, and re-emitting needs
+no model: `--to-qti`, `--to-html`, and `--to-cc` all rebuild from the committed JSON. The one seam
+above the waist — `generate/base.py` — lets a new generator reuse the whole driver, which is how the
+page generator landed without touching `run_unit`.
 
 ## The course directory is the integration bus
 
