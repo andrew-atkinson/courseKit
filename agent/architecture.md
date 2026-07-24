@@ -8,95 +8,97 @@ at `~/video_transcription`) is unchanged since the 19 July pass. The test count 
 `README.md`, where a meta-test (`tests/test_docs_facts.py`) keeps it honest — it is deliberately not
 repeated here, because a number stated in two places rots in one of them.
 
-## Data flow
+## Two views
+
+The system is two independent tools that meet through files, and a single pipeline inside this repo.
+Those are different stories, so they get different diagrams — the first shows *how the tools connect*,
+the second shows *what happens inside coursekit*. (Module-level dependencies are the third view,
+[below](#dependency-direction).)
+
+### View 1 — two tools, one bus
 
 ```mermaid
-flowchart TB
-    MEDIA[/"lecture video"/]
-    MANIFEST[/"imsmanifest.xml<br/>from a Canvas export"/]
+flowchart LR
+    canvas(["<b>Canvas</b>"])
 
-    subgraph ING [" INGEST · media to text "]
-        VTC["vt_context.py<br/>builds course structure"]
-        VTT["vt_transcribe.py<br/>mlx-whisper"]
-        VTD["vt_describe.py → vt_extract.py<br/>vision + knowledge"]
-        VTA["vt_analyze.py<br/>pedagogy + SME passes"]
-        VTF["vt_format.py → vt_rich.py"]
-        VTT --> VTD --> VTA --> VTF
+    subgraph VT [" videotranscriber · separate repo "]
+        direction TB
+        vtpipe["transcribe → describe<br/>→ analyze → format"]
+        vtctx["vt_context.py"]
     end
 
-    subgraph CD [" COURSE DIRECTORY · the integration bus "]
-        CFG[".vtconfig/config.yaml<br/>transcriber settings"]
-        CTX[".vtconfig/context.yaml<br/>course · weeks · modules"]
-        QY[".vtconfig/quiz.yaml · page.yaml<br/>quizbot settings"]
-        SUPP[".vtconfig/pages/*.yaml supplements<br/>style.yaml theme"]
-        TRANS["output/week N/week-N.md"]
+    subgraph BUS [" .vtconfig/ · the course-directory bus "]
+        direction TB
+        ctx["context.yaml<br/>course · weeks · modules"]
+        md["output/week-N.md<br/>transcripts"]
+        cfg["quiz.yaml · page.yaml<br/>pages/*.yaml · style.yaml"]
     end
 
-    subgraph QB [" GENERATE · text to structure "]
-        DISC["discover.py"] --> PIPE["pipeline.py<br/>run_unit · run_course · loop"]
-        PIPE --> SEAM{{"Generator seam<br/>generate/base.py"}}
-        SEAM --> QG["quiz: tools.py → bank.py"]
-        SEAM --> PGN["page: tools.py → page.py<br/>renderer + components"]
+    subgraph CK [" coursekit · this repo "]
+        direction TB
+        gen["generate<br/>bank.json · page.json"]
+        emit["emit<br/>.gift · QTI .zip · .html · pages .imscc"]
+        gen --> emit
     end
 
-    IRB[("<b>bank.json</b><br/>canonical IR")]
-    IRP[("<b>page.json</b><br/>canonical IR")]
-
-    subgraph EM [" EMIT · structure to artifacts "]
-        GIFT["gift.py"]
-        QTI["qti.py"]
-        HTML["html.py"]
-        CC["cc.py"]
-        APIE["canvas API emitter"]
-    end
-
-    ZIP[/"QTI .zip"/]
-    GF[/"bank.gift"/]
-    PHTML[/"page .html"/]
-    IMSCC[/"pages .imscc"/]
-    CANVAS(["<b>Canvas</b>"])
-
-    subgraph SPINE [" coursekit · THE SHARED SPINE "]
-        PROV["providers/"]
-        PROM["prompts.py + prompts/{quiz,page}/"]
-        HW["hardware.py"]
-        CCFG["courseconfig.py"]
-        BASE["Generator seam · generate/base.py"]
-    end
-
-    MEDIA --> VTT
-    CANVAS -- "export" --> MANIFEST --> VTC
-    VTC --> CTX
-    VTF --> TRANS
-    CD -- "read by" --> DISC
-    QG --> IRB
-    PGN --> IRP
-    IRB --> GIFT & QTI
-    IRB -.-> APIE
-    IRP --> HTML & CC
-    SUPP -- "merged at render" --> HTML & CC
-    GIFT --> GF
-    QTI --> ZIP
-    HTML --> PHTML
-    CC --> IMSCC
-    ZIP -- "file import" --> CANVAS
-    IMSCC -- "course import" --> CANVAS
-    APIE -.-> CANVAS
-    SPINE -.- PIPE
-    SPINE -.- ING
+    canvas -- "export · imsmanifest.xml" --> vtctx
+    vtpipe --> md
+    vtctx --> ctx
+    BUS --> CK
+    emit -- "import" --> canvas
 ```
 
-**Canvas is a source as well as a sink.** `vt_context.py` builds `context.yaml` from a media-dir
-scan *plus a Canvas `imsmanifest.xml`* — which is why CC101's context.yaml records
-`sources: [filesystem, canvas_manifest]`. Module and week titles come out of a course export and
-end up shaping quiz prompts. The loop closes.
+**Neither tool imports the other; the contract is the course directory.** The transcriber writes
+`context.yaml` + `week-N.md`; coursekit reads them. That file boundary is what lets them stay
+separate repos with disjoint runtimes — the transcriber keeps `mlx-whisper` and its Apple-Silicon
+stack; coursekit stays pydantic + stdlib.
+
+**Canvas is a source as well as a sink.** `vt_context.py` builds `context.yaml` from a media-dir scan
+*plus a Canvas `imsmanifest.xml`* — CC101's context.yaml records `sources: [filesystem,
+canvas_manifest]`. Course and week titles come out of a Canvas export, shape the prompts, and the
+generated artifacts import back into Canvas. The loop closes.
+
+### View 2 — the coursekit pipeline (the waist)
+
+```mermaid
+flowchart LR
+    md[/"week-N.md<br/>+ context.yaml"/] --> disc["discover.py<br/>units"]
+    disc --> pipe["pipeline.py<br/>run_course · run_unit · loop"]
+
+    subgraph SEAM [" Generator seam · generate/base.py "]
+        direction TB
+        qgen["quiz generator<br/>tools.py → bank.py"]
+        pgen["page generator<br/>tools.py → page.py"]
+    end
+    pipe --> SEAM
+
+    qgen --> bank[("<b>bank.json</b>")]
+    pgen --> page[("<b>page.json</b>")]
+
+    bank --> gift["gift.py"] --> gout[/".gift"/]
+    bank --> qti["qti.py"] --> zip[/"QTI .zip"/]
+
+    page --> render["renderer · render_body<br/>one renderer, two paths"]
+    render --> html["html.py"] --> hout[/".html"/]
+    render --> cc["cc.py"] --> imscc[/"pages .imscc"/]
+
+    supp[/"pages/*.yaml<br/>style.yaml"/] -. "merged in render" .-> render
+
+    zip -- "QTI import" --> canvas(["<b>Canvas</b>"])
+    imscc -- "course import" --> canvas
+```
 
 **The waist.** Each artifact family has one canonical IR — quizzes converge on `bank.json`, pages on
 `page.json` — and every emitter reads only its IR (gift/qti from `bank.json`; html/cc from
 `page.json`). Adding a platform costs one emitter, not one converter per input, and re-emitting needs
-no model: `--to-qti`, `--to-html`, and `--to-cc` all rebuild from the committed JSON. The one seam
-above the waist — `generate/base.py` — lets a new generator reuse the whole driver, which is how the
-page generator landed without touching `run_unit`.
+no model: `--to-qti`, `--to-html`, and `--to-cc` rebuild from the committed JSON. A Canvas **API**
+emitter is the gated third delivery path — it will read the same two IRs, so it is one more emitter,
+not a new pipeline.
+
+**The one seam above the waist** — `generate/base.py` — is what the driver speaks: `pipeline.loop`
+knows only `reset · tools · run_tool_calls · is_finalized · nudge · result`, nothing about quizzes or
+pages. That is how the page generator reused the whole driver without touching `run_unit`, and why a
+third generator would too.
 
 ## The course directory is the integration bus
 
@@ -112,19 +114,37 @@ its Apple-Silicon dependency; quizbot's runtime stays pydantic + stdlib. It also
 
 ```mermaid
 flowchart LR
-    VT["videotranscriber"] -.->|"not yet"| CK
-    QZ["quiz generator"] --> CK
-    PG["page generator"] --> CK
-    CK["<b>coursekit</b><br/>providers · prompts<br/>hardware · courseconfig · <b>Generator seam</b>"]
+    VT["videotranscriber<br/>separate repo"]
+
+    subgraph GENS [" generators · this repo "]
+        direction TB
+        QZ["quiz generator"]
+        PG["page generator"]
+    end
+
+    CK["<b>coursekit spine</b><br/>providers · prompts · hardware<br/>courseconfig · Generator seam"]
+
+    VT == "produces the documents<br/>they consume · data" ==> GENS
+    QZ -- "imports" --> CK
+    PG -- "imports" --> CK
+    VT -. "imports · not yet" .-> CK
 ```
 
-Both generators now depend on the spine through the same `Generator` seam
-(`coursekit/generate/base.py`): the driver (`run_unit`/`run_course`/`loop`) knows nothing about
-quizzes or pages, so the page generator reused it without touching it. Quiz = `bank.json` → GIFT/QTI;
-page = `page.json` → HTML (Jinja components), with instructor supplements merged at render time.
+**Two kinds of arrow, because there are two kinds of dependency** — the earlier version showed only
+the code one, which made the transcriber look barely connected when in fact everything downstream
+starts with its output.
 
-One direction only, no cycle. **Quizbot depends on the spine today; the transcriber does not yet** —
-it still has its own copies. That's the migration debt, and it is measurable:
+- **Data (thick).** The transcriber produces the `week-N.md` documents the generators turn into
+  artifacts — the generators are *downstream* of it. The coupling is through the course directory,
+  not an import (any markdown works; the transcriber is just where the documents come from), which is
+  exactly why they can be separate repos.
+- **Code (thin).** Both generators import the coursekit spine through the one `Generator` seam
+  (`generate/base.py`): the driver (`run_unit`/`run_course`/`loop`) knows nothing about quizzes or
+  pages, so the page generator reused it untouched. Quiz = `bank.json` → GIFT/QTI; page = `page.json`
+  → HTML, supplements merged at render.
+
+No cycle on either axis. The transcriber does **not** import the spine yet — same capabilities, its
+own copies — and that dashed edge is the migration debt, which is measurable:
 
 | Concern | videotranscriber | coursekit | Status |
 | --- | --- | --- | --- |
