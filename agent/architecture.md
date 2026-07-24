@@ -165,10 +165,14 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
    courseconfig) is complete.
 3. ✅ **The rename** (quizbot → coursekit) — done, one isolated commit, into the package layout above.
 4. ✅ **Generator #2 (pages)** — done: the `Generator` seam + `page.json` IR + Jinja renderer +
-   standalone-HTML emitter + a per-week supplements file for instructor links. **Still open in this
-   increment:** the Common Cartridge page emitter (`emit/cc.py`) — the format is fully ground-truthed
-   from the CC101 export (`type="webcontent"` + the wiki-page meta header + `module_meta.xml`), so
-   it is build-then-import-test; and a real-model page run through LM Studio (the offline slice is
+   standalone-HTML emitter + a per-week supplements file for instructor links + the **Common
+   Cartridge page emitter** (`emit/cc.py`, `--to-cc`) — one `.imscc` of `type="webcontent"` wiki
+   pages that imports as **Pages** (the `course_settings/canvas_export.txt` marker flips Canvas into
+   its own importer; without it webcontent lands in Files) and places them in one module via
+   `course_settings/module_meta.xml` + the manifest's `<organizations>` tree. Never ships
+   `course_settings.xml`, so it can't mutate the target course. Ground-truthed against the CC101
+   export; a first import confirmed the styled body survives Canvas's sanitizer. **Open:** confirming
+   the Pages/modules import in situ, and a real-model page run through LM Studio (the offline slice is
    proven with a fake provider).
 5. **Migrate the transcriber onto the spine** — providers first, taking the union of capabilities.
 6. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class.

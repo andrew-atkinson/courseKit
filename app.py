@@ -18,6 +18,7 @@ from coursekit import pipeline
 from coursekit.emit import qti
 from coursekit import courseconfig
 from coursekit.emit import html as html_emit
+from coursekit.emit import cc as cc_emit
 from coursekit.generate.page.generator import PageGenerator
 from coursekit.providers import get_provider
 
@@ -108,6 +109,9 @@ def main(argv=None) -> int:
     parser.add_argument("--to-html", metavar="PATH",
                         help="model-free: re-render every page.json under PATH to HTML, merging "
                              "the course's current supplements")
+    parser.add_argument("--to-cc", metavar="PATH",
+                        help="model-free: package every page.json under PATH into ONE Canvas "
+                             ".imscc that imports as Pages")
     parser.add_argument("--bundle", action="store_true",
                         help="with --to-qti: write ONE package containing every quiz, "
                              "so a single Canvas import brings them all in")
@@ -126,6 +130,14 @@ def main(argv=None) -> int:
         for _, out in results:
             print(f"  [OK]   {out}")
         print(f"\n{len(results)} page(s).")
+        return 0
+
+    if args.to_cc:
+        out = cc_emit.write_imscc(args.to_cc)
+        if out is None:
+            print(f"No page.json found under {args.to_cc}")
+            return 1
+        print(f"Canvas Common Cartridge:\n  [OK]   {out}")
         return 0
 
     if not args.path:
