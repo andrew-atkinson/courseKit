@@ -19,7 +19,8 @@ the second shows *what happens inside coursekit*. (Module-level dependencies are
 
 ```mermaid
 flowchart LR
-    canvas(["<b>Canvas</b>"])
+    media[/"lecture video"/]
+    seed[/"prior Canvas export<br/>imsmanifest.xml · optional"/]
 
     subgraph VT [" videotranscriber · separate repo "]
         direction TB
@@ -41,7 +42,10 @@ flowchart LR
         gen --> emit
     end
 
-    canvas -- "export · imsmanifest.xml" --> vtctx
+    canvas([" Canvas · delivery "])
+
+    media --> vtpipe
+    seed -. "seed structure · once" .-> vtctx
     vtpipe --> md
     vtctx --> ctx
     BUS --> CK
@@ -53,10 +57,13 @@ flowchart LR
 separate repos with disjoint runtimes — the transcriber keeps `mlx-whisper` and its Apple-Silicon
 stack; coursekit stays pydantic + stdlib.
 
-**Canvas is a source as well as a sink.** `vt_context.py` builds `context.yaml` from a media-dir scan
-*plus a Canvas `imsmanifest.xml`* — CC101's context.yaml records `sources: [filesystem,
-canvas_manifest]`. Course and week titles come out of a Canvas export, shape the prompts, and the
-generated artifacts import back into Canvas. The loop closes.
+**No dependency cycle — Canvas is a sink, optionally a one-time seed.** The generated artifacts import
+into Canvas; that is the delivery. Separately, when a course already lives in Canvas, a *prior*
+export's `imsmanifest.xml` can seed `context.yaml` with the real module and week titles (CC101
+records `sources: [filesystem, canvas_manifest]`). That is a workflow loop across a course's life, not
+a coupling: `vt_context.py` reads an export **file**, and coursekit writes an import **package** —
+nothing calls or imports Canvas, and `context.yaml` builds fine from a filesystem scan alone (the seed
+is dashed because it is optional).
 
 ### View 2 — the coursekit pipeline (the waist)
 
