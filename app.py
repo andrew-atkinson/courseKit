@@ -1,10 +1,13 @@
 """CLI entry point. All orchestration lives in pipeline.py; this only parses args, builds the
 LM Studio client, and prints a summary.
 
-    python app.py [PATH] [--week N ...] [--weeks A-B] [--output-root DIR] [--dry-run]
+    python app.py [PATH] [--quizzes | --pages | --all] [--week N ...] [--weeks A-B]
+                  [--output-root DIR] [--dry-run]
 
 PATH is a transcript file or a directory of them; it defaults to the TRANSCRIPTION env var.
-Artifacts are written with the course (a sibling quizzes/ tree), never into this repo.
+By default a run generates BOTH quizzes and pages (equivalent to --all); --quizzes or --pages
+narrows it to one. Artifacts are written with the course (sibling quizzes/ and pages/ trees),
+never into this repo.
 """
 
 import argparse
@@ -20,7 +23,18 @@ from coursekit import courseconfig
 from coursekit.emit import html as html_emit
 from coursekit.emit import cc as cc_emit
 from coursekit.generate.page.generator import PageGenerator
+from coursekit.generate.quiz.generator import QuizGenerator
 from coursekit.providers import get_provider
+
+
+def _select_generators(args):
+    """Which generators a run drives. Default (and --all) is both; --quizzes / --pages narrow to
+    one. Quizzes run first so a combined run leaves the pages step last."""
+    if args.quizzes and not args.pages:
+        return [QuizGenerator()]
+    if args.pages and not args.quizzes:
+        return [PageGenerator()]
+    return [QuizGenerator(), PageGenerator()]
 
 
 def _build_provider():
@@ -103,7 +117,11 @@ def main(argv=None) -> int:
     parser.add_argument("--dry-run", action="store_true",
                         help="list the units that would be processed, without calling the model")
     parser.add_argument("--pages", action="store_true",
-                        help="generate course pages instead of quizzes")
+                        help="generate only course pages (default is both quizzes and pages)")
+    parser.add_argument("--quizzes", action="store_true",
+                        help="generate only quizzes (default is both quizzes and pages)")
+    parser.add_argument("--all", action="store_true",
+                        help="generate both quizzes and pages (the default; explicit form)")
     parser.add_argument("--to-qti", metavar="PATH",
                         help="model-free: write a Canvas QTI .zip beside every bank.json under PATH")
     parser.add_argument("--to-html", metavar="PATH",
@@ -144,33 +162,37 @@ def main(argv=None) -> int:
         parser.error("no PATH given and TRANSCRIPTION is not set")
 
     weeks = _parse_weeks(args)
-    generator = PageGenerator() if args.pages else None   # None → the default quiz generator
+    generators = _select_generators(args)
     provider = None if args.dry_run else _build_provider()
-    # MODEL_NAME (env) wins; otherwise the course's own <generator>.yaml `model` key. Resolved from
-    # the input path's course root — one invocation targets one course in practice.
-    config_name = "page.yaml" if args.pages else "quiz.yaml"
-    model = os.getenv("MODEL_NAME") or courseconfig.load(args.path, config_name=config_name).value("model")
 
-    if not args.dry_run:
-        verdict, msg = provider.check_fit(model)
-        if verdict is False:
-            print(f"Warning: {msg}\n")
+    incomplete = False
+    for gen in generators:
+        # MODEL_NAME (env) wins; otherwise the course's own <generator>.yaml `model` key. Each
+        # generator resolves its own — a combined run may use different models for quizzes and pages.
+        model = os.getenv("MODEL_NAME") or courseconfig.load(
+            args.path, config_name=f"{gen.category}.yaml").value("model")
 
-    try:
-        results = pipeline.run_course(
-            args.path, weeks=weeks, output_root=args.output_root,
-            provider=provider, model=model, dry_run=args.dry_run, max_iters=args.max_iters,
-            generator=generator,
-        )
-    except pipeline.ModelLoadError as e:
-        print(str(e))
-        return 2
+        if not args.dry_run:
+            verdict, msg = provider.check_fit(model)
+            if verdict is False:
+                print(f"Warning ({gen.category}): {msg}\n")
 
-    _print_summary(results, dry_run=args.dry_run)
+        try:
+            results = pipeline.run_course(
+                args.path, weeks=weeks, output_root=args.output_root,
+                provider=provider, model=model, dry_run=args.dry_run, max_iters=args.max_iters,
+                generator=gen,
+            )
+        except pipeline.ModelLoadError as e:
+            print(str(e))
+            return 2
 
-    if not args.dry_run and any(not r.finalized for r in results):
-        return 1
-    return 0
+        if len(generators) > 1:
+            print(f"\n=== {gen.category} ===")
+        _print_summary(results, dry_run=args.dry_run)
+        incomplete = incomplete or (not args.dry_run and any(not r.finalized for r in results))
+
+    return 1 if incomplete else 0
 
 
 if __name__ == "__main__":

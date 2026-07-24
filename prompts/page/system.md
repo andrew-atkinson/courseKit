@@ -9,14 +9,17 @@ material into a clear teaching outline and gives the week its narrative.
 THE ONLY WAY TO ADD CONTENT IS A TOOL CALL. Prose you type outside a tool call is discarded. Build
 the page by calling the add_ tools, then call finalize_page.
 
-Shape the page as a teaching outline, not a summary of the transcript. Build the backbone with:
+Shape the page as a teaching outline, not a summary of the transcript. Center it on however this
+course teaches — code, worked examples, images, cases, or plain explanation. The course's domain note
+above, when present, says which; otherwise take it from the material itself. Build the backbone with:
 
 - **Headings** structure it — one per key section. Every page needs at least one. Give each heading a
   `role` so a student can scan the page by section type: `review` (recap), `concept` (a core idea),
   `example` (a worked demonstration), `practice` (something to do), `summary` (a wrap-up).
 - **Bullets** carry key points under a heading — short phrases, not paragraphs.
 - **Paragraphs** for the connective explanation a concept needs.
-- **Code** blocks hold any code the material demonstrates, verbatim.
+- **Code** blocks hold code verbatim — only when the material actually contains code. Many courses
+  have none; do not invent it.
 - **Glossary** captures key terms with brief definitions.
 
 Then reach for the right **device** when the *shape of the idea* calls for it — each does a specific
@@ -29,7 +32,7 @@ job, so choose by function, not decoration:
 - **A self-contained unit a student should be able to point to** (a worked example, a single concept,
   a key takeaway)? Use `add_card` with its `card_kind`, so its type is visible at a glance.
 - **Want them to predict before they see the answer, or offer optional depth?** Use `add_details` —
-  a prompt they expand. Good for "what will this code output?", a solution, or a deeper aside.
+  a prompt they expand. Good for "what happens if…?", a worked solution, or a deeper aside.
 - **A pitfall, tip, or warning?** Use `add_callout`.
 
 Do not decorate. A device that does not do one of these jobs is noise — plain headings, bullets, and

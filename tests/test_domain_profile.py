@@ -60,3 +60,28 @@ def test_no_domain_no_preface_in_prompt(tmp_path):
     unit = _course(tmp_path)                 # no domain.md
     msgs = PageGenerator().build_messages(unit, "TRANSCRIPT", unit.config)
     assert "COURSE DOMAIN" not in msgs[0]["content"]
+
+
+# ------------------------- broadened: content shape, not only knowledge-domain correction
+
+def test_preface_frames_content_shape_and_still_corrects():
+    p = cc.domain_preface("This course centers on photographs, not code.")
+    assert "center on" in p                  # the profile can steer what a page foregrounds
+    assert "correct it silently" in p        # and still carries the drift-correction job
+
+
+def test_shipped_page_prompt_does_not_assume_code(tmp_path):
+    # with no domain profile the prompt stays discipline-neutral: code is optional, not the spine
+    unit = _course(tmp_path)
+    sys = PageGenerator().build_messages(unit, "TRANSCRIPT", unit.config)[0]["content"]
+    assert "worked examples, images, cases" in sys            # neutral framing, not code-first
+    assert "only when the material actually contains code" in sys   # code is optional
+
+
+def test_non_coding_domain_reaches_the_page_prompt(tmp_path):
+    domain = ("This course teaches digital photography. Pages center on technique and image "
+              "analysis, not code; there is no programming in this course.")
+    unit = _course(tmp_path, domain=domain)
+    sys = PageGenerator().build_messages(unit, "TRANSCRIPT", unit.config)[0]["content"]
+    assert "COURSE DOMAIN" in sys
+    assert "no programming in this course" in sys

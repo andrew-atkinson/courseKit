@@ -41,7 +41,7 @@ Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint �
 [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest -q        # 423 tests, all offline — no model needed
+uv run pytest -q        # 467 tests, all offline — no model needed
 ```
 
 ## Quick start
@@ -50,15 +50,17 @@ uv run pytest -q        # 423 tests, all offline — no model needed
 # see what it would do — free, no model
 uv run python app.py "/path/to/course export" --dry-run
 
-# quizzes: one week, a range, or the whole course
+# both quizzes AND pages, one week (the default)
 uv run python app.py "/path/to/course export" --week 3
 
-# pages instead
+# narrow to one kind
 uv run python app.py "/path/to/course export" --pages --week 3
+uv run python app.py "/path/to/course export" --quizzes --week 3
 ```
 
-`PATH` is a markdown file or a directory of per-week transcripts (`week-*.md`). Artifacts land beside
-the course (a `quizzes/` or `pages/` tree), never in this repo. The detailed guides below cover
+`PATH` is a markdown file or a directory of per-week transcripts (`week-*.md`). A run generates **both
+quizzes and pages** by default (`--all`); `--quizzes` or `--pages` narrows it. Artifacts land beside
+the course (`quizzes/` and `pages/` trees), never in this repo. The detailed guides below cover
 output, Canvas import, and per-course configuration.
 
 ## Commands
@@ -68,8 +70,9 @@ output, Canvas import, and per-course configuration.
 | `app.py PATH --dry-run`         | List the weeks it would process. No model.  |
 | `app.py PATH --week 3`          | Generate one week. Repeatable.              |
 | `app.py PATH --weeks 3-8`       | Generate an inclusive range.                |
-| `app.py PATH`                   | Generate every week found.                  |
-| `app.py PATH --pages`           | Generate course pages instead of quizzes.   |
+| `app.py PATH`                   | Both quizzes and pages, every week found.   |
+| `app.py PATH --pages`           | Only pages.                                 |
+| `app.py PATH --quizzes`         | Only quizzes.                               |
 | `app.py PATH --output-root DIR` | Write elsewhere instead of with the course. |
 | `app.py PATH --max-iters N`     | Cap model turns per week (default 80).      |
 | `app.py --to-qti DIR`           | One Canvas quiz `.zip` per week. Model-free.|

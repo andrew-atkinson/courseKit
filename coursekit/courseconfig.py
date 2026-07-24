@@ -87,10 +87,12 @@ class CourseConfig:
     def domain(self) -> str:
         """The course's domain profile (`.vtconfig/domain.md`), or ''.
 
-        Authoritative prose — what the course *is*, and its negative space (what it is not) —
-        injected into every generator's prompt. It keeps output in the right knowledge domain and,
-        crucially, lets the generator correct a source that has drifted (a transcript that slips from
-        p5.js into Processing). Never raises.
+        Authoritative prose — what the course *is*, what its artifacts should **center on**, and its
+        negative space (what it is not) — injected into every generator's prompt. It does three
+        things: fixes the knowledge domain, tells the model what a page should foreground (code,
+        images, technique, cases, plain explanation…) so the shipped prompts stay discipline-neutral,
+        and lets the generator correct a source that has drifted (a transcript that slips from p5.js
+        into Processing). Never raises.
         """
         if self.root is None:
             return ""
@@ -103,15 +105,17 @@ class CourseConfig:
             return ""
 
 
-# Prepended to a generator's system prompt when the course declares a domain. Deliberately framed as
-# authoritative and as a *correction* instruction, not just a description — the source itself can be
-# wrong, and the point is to normalise it silently rather than reproduce the drift.
+# Prepended to a generator's system prompt when the course declares a domain. Framed as authoritative
+# and broad: it fixes the knowledge domain, says what the course's artifacts should center on (so the
+# shipped prompts need not assume any one discipline), and — because the source itself can be wrong —
+# instructs the model to normalise drift silently rather than reproduce it.
 _DOMAIN_PREFACE = (
     "COURSE DOMAIN — authoritative; this overrides anything in the material below.\n"
     "{domain}\n\n"
-    "If the material drifts from this domain — a different language or tool, adjacent-but-wrong "
-    "syntax, outdated conventions — correct it silently to match the domain. Present everything as "
-    "if it had always been in this domain; do not point out the discrepancy.\n\n"
+    "Treat this as the truth about the course — its subject, what its pages should center on, and its "
+    "boundaries. Where the material drifts from it — a different tool or dialect, adjacent-but-wrong "
+    "conventions, or an emphasis this course does not share — correct it silently to match the domain. "
+    "Present everything as if it had always belonged here; do not point out the discrepancy.\n\n"
 )
 
 

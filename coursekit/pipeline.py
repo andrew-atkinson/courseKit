@@ -133,9 +133,11 @@ def run_unit(unit: Unit, provider, model, generator: Generator | None = None, *,
     out.mkdir(parents=True, exist_ok=True)
 
     gen.reset(unit, out)
-    # The course's own config for this generator (quiz.yaml, page.yaml, …) selects prompts by name
-    # and supplies the project root for file overrides. Absent config degrades to defaults.
-    cfg = unit.config or courseconfig.load(unit.transcript_path, config_name=f"{gen.category}.yaml")
+    # The course's own config for THIS generator (quiz.yaml, page.yaml, …) selects prompts by name
+    # and supplies the project root for file overrides. Load it per-generator, not from unit.config
+    # (which discover binds to quiz.yaml) — a combined run drives both generators over one unit, and
+    # the page pass must read page.yaml, not the quiz's. Absent config degrades to defaults.
+    cfg = courseconfig.load(unit.transcript_path, config_name=f"{gen.category}.yaml")
     transcript = unit.transcript_path.read_text(encoding="utf-8")
     messages = gen.build_messages(unit, transcript, cfg)
 

@@ -78,6 +78,33 @@ def test_page_generator_runs_through_the_unchanged_driver(tmp_path):
     assert saved["page_type"] == "week_intro"
 
 
+def test_run_unit_reads_page_yaml_not_quiz_yaml(tmp_path):
+    # Combined-run regression: discover binds unit.config to quiz.yaml, so run_unit must load the
+    # PAGE generator's own page.yaml — otherwise a course's page prompt selection is silently ignored
+    # (and the quiz's would leak in).
+    root = tmp_path / "course"
+    pd = root / ".vtconfig" / "prompts" / "page"
+    pd.mkdir(parents=True)
+    (root / ".vtconfig" / "page.yaml").write_text("task_prompt: brief\n", encoding="utf-8")
+    (pd / "brief.md").write_text("PAGE-BRIEF-MARKER", encoding="utf-8")
+    # a quiz.yaml that would mislead if it were (wrongly) used for the page pass
+    (root / ".vtconfig" / "quiz.yaml").write_text("task_prompt: exam\n", encoding="utf-8")
+    f = root / "output" / "week-3.md"
+    f.parent.mkdir(parents=True)
+    f.write_text("body", encoding="utf-8")
+    unit = find_units(f)[0]
+
+    raw = _ScriptedRaw(PAGE_SCRIPT)
+    captured = {}
+    _create = raw.create
+    raw.create = lambda **kw: (captured.setdefault("messages", kw["messages"]), _create(**kw))[1]
+    provider = OpenAICompatProvider(client=raw, name="fake")
+
+    run_unit(unit, provider, "fake-model", PageGenerator())
+
+    assert "PAGE-BRIEF-MARKER" in captured["messages"][1]["content"]   # page.yaml's brief was used
+
+
 def test_page_generator_uses_the_shipped_page_prompts(tmp_path):
     # No .vtconfig: prompts resolve to the shipped prompts/page/{system,task}.md.
     f = tmp_path / "week-3.md"
