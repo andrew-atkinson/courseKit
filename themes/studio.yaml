@@ -1,0 +1,36 @@
+name: studio
+voice: "The gallery wall — big, light display serifs over quiet sans; hairline frames; the images are the color."
+type:
+  heading_family: "Didot, 'Bodoni 72', 'Playfair Display', Georgia, serif"
+  body_family: "'Helvetica Neue', -apple-system, 'Segoe UI', Arial, sans-serif"
+  mono_family: "ui-monospace, Menlo, Consolas, monospace"
+  base_size: 16
+  heading_weight: 400
+  heading_prefix: ""
+  heading_sizes: { 2: 40, 3: 30, 4: 22 }   # the adventurous move: scale, not ornament
+color:
+  ink: "#222222"
+  muted: "#6b6b6b"
+  accent: "#9c2d2d"
+  tints:
+    note: "#f5f5f4"
+    tip: "#f0f2f0"
+    warning: "#f7ecec"
+  frame_bg: "#ffffff"
+  frame_border: "#e4e4e2"
+  code_bg: "#f5f5f4"
+  code_fg: "#222222"
+glyphs:
+  roles: { review: "·", concept: "—", practice: "✳", example: "❍", summary: "■" }
+  tones: { note: "·", tip: "✳", warning: "▲" }
+space:
+  unit: 8
+  section_gap: 64
+  density: comfortable
+shape:
+  section_frame: card
+  frame_style: solid
+  frame_roles: [concept, example]
+  heading_marker: none
+  radius: 2
+  border_width: 1

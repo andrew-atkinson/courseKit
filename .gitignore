@@ -9,9 +9,12 @@ uv.lock
 .env
 
 # folders
-docs
+# Track the markdown docs/guides; keep the heavy Canvas exports + samples out of git.
+docs/*
+!docs/*.md
 input/
 output/
+reference/
 
 # me only
 setup.md

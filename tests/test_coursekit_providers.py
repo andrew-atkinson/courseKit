@@ -1,5 +1,4 @@
 import pytest
-
 from coursekit.providers import (OpenAICompatProvider, Reply, ToolCall, get_provider,
                                  provider_names)
 

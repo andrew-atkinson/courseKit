@@ -1,4 +1,4 @@
-import hardware
+from coursekit import hardware
 
 
 def _stub(monkeypatch, models, available):
@@ -56,3 +56,31 @@ def test_already_loaded_model_always_fits(monkeypatch):
     verdict, msg = hardware.check_fit("gemma")
     assert verdict is True
     assert "already loaded" in msg
+
+
+# ------------------------------------------- fit-checking via the provider
+
+def test_local_provider_delegates_to_the_ram_check(monkeypatch):
+    from coursekit.providers import OpenAICompatProvider
+    _stub(monkeypatch, [{"modelKey": "big", "sizeBytes": 19 * 1024**3}], available=21.0)
+    p = OpenAICompatProvider(client=object(), is_local=True)
+    verdict, msg = p.check_fit("big")
+    assert verdict is False and "may fail to load" in msg
+
+
+def test_hosted_provider_reports_unknown_not_a_local_ram_verdict(monkeypatch):
+    """A cloud endpoint has no local RAM budget — measuring the caller's machine and
+    warning about it would be actively misleading."""
+    from coursekit.providers import OpenAICompatProvider
+    _stub(monkeypatch, [{"modelKey": "gpt", "sizeBytes": 500 * 1024**3}], available=1.0)
+    p = OpenAICompatProvider(client=object(), is_local=False)
+    assert p.check_fit("gpt") == (None, "")
+
+
+def test_base_provider_default_is_unknown():
+    from coursekit.providers.base import Provider
+    class _Bare(Provider):
+        def chat_with_tools(self, **kw): ...
+        def append_assistant(self, messages, reply): ...
+        def append_tool_results(self, messages, results): ...
+    assert _Bare().check_fit("anything") == (None, "")

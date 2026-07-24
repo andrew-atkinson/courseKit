@@ -1,11 +1,9 @@
 import xml.etree.ElementTree as ET
 import zipfile
-
 import pytest
-
-import bank as bankmod
-import qti
-from bank import Bank
+from coursekit.generate.quiz import bank as bankmod
+from coursekit.emit import qti
+from coursekit.generate.quiz.bank import Bank
 
 
 def liter(root, name):

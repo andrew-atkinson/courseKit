@@ -1,0 +1,3 @@
+{%- set tint = t.color.tints.get(b.tone, t.color.tints.note) -%}
+{%- set glyph = t.glyphs.tones.get(b.tone) if (t.glyphs and t.glyphs.tones) else none -%}
+<div style="background-color: {{ tint }}; border-radius: {{ t.shape.radius }}px; padding: {{ t.space.unit * 2 }}px {{ t.space.unit * 2 }}px; margin: 0 0 {{ t.space.unit * 2 }}px 0; font-family: {{ t.type.body_family }}; color: {{ t.color.ink }}; line-height: 1.6;"><strong style="color: {{ t.color.accent }};">{% if glyph %}{{ glyph }} {% endif %}{{ b.tone | capitalize }}</strong><br>{{ b.text | md_inline }}</div>

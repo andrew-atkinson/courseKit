@@ -1,0 +1,39 @@
+{%- macro section_heading(text) -%}
+{%- set hm = t.shape.heading_marker -%}
+<h4 style="font-family: {{ t.type.heading_family }}; font-weight: {{ t.type.heading_weight }}; color: {{ t.color.ink }}; margin: {{ t.space.section_gap }}px 0 {{ t.space.unit }}px 0;
+{%- if hm == 'bar' %} border-left: {{ t.shape.border_width }}px solid {{ t.color.accent }}; padding-left: 14px;
+{%- elif hm == 'underline' %} border-bottom: {{ t.shape.border_width }}px solid {{ t.color.accent }}; padding-bottom: 6px;
+{%- endif %}">
+{%- if hm == 'prefix' and t.type.heading_prefix %}<span style="color: {{ t.color.accent }};">{{ t.type.heading_prefix }}</span>{% endif %}{{ text }}</h4>
+{%- endmacro -%}
+{%- if references %}
+{{ section_heading("References") }}
+<ul style="font-family: {{ t.type.body_family }}; line-height: 1.7; margin: 0 0 {{ t.space.unit * 2 }}px 0; padding-left: 22px;">
+{%- for r in references %}
+<li><a href="{{ r.url }}" target="_blank" style="color: {{ t.color.accent }};">{{ r.label }}</a></li>
+{%- endfor %}
+</ul>
+{%- endif %}
+{%- if images %}
+{{ section_heading("Images") }}
+<div style="margin: 0 0 {{ t.space.unit * 2 }}px 0;">
+{%- for im in images %}
+<figure style="display: inline-block; vertical-align: top; width: 47%; margin: 0 2% {{ t.space.unit * 2 }}px 0;">
+<img src="{{ im.url }}" alt="{{ im.alt or im.caption or '' }}" style="width: 100%; border: {{ t.shape.border_width }}px solid {{ t.color.tints.note }}; border-radius: {{ t.shape.radius }}px;">
+{%- if im.caption %}
+<figcaption style="font-family: {{ t.type.body_family }}; font-size: 13px; color: {{ t.color.muted }}; margin-top: 6px;">{{ im.caption }}</figcaption>
+{%- endif %}
+</figure>
+{%- endfor %}
+</div>
+{%- endif %}
+{%- if examples %}
+{{ section_heading("Examples") }}
+{%- for e in examples %}
+{%- if e.embed %}
+<p style="margin: 0 0 {{ t.space.unit * 2 }}px 0;"><iframe src="{{ e.url }}" title="{{ e.label or 'Embedded content' }}" width="{{ e.width or 600 }}" height="{{ e.height or 400 }}" loading="lazy" style="border: {{ t.shape.border_width }}px solid {{ t.color.tints.note }}; border-radius: {{ t.shape.radius }}px;"></iframe></p>
+{%- else %}
+<p style="margin: 0 0 {{ t.space.unit }}px 0; font-family: {{ t.type.body_family }};"><a href="{{ e.url }}" target="_blank" style="color: {{ t.color.accent }};">{{ e.label }}</a></p>
+{%- endif %}
+{%- endfor %}
+{%- endif %}

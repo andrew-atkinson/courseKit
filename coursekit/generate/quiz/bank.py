@@ -12,7 +12,6 @@ import random
 import re
 from pathlib import Path
 from typing import Annotated, Literal
-
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -493,7 +492,7 @@ def finalize(seed: int | None = None) -> str:
         return ("ERROR: not finalized.\n" + "\n".join(f"  - {p}" for p in problems)
                 + "\nFix these with more add_* calls, then call finalize_bank again.")
 
-    import gift  # local import: bank.py stays free of serialisation concerns
+    from coursekit.emit import gift  # local import: bank.py stays free of serialisation concerns
 
     if seed is None:
         seed = random.Random(_bank.run_id).randint(1000, 9999)

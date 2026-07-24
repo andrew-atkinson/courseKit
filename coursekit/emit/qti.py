@@ -585,7 +585,7 @@ def _quiz_resources(bank, quiz: dict) -> str:
 
 def _manifest(manifest_id: str, title: str, resources: str) -> str:
     """A QTI Quiz Export manifest. Quiz resources are plain `imsqti_xmlv1p2` pointing at the
-    inline-questions file — the shape that imports with questions (docs/Classic-Quiz-Sample).
+    inline-questions file — the shape that imports with questions (reference/Classic-Quiz-Sample).
     Any number of quizzes can be declared here, which is what makes a one-import bundle work."""
     return f'''<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="{manifest_id}" {MANIFEST_NS}>
@@ -683,7 +683,7 @@ def _quiz_for(bank, quiz_json_path: Path) -> dict:
 
 def _load_banks(path) -> tuple[list[tuple], list[tuple]]:
     """(entries, skipped) for every bank.json under path. entries are (bank, quiz, bank_json)."""
-    from bank import Bank
+    from coursekit.generate.quiz.bank import Bank
     path = Path(path)
     jsons = [path] if path.is_file() else sorted(path.glob("**/bank.json"))
     entries, skipped = [], []
@@ -732,7 +732,7 @@ def reemit(path) -> list[tuple]:
     Returns (bank_json, imscc_or_None, reason). A bank with a not-yet-supported question type is
     skipped with a reason rather than aborting the whole walk.
     """
-    from bank import Bank
+    from coursekit.generate.quiz.bank import Bank
     path = Path(path)
     jsons = [path] if path.is_file() else sorted(path.glob("**/bank.json"))
     results = []

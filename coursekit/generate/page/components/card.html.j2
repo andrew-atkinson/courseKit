@@ -1,0 +1,6 @@
+{%- set kmap = {"concept": "note", "example": "tip", "takeaway": "warning"} -%}
+{%- set tint = t.color.tints.get(kmap.get(b.card_kind, "note"), t.color.tints.note) -%}
+{%- set glyph = t.glyphs.roles.get(b.card_kind) if (t.glyphs and t.glyphs.roles) else none -%}
+<div style="background-color: {{ tint }}; border-radius: {{ t.shape.radius }}px; padding: {{ t.space.unit * 2 }}px; margin: 0 0 {{ t.space.unit * 2 }}px 0; font-family: {{ t.type.body_family }}; color: {{ t.color.ink }}; line-height: 1.6;">
+<div style="font-family: {{ t.type.heading_family }}; font-weight: {{ t.type.heading_weight }}; color: {{ t.color.accent }}; margin-bottom: {{ t.space.unit }}px;">{% if glyph %}{{ glyph }}&nbsp; {% endif %}<span style="font-size: 12px;">{{ b.card_kind | upper }}</span> &nbsp;·&nbsp; {{ b.title }}</div>
+{{ b.text | md_inline }}</div>

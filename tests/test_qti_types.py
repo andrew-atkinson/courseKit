@@ -1,12 +1,10 @@
-"""Item emitters, checked against real Canvas exports: docs/Classic-Quiz-Sample for
+"""Item emitters, checked against real Canvas exports: reference/Classic-Quiz-Sample for
 short-answer / multiple-answer / matching, and docs/'numeric quiz' for numerical.
 true_false is inferred (no sample) but confirmed working on a live import."""
 import xml.etree.ElementTree as ET
-
 import pytest
-
-import qti
-from bank import MAVariant, MatchVariant, NumVariant, Pair, SAVariant, TFVariant
+from coursekit.emit import qti
+from coursekit.generate.quiz.bank import MAVariant, MatchVariant, NumVariant, Pair, SAVariant, TFVariant
 
 
 def liter(root, name):
@@ -134,7 +132,7 @@ def test_matching_scores_sum_to_about_100():
 # ----------------------------------------------- all supported types in a bank
 
 def test_objectbank_with_mixed_supported_types_is_well_formed():
-    from bank import Group, MCVariant
+    from coursekit.generate.quiz.bank import Group, MCVariant
     g = Group(group_id="c1", concept_title="Mixed", question_type="true_false")
     for lbl, ans in zip("ABCD", [True, False, True, False]):
         g.variants[lbl] = TFVariant(group_id="c1", label=lbl, variant_summary=f"Claim {lbl}",
@@ -195,7 +193,7 @@ def test_numerical_scores_100():
 
 
 def test_numerical_group_emits_as_a_bank():
-    from bank import Group
+    from coursekit.generate.quiz.bank import Group
     g = Group(group_id="c1", concept_title="Constants", question_type="numerical")
     for i, lbl in enumerate("ABCD"):
         g.variants[lbl] = _num(answer=i + 1, tolerance=0.5, label=lbl)

@@ -1,28 +1,47 @@
 """CLI entry point. All orchestration lives in pipeline.py; this only parses args, builds the
 LM Studio client, and prints a summary.
 
-    python app.py [PATH] [--week N ...] [--weeks A-B] [--output-root DIR] [--dry-run]
+    python app.py [PATH] [--quizzes | --pages | --all] [--week N ...] [--weeks A-B]
+                  [--output-root DIR] [--dry-run]
 
 PATH is a transcript file or a directory of them; it defaults to the TRANSCRIPTION env var.
-Artifacts are written with the course (a sibling quizzes/ tree), never into this repo.
+By default a run generates BOTH quizzes and pages (equivalent to --all); --quizzes or --pages
+narrows it to one. Artifacts are written with the course (sibling quizzes/ and pages/ trees),
+never into this repo.
 """
 
 import argparse
 import os
 import sys
-
 from dotenv import load_dotenv
-from openai import OpenAI
 
 load_dotenv(override=True)
 
-import hardware
-import pipeline
-import qti
+from coursekit import pipeline
+from coursekit.emit import qti
+from coursekit import courseconfig
+from coursekit.emit import html as html_emit
+from coursekit.emit import cc as cc_emit
+from coursekit.generate.page.generator import PageGenerator
+from coursekit.generate.quiz.generator import QuizGenerator
+from coursekit.providers import get_provider
 
 
-def _build_client() -> OpenAI:
-    return OpenAI(base_url=os.getenv("LOCAL_HOST_URL"), api_key="lmstudio")
+def _select_generators(args):
+    """Which generators a run drives. Default (and --all) is both; --quizzes / --pages narrow to
+    one. Quizzes run first so a combined run leaves the pages step last."""
+    if args.quizzes and not args.pages:
+        return [QuizGenerator()]
+    if args.pages and not args.quizzes:
+        return [PageGenerator()]
+    return [QuizGenerator(), PageGenerator()]
+
+
+def _build_provider():
+    """Which endpoint serves the model is config, not code — institutional policy may dictate
+    on-prem inference or a specific vendor."""
+    return get_provider(os.getenv("PROVIDER", "lm_studio"),
+                        base_url=os.getenv("LOCAL_HOST_URL"))
 
 
 def _parse_weeks(args) -> list[str] | None:
@@ -46,8 +65,8 @@ def _print_summary(results, *, dry_run: bool) -> None:
             print(f"  [plan] {r.unit.week_label}")
         else:
             status = "OK" if r.finalized else "INCOMPLETE"
-            print(f"  [{status}] {r.unit.week_label}  "
-                  f"{r.n_groups} groups, {r.n_variants} variants")
+            counts = ", ".join(f"{v} {k}" for k, v in r.counts.items()) or "nothing"
+            print(f"  [{status}] {r.unit.week_label}  {counts}")
             for p in r.problems:
                 print(f"           - {p}")
         print(f"         -> {r.output_dir}")
@@ -97,8 +116,20 @@ def main(argv=None) -> int:
                         help="override: write under DIR/<course>/<week> instead of with the course")
     parser.add_argument("--dry-run", action="store_true",
                         help="list the units that would be processed, without calling the model")
+    parser.add_argument("--pages", action="store_true",
+                        help="generate only course pages (default is both quizzes and pages)")
+    parser.add_argument("--quizzes", action="store_true",
+                        help="generate only quizzes (default is both quizzes and pages)")
+    parser.add_argument("--all", action="store_true",
+                        help="generate both quizzes and pages (the default; explicit form)")
     parser.add_argument("--to-qti", metavar="PATH",
                         help="model-free: write a Canvas QTI .zip beside every bank.json under PATH")
+    parser.add_argument("--to-html", metavar="PATH",
+                        help="model-free: re-render every page.json under PATH to HTML, merging "
+                             "the course's current supplements")
+    parser.add_argument("--to-cc", metavar="PATH",
+                        help="model-free: package every page.json under PATH into ONE Canvas "
+                             ".imscc that imports as Pages")
     parser.add_argument("--bundle", action="store_true",
                         help="with --to-qti: write ONE package containing every quiz, "
                              "so a single Canvas import brings them all in")
@@ -108,32 +139,60 @@ def main(argv=None) -> int:
     if args.to_qti:
         return _run_bundle(args.to_qti) if args.bundle else _run_to_qti(args.to_qti)
 
+    if args.to_html:
+        results = html_emit.reemit(args.to_html)
+        if not results:
+            print(f"No page.json found under {args.to_html}")
+            return 1
+        print("Pages re-rendered:")
+        for _, out in results:
+            print(f"  [OK]   {out}")
+        print(f"\n{len(results)} page(s).")
+        return 0
+
+    if args.to_cc:
+        out = cc_emit.write_imscc(args.to_cc)
+        if out is None:
+            print(f"No page.json found under {args.to_cc}")
+            return 1
+        print(f"Canvas Common Cartridge:\n  [OK]   {out}")
+        return 0
+
     if not args.path:
         parser.error("no PATH given and TRANSCRIPTION is not set")
 
     weeks = _parse_weeks(args)
-    client = None if args.dry_run else _build_client()
-    model = os.getenv("MODEL_NAME")
+    generators = _select_generators(args)
+    provider = None if args.dry_run else _build_provider()
 
-    if not args.dry_run:
-        verdict, msg = hardware.check_fit(model)
-        if verdict is False:
-            print(f"Warning: {msg}\n")
+    incomplete = False
+    for gen in generators:
+        # MODEL_NAME (env) wins; otherwise the course's own <generator>.yaml `model` key. Each
+        # generator resolves its own — a combined run may use different models for quizzes and pages.
+        model = os.getenv("MODEL_NAME") or courseconfig.load(
+            args.path, config_name=f"{gen.category}.yaml").value("model")
 
-    try:
-        results = pipeline.run_course(
-            args.path, weeks=weeks, output_root=args.output_root,
-            client=client, model=model, dry_run=args.dry_run, max_iters=args.max_iters,
-        )
-    except pipeline.ModelLoadError as e:
-        print(str(e))
-        return 2
+        if not args.dry_run:
+            verdict, msg = provider.check_fit(model)
+            if verdict is False:
+                print(f"Warning ({gen.category}): {msg}\n")
 
-    _print_summary(results, dry_run=args.dry_run)
+        try:
+            results = pipeline.run_course(
+                args.path, weeks=weeks, output_root=args.output_root,
+                provider=provider, model=model, dry_run=args.dry_run, max_iters=args.max_iters,
+                generator=gen,
+            )
+        except pipeline.ModelLoadError as e:
+            print(str(e))
+            return 2
 
-    if not args.dry_run and any(not r.finalized for r in results):
-        return 1
-    return 0
+        if len(generators) > 1:
+            print(f"\n=== {gen.category} ===")
+        _print_summary(results, dry_run=args.dry_run)
+        incomplete = incomplete or (not args.dry_run and any(not r.finalized for r in results))
+
+    return 1 if incomplete else 0
 
 
 if __name__ == "__main__":

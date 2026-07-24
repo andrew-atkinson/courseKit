@@ -1,0 +1,17 @@
+{%- set hm = t.shape.heading_marker -%}
+{%- set mt = t.space.unit if framed else t.space.section_gap -%}
+{%- set hs = t.type.heading_sizes.get(b.level) if t.type.heading_sizes else none -%}
+{%- set glyph = t.glyphs.roles.get(b.role) if (b.role and t.glyphs and t.glyphs.roles) else none -%}
+{%- if hm == 'segment' -%}
+{%- set seg = (t.color.segments.get(b.role, t.color.segments.default) if t.color.segments else t.color.accent) -%}
+{%- set pad = frame_pad if framed else 0 -%}
+<h{{ b.level }} style="margin: {{ -pad if framed else mt }}px 0 {{ t.space.unit }}px {{ -pad if framed else 0 }}px; font-weight: 400; line-height: 0;"><span style="display: inline-block; vertical-align: middle; background-color: {{ seg }}; color: {{ t.color.segment_ink }}; font-family: {{ t.type.heading_family }}; font-weight: {{ t.type.heading_weight }};{% if hs %} font-size: {{ hs }}px;{% endif %} line-height: 20px; padding: 6px 14px; border-radius: {{ t.shape.radius if framed else 0 }}px 0 0 0;">{% if glyph %}{{ glyph }}&nbsp; {% endif %}{{ b.text }}</span><span style="display: inline-block; vertical-align: middle; width: 0; height: 0; border-top: 16px solid transparent; border-bottom: 16px solid transparent; border-left: 12px solid {{ seg }};"></span></h{{ b.level }}>
+{%- else -%}
+<h{{ b.level }} style="font-family: {{ t.type.heading_family }}; font-weight: {{ t.type.heading_weight }}; color: {{ t.color.ink }}; margin: {{ mt }}px 0 {{ t.space.unit }}px 0;
+{%- if hs %} font-size: {{ hs }}px; line-height: 1.2;{% endif %}
+{%- if hm == 'bar' %} border-left: {{ t.shape.border_width }}px solid {{ t.color.accent }}; padding-left: 14px;
+{%- elif hm == 'underline' %} border-bottom: {{ t.shape.border_width }}px solid {{ t.color.accent }}; padding-bottom: 6px;
+{%- endif %}">
+{%- if glyph %}<span style="color: {{ t.color.accent }};">{{ glyph }} </span>{% endif %}
+{%- if hm == 'prefix' and t.type.heading_prefix %}<span style="color: {{ t.color.accent }};">{{ t.type.heading_prefix }}</span>{% endif %}{{ b.text }}</h{{ b.level }}>
+{%- endif -%}

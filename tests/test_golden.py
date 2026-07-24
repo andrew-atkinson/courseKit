@@ -12,9 +12,8 @@ To re-bless after an intentional change:
 
 from pathlib import Path
 from typing import get_args
-
-import gift
-from bank import Bank, QuestionType
+from coursekit.emit import gift
+from coursekit.generate.quiz.bank import Bank, QuestionType
 
 GOLDEN = Path(__file__).parent / "golden"
 

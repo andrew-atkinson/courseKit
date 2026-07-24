@@ -1,9 +1,7 @@
 import json
-
 import pytest
-
-import bank as bankmod
-from bank import (MAVariant, MatchVariant, MCVariant, NumVariant, Pair, SAVariant,
+from coursekit.generate.quiz import bank as bankmod
+from coursekit.generate.quiz.bank import (MAVariant, MatchVariant, MCVariant, NumVariant, Pair, SAVariant,
                   TFVariant, ValidationError)
 
 

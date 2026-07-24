@@ -1,9 +1,7 @@
 import random
 import string
-
 import pytest
-
-from gift import detect_gift_type, repchar, unrepchar
+from coursekit.emit.gift import detect_gift_type, repchar, unrepchar
 
 # Strings chosen to break GIFT. The first is the real one: every code-completion
 # question in this project contains '=', which is a GIFT control character.

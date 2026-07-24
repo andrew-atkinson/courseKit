@@ -1,0 +1,4 @@
+<details style="border: 1px solid {{ t.color.accent }}; border-radius: {{ t.shape.radius }}px; overflow: hidden; margin: 0 0 {{ t.space.unit * 2 }}px 0; font-family: {{ t.type.body_family }}; color: {{ t.color.ink }};">
+<summary style="cursor: pointer; background-color: {{ t.color.tints.note }}; padding: {{ t.space.unit }}px {{ t.space.unit * 2 }}px; font-family: {{ t.type.heading_family }}; font-weight: {{ t.type.heading_weight }}; color: {{ t.color.accent }};">{{ b.summary }}</summary>
+<div style="padding: {{ t.space.unit * 2 }}px; line-height: 1.6;">{{ b.text | md_inline }}</div>
+</details>

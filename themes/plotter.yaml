@@ -1,0 +1,36 @@
+name: plotter
+voice: "Pen on paper, by machine — registration marks, dashed hairlines, slate greys and one riso-teal ink. Precise, cool, printed."
+type:
+  heading_family: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+  body_family: "-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+  mono_family: "ui-monospace, Menlo, Consolas, monospace"
+  base_size: 16
+  heading_weight: 600
+  heading_prefix: ""
+  heading_sizes: { 2: 26, 3: 21, 4: 17 }
+color:
+  ink: "#2e3338"
+  muted: "#646b73"
+  accent: "#0b6e80"            # riso teal ink, AA on white
+  tints:
+    note: "#eef2f4"
+    tip: "#e8f2f3"
+    warning: "#f6ecea"
+  frame_bg: "#ffffff"
+  frame_border: "#b9c2c9"
+  code_bg: "#f0f2f4"
+  code_fg: "#2e3338"
+glyphs:
+  roles: { review: "◦", concept: "＋", practice: "✎", example: "◇", summary: "▣" }
+  tones: { note: "◦", tip: "＋", warning: "△" }
+space:
+  unit: 8
+  section_gap: 44
+  density: comfortable
+shape:
+  section_frame: card
+  frame_style: dashed          # the plotter signature: dashed registration hairlines
+  frame_roles: [concept, practice, example]
+  heading_marker: underline
+  radius: 0
+  border_width: 1

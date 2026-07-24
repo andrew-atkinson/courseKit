@@ -1,0 +1,32 @@
+name: bauhaus
+voice: "Form follows function — geometric sans, heavy weight contrast, structural bars of cobalt. The Bauhaus-to-code lineage, explicit."
+type:
+  heading_family: "'Avenir Next', Futura, 'Century Gothic', -apple-system, sans-serif"
+  body_family: "'Avenir Next', -apple-system, 'Segoe UI', Helvetica, sans-serif"
+  mono_family: "ui-monospace, Menlo, Consolas, monospace"
+  base_size: 16
+  heading_weight: 700
+  heading_prefix: ""
+  heading_sizes: { 2: 28, 3: 22, 4: 18 }
+color:
+  ink: "#111111"
+  muted: "#4f4f4f"
+  accent: "#1d3fbf"            # cobalt, AA as text on white
+  tints:
+    note: "#edf1fe"
+    tip: "#fbf3df"
+    warning: "#fbebe7"
+  code_bg: "#f2f2f0"           # light, quiet code on a structural page
+  code_fg: "#111111"
+glyphs:
+  roles: { review: "○", concept: "■", practice: "▲", example: "●", summary: "◆" }
+  tones: { note: "■", tip: "●", warning: "▲" }
+space:
+  unit: 8
+  section_gap: 48
+  density: comfortable
+shape:
+  section_frame: none
+  heading_marker: bar
+  radius: 0
+  border_width: 3              # thick structural bars

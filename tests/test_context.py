@@ -1,4 +1,4 @@
-from context import build_messages
+from coursekit.generate.quiz.context import build_messages
 
 
 def test_returns_system_then_user():
@@ -51,3 +51,33 @@ def test_is_pure_no_env_dependency(monkeypatch):
     # Importing context.py used to read TRANSCRIPTION at import time; it must not now.
     monkeypatch.delenv("TRANSCRIPTION", raising=False)
     assert build_messages("body")  # does not raise
+
+
+# ------------------------------------------- prompts come from files now
+
+def test_prompts_load_from_the_shipped_files():
+    from coursekit import prompts
+    system = build_messages("body")[0]["content"]
+    assert prompts.load("quiz", "system").body.split("\n")[0] in system
+
+
+def test_a_course_can_override_the_task_brief(tmp_path):
+    """The payoff of externalising: change the brief per course, no code edit."""
+    d = tmp_path / ".vtconfig" / "prompts" / "quiz"
+    d.mkdir(parents=True)
+    (d / "task.md").write_text("---\nname: task\ncategory: quiz\n---\n\nONLY TRUE/FALSE.\n",
+                               encoding="utf-8")
+
+    msgs = build_messages("body", project_root=tmp_path)
+    assert msgs[1]["content"].strip() == "ONLY TRUE/FALSE."
+    # the system prompt still falls through to the shipped default
+    assert "THE ONLY WAY TO RECORD A QUESTION IS A TOOL CALL." in msgs[0]["content"]
+
+
+def test_named_prompt_variants_can_be_selected(tmp_path):
+    d = tmp_path / ".vtconfig" / "prompts" / "quiz"
+    d.mkdir(parents=True)
+    (d / "exam.md").write_text("---\nname: exam\ncategory: quiz\n---\n\nEXAM STYLE.\n",
+                               encoding="utf-8")
+    msgs = build_messages("body", project_root=tmp_path, task_prompt="exam")
+    assert msgs[1]["content"].strip() == "EXAM STYLE."
