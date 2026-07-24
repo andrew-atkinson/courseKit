@@ -1,11 +1,8 @@
 # Generating quizzes
 
-A quiz is **5 concepts × 4 variants**. Each concept becomes a Canvas *question group* that draws one
-variant at random, so every student gets a different version of the same quiz. The model commits each
-question through a tool call — prose is scratch, so a revision overwrites rather than piling up.
+A quiz is **5 concepts × 4 variants**. Each concept becomes a Canvas _question group_ that draws one variant at random, so every student gets a different version of the same quiz. The model commits each question through a tool call — prose is scratch, so a revision overwrites rather than piling up.
 
-The canonical artifact is `bank.json`; the emitters (GIFT, QTI) read only it. Adding a platform is one
-emitter, not a rewrite.
+The canonical artifact is `bank.json`; the emitters (GIFT, QTI) read only it. Adding a platform is one emitter, not a rewrite.
 
 ## See what it would do (free, no model)
 
@@ -26,9 +23,7 @@ uv run python app.py "/path/to/course export"               # every week found
 `PATH` is a markdown file **or** a directory. Given a directory it picks up per-week transcripts
 (`week-*.md`). Expect a few minutes per week on a local model.
 
-**Input is decoupled** — any markdown works. If the path happens to sit under a videotranscriber
-project (marked by a `.vtconfig/` folder), coursekit reads its `context.yaml` to enrich the prompt
-with week titles and module names. It never requires it.
+**Input is decoupled** — any markdown works. If the path happens to sit under a videotranscriber project (marked by a `.vtconfig/` folder), coursekit reads its `context.yaml` to enrich the prompt with week titles and module names. It never requires it.
 
 ## Where output goes
 
@@ -51,8 +46,7 @@ Use `--output-root DIR` to redirect elsewhere (e.g. scratch during testing).
 
 ## Exporting to Canvas
 
-QTI generation is **model-free** — it reads `bank.json`, so you can re-export any time without
-regenerating questions.
+QTI generation is **model-free** — it reads `bank.json`, so you can re-export any time without regenerating questions.
 
 ```bash
 # one .zip per week, written beside each bank.json
@@ -68,20 +62,13 @@ Then in Canvas: **Import Content → Content Type: "QTI .zip file"** → upload 
 > course-package one brings the quiz in **empty**. (The full story is in
 > [canvasQuizStructure.md](canvasQuizStructure.md).)
 
-Each quiz arrives with 5 question groups, each drawing 1 of 4 variants, plus a description and grading
-criteria. Both the per-week `.zip` and the `--bundle` package have been imported into a live Canvas
-course and confirmed working, with the groups randomizing as intended.
+Each quiz arrives with 5 question groups, each drawing 1 of 4 variants, plus a description and grading criteria. Both the per-week `.zip` and the `--bundle` package have been imported into a live Canvas course and confirmed working, with the groups randomizing as intended.
 
 ## Good to know
 
-- **The model is an unreliable driver, and the loop expects it.** It sometimes stops before finishing
-  or spins on a rejected call. `pipeline.loop` checks the bank rather than trusting the model, nudges
-  it back within a bounded budget, and bails on a rejection spiral instead of burning every turn.
-- **Guardrails are steering, not just validation.** When the model reuses a correct-answer position,
-  the rejection tells it which positions are still free — errors are written for the model to act on.
-- **Module placement isn't supported** yet: quizzes import into the Quizzes list, not into weekly
-  modules. **GIFT output is unverified** against a live Moodle — it's there as readable plain text;
-  Canvas QTI is the tested path.
+- **The model is an unreliable driver, and the loop expects it.** It sometimes stops before finishing or spins on a rejected call. `pipeline.loop` checks the bank rather than trusting the model, nudges it back within a bounded budget, and bails on a rejection spiral instead of burning every turn.
+- **Guardrails are steering, not just validation.** When the model reuses a correct-answer position, the rejection tells it which positions are still free — errors are written for the model to act on.
+- **Module placement isn't supported** yet: quizzes import into the Quizzes list, not into weekly modules. **GIFT output is unverified** against a live Moodle — it's there as readable plain text; Canvas QTI is the tested path.
 
 See also: [Configuration](configuration.md) (providers, per-course `quiz.yaml`, prompt overrides) and
 [the domain profile](domain-profile.md) (keeping the model in the right knowledge domain).
