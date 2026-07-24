@@ -72,6 +72,13 @@ class Provider(ABC):
         """Append a plain user turn — the same shape everywhere, so not abstract."""
         messages.append({"role": "user", "content": text})
 
+    def chat(self, *, model: str, messages: list, temperature: float | None = None,
+             max_tokens: int | None = None) -> str:
+        """A plain completion: messages in, assistant text out — no tools. For prose→prose passes
+        (e.g. reshaping raw extracted document text into a teaching-ready week doc). Not abstract so
+        existing tool-only providers keep working; a provider that can't complete says so loudly."""
+        raise NotImplementedError(f"{type(self).__name__} does not implement plain chat()")
+
     def check_fit(self, model: str) -> tuple[bool | None, str]:
         """Can this endpoint serve the model? -> (verdict, message).
 

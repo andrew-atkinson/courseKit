@@ -41,7 +41,7 @@ Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint �
 [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest -q        # 467 tests, all offline — no model needed
+uv run pytest -q        # 481 tests, all offline — no model needed
 ```
 
 ## Quick start
@@ -78,6 +78,9 @@ output, Canvas import, and per-course configuration.
 | `app.py --to-qti DIR`           | One Canvas quiz `.zip` per week. Model-free.|
 | `app.py --to-qti DIR --bundle`  | One `.zip` for all quizzes. Model-free.     |
 | `app.py --to-html DIR`          | Re-render pages from `page.json`. Model-free.|
+| `app.py --to-cc DIR`            | One Canvas `.imscc` of all pages. Model-free.|
+| `app.py --ingest DIR`           | Documents (PDF/pptx/txt/md) → `output/week-N.md`. |
+| `app.py --ingest DIR --raw`     | Same, extract only — no model, fully offline. |
 | `uv run pytest -q`              | Run the test suite. Fully offline.          |
 
 Exit codes: `0` success · `1` a unit failed to finalize · `2` the model could not be loaded.

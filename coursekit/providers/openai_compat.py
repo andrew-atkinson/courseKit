@@ -48,6 +48,14 @@ class OpenAICompatProvider(Provider):
         return Reply(finish_reason=choice.finish_reason, content=choice.message.content,
                      tool_calls=calls, raw_message=choice.message)
 
+    def chat(self, *, model, messages, temperature=None, max_tokens=None):
+        kwargs = {"model": model, "messages": messages}
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        return self._client.chat.completions.create(**kwargs).choices[0].message.content or ""
+
     def append_assistant(self, messages, reply):
         # Prefer the provider-native object: it carries the tool_calls the following tool
         # messages refer to by id. Fall back to a plain dict when there is no raw message

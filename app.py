@@ -88,6 +88,25 @@ def _run_bundle(path) -> int:
     return 0
 
 
+def _run_ingest(path, *, raw: bool) -> int:
+    """Turn documents (PDF/pptx/txt/md) under PATH into output/week-N.md, then stop. Local-first:
+    with --raw it never calls the model; otherwise it reshapes each doc with the local model."""
+    from coursekit.ingest import ingest as ing
+    provider = model = None
+    if not raw:
+        provider = _build_provider()
+        model = os.getenv("MODEL_NAME") or courseconfig.load(path, config_name="ingest.yaml").value("model")
+    results = ing.ingest(path, raw=raw, provider=provider, model=model)
+    if not results:
+        print(f"No supported documents (.pdf/.pptx/.txt/.md) found under {path}")
+        return 1
+    print("Ingested:")
+    for src, dest in results:
+        print(f"  {src.name}  ->  {dest}")
+    print(f"\n{len(results)} week doc(s) written. Now generate with:  python app.py \"<course>\"")
+    return 0
+
+
 def _run_to_qti(path) -> int:
     results = qti.reemit(path)
     if not results:
@@ -133,8 +152,16 @@ def main(argv=None) -> int:
     parser.add_argument("--bundle", action="store_true",
                         help="with --to-qti: write ONE package containing every quiz, "
                              "so a single Canvas import brings them all in")
+    parser.add_argument("--ingest", metavar="PATH",
+                        help="turn documents (PDF/pptx/txt/md) under PATH into output/week-N.md, "
+                             "then stop (run generation separately)")
+    parser.add_argument("--raw", action="store_true",
+                        help="with --ingest: extract text only, skip the local-LLM shaping pass")
     parser.add_argument("--max-iters", type=int, default=pipeline.DEFAULT_MAX_ITERS)
     args = parser.parse_args(argv)
+
+    if args.ingest:
+        return _run_ingest(args.ingest, raw=args.raw)
 
     if args.to_qti:
         return _run_bundle(args.to_qti) if args.bundle else _run_to_qti(args.to_qti)
