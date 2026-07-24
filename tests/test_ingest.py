@@ -2,6 +2,8 @@
 shaping pass is exercised through a fake Provider (no network, no real model)."""
 
 import inspect
+import io
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -60,6 +62,61 @@ def test_extract_pptx_roundtrip(tmp_path):
     assert "Exposure Triangle" in text and "Aperture, shutter, ISO" in text
 
 
+def test_extract_pptx_includes_speaker_notes(tmp_path):
+    # lecture decks keep the substance in the notes; the slide is just a headline
+    from pptx import Presentation
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[5])
+    slide.shapes.title.text = "Aperture"
+    slide.notes_slide.notes_text_frame.text = "Aperture controls depth of field and light."
+    f = tmp_path / "week-2.pptx"
+    prs.save(str(f))
+
+    text = extract.extract_text(f)
+    assert "Aperture" in text
+    assert "controls depth of field" in text     # the speaker-notes content came through
+
+
+def _make_docx(paras: list[str]) -> bytes:
+    """A minimal .docx: a zip whose word/document.xml holds <w:p> paragraphs of <w:t> runs."""
+    W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    body = "".join(f"<w:p><w:r><w:t>{p}</w:t></w:r></w:p>" for p in paras)
+    doc = f'<?xml version="1.0"?><w:document xmlns:w="{W}"><w:body>{body}</w:body></w:document>'
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("word/document.xml", doc)
+    return buf.getvalue()
+
+
+def _make_odt(paras: list[str]) -> bytes:
+    """A minimal .odt: a zip whose content.xml holds <text:p> paragraphs (one with a nested span)."""
+    T = "urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    O = "urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    body = "".join(f"<text:p>{p}</text:p>" for p in paras)
+    content = (f'<?xml version="1.0"?><office:document-content xmlns:office="{O}" '
+               f'xmlns:text="{T}"><office:body><office:text>{body}</office:text>'
+               f'</office:body></office:document-content>')
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("content.xml", content)
+    return buf.getvalue()
+
+
+def test_extract_docx(tmp_path):
+    f = tmp_path / "week-6.docx"
+    f.write_bytes(_make_docx(["Depth of field explained", "Aperture and focal length"]))
+    text = extract.extract_text(f)
+    assert "Depth of field explained" in text and "Aperture and focal length" in text
+
+
+def test_extract_odt_gathers_nested_spans(tmp_path):
+    f = tmp_path / "week-7.odt"
+    f.write_bytes(_make_odt(["Colour theory intro", "Warm <text:span>and cool</text:span> tones"]))
+    text = extract.extract_text(f)
+    assert "Colour theory intro" in text
+    assert "Warm and cool tones" in text        # nested span text is gathered, not dropped
+
+
 def test_extract_txt_cleans_whitespace(tmp_path):
     t = tmp_path / "a.txt"
     t.write_text("line one\n\n\n\nline two   \n", encoding="utf-8")
@@ -74,7 +131,7 @@ def test_extract_md_passthrough(tmp_path):
 
 def test_unsupported_type_raises():
     with pytest.raises(ValueError, match="unsupported"):
-        extract.extract_text(Path("notes.docx"))
+        extract.extract_text(Path("notes.rtf"))       # .rtf is not in the supported set
 
 
 # ------------------------------------------------------------- week mapping
@@ -134,7 +191,7 @@ def test_shaping_without_a_provider_errors(tmp_path):
 
 
 def test_ingest_no_supported_docs_is_empty(tmp_path):
-    (tmp_path / "notes.docx").write_text("x", encoding="utf-8")   # unsupported
+    (tmp_path / "notes.rtf").write_text("x", encoding="utf-8")   # unsupported type
     assert ingest.ingest(tmp_path, raw=True) == []
 
 
@@ -151,7 +208,8 @@ def test_ingest_writes_into_the_vtconfig_course_output(tmp_path):
 # ------------------------------------------------------------- offline guarantee
 
 def test_ingest_makes_no_network_calls():
-    # same spirit as the no-URL guardrail: the ingest path is local-only, never fetches
+    # same spirit as the no-URL guardrail: the ingest path is local-only, never fetches. Check for
+    # network *libraries* (not literal "http://", which appears legitimately in XML namespace URIs).
     src = inspect.getsource(ingest) + inspect.getsource(extract)
-    for bad in ("requests", "urllib", "http://", "https://", "socket", "httpx"):
+    for bad in ("requests", "urllib", "httpx", "socket", "urlopen"):
         assert bad not in src, f"ingest must stay offline, found {bad!r}"

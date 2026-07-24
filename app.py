@@ -98,7 +98,9 @@ def _run_ingest(path, *, raw: bool) -> int:
         model = os.getenv("MODEL_NAME") or courseconfig.load(path, config_name="ingest.yaml").value("model")
     results = ing.ingest(path, raw=raw, provider=provider, model=model)
     if not results:
-        print(f"No supported documents (.pdf/.pptx/.txt/.md) found under {path}")
+        from coursekit.ingest.extract import SUPPORTED_SUFFIXES
+        kinds = "/".join(sorted(SUPPORTED_SUFFIXES))
+        print(f"No supported documents ({kinds}) found under {path}")
         return 1
     print("Ingested:")
     for src, dest in results:
@@ -153,8 +155,8 @@ def main(argv=None) -> int:
                         help="with --to-qti: write ONE package containing every quiz, "
                              "so a single Canvas import brings them all in")
     parser.add_argument("--ingest", metavar="PATH",
-                        help="turn documents (PDF/pptx/txt/md) under PATH into output/week-N.md, "
-                             "then stop (run generation separately)")
+                        help="turn documents (PDF/docx/odt/pptx/txt/md) under PATH into "
+                             "output/week-N.md, then stop (run generation separately)")
     parser.add_argument("--raw", action="store_true",
                         help="with --ingest: extract text only, skip the local-LLM shaping pass")
     parser.add_argument("--max-iters", type=int, default=pipeline.DEFAULT_MAX_ITERS)

@@ -54,12 +54,90 @@ Somethings are just ideas and not necessarily to be implemented, this is just a 
      taste-skill's anti-slop rule and CLT signaling). The role→color system and code→color system
      should share one palette per theme.
 
+### Generalize quiz generation beyond coding (2026-07-24 — BLOCKER for non-coding quizzes)
+
+The quiz half of "generalize beyond coding" (the page half shipped: de-biased prompts + content-shape
+domain profile). `prompts/quiz/task.md` is coding-shaped and hard-fails elsewhere: generating a quiz
+for the photo course could not complete question 5, which is hard-wired to be a code-completion
+question. This should land **before** the combined pages+quizzes cartridge (no point bundling quizzes
+that can't generate for the course). Infrastructure is already flexible (bank variants aren't
+hard-capped; the position rule is code, scoped to MC) — mostly a prompt + config change, mirroring the
+page work.
+
+1. **Question forms: generic default + domain-specific options.** Remove the hard-coded "c5 =
+   code-completion" from `task.md`; make the default subject-neutral (N concept groups, type mix suited
+   to each concept). The **domain profile** (already injected into the quiz prompt via
+   `domain_preface`) carries the specifics — a coding `domain.md` asks for a code-completion question
+   where code exists; a photo one steers to identify / compare / attribute / analyse. One mechanism,
+   consistent with pages. See [[content-shape-domain-profile]] equivalent for pages.
+2. **Number of questions + variations, parameterized.** `quiz.yaml` `questions: N` (default 5) and
+   `variants: M` (default 4); generalize the correct-answer-position rule from the hard 4 to M. Two
+   enhancements: (a) an *analysis-suggested* question count — a pass over the week's material proposes
+   how many concepts it can fairly assess; (b) variants driven by class size (more students → more
+   variants to reduce overlap) or simply professor-set.
+
+### Page design + summarisation (2026-07-24, from real art-course output — coursekit-test)
+
+Surfaced running pages on real art decks (Still Lives wk6, History Landscape wk7). Confirmed against
+the generated `page.json`.
+
+1. **Prior-week review needs a distinct graphic treatment (all 4 themes).** The page already emits a
+   `role=review` opener that recaps the previous week (confirmed: wk7 opened "Review: The Constructed
+   Image" recapping wk6's still-life themes). A look-back should *read* as a different topic — its own
+   graphic quality (a "previously / recap" band), distinct from current-week content. Build on the
+   existing heading `role` system in the renderer + each theme. NOTE: the recap is currently
+   **emergent** (the model does it from the prompt's "recap earlier weeks" line), not a real
+   cross-week mechanism — the generator never sees the prior week. A *reliable* spaced-learning
+   feature (deliberately feeding prior-week concepts into the next week's generation) is a separate,
+   bigger item.
+2. **Variable summary length / detail level.** Introduce a `detail` control with ~3 settings: (1) one
+   paragraph of key concepts, (2) today's medium outline, (3) near-complete detail. A generation knob
+   — `page.yaml` `detail: brief|medium|full` (or a CLI flag) selecting a different task instruction.
+3. **Key-terms / glossary needs clear demarcation (all 4 themes).** The glossary rendered directly
+   under the last concept heading ("Landscape and Violence") with no separation, so the terms
+   (Picturesque, French Formal Garden, Ha-ha, Sublime, New Topographics) misread as part of that
+   section. Give the glossary its own labeled frame ("Key Terms"), visually distinct, regardless of
+   where the model places it. Design-system fix.
+4. **Extract images for later inclusion.** `python-pptx` gives embedded images via `shape.image.blob`;
+   because image + caption + theme share a slide, extract them together (the richer structure-aware
+   variant). The renderer already has an instructor-figures path to wire into. **Copyright gate:**
+   these are artworks — instructor's own deck = instructor-sourced (within the boundary), but
+   auto-embedding into distributed Canvas pages is a deliberate decision. Extract-to-files is safe now;
+   embedding is the later step. Ties to "structure-aware PPTX" and the "vision captioning" items above.
+
 ### Next Items
 
+- **Document ingest — known limitations / future iterations** (shipped 2026-07-24 as
+  `coursekit/ingest/`; supports PDF · docx · odt · pptx incl. speaker notes · txt/md, offline,
+  `--ingest [--raw]`). Deferred to later iterations, roughly in value order:
+  - **Visual content is dropped.** Images, diagrams, charts, and photos in slides/PDFs are ignored —
+    a real gap for image-led courses. A vision-description pass (local vision model, like the
+    transcriber's `vt_describe`) would caption them into the week doc. This is the heavy/vision axis.
+  - **OCR for scanned PDFs.** A scanned page (image of text) extracts empty. Needs an OCR step
+    (offline: tesseract/`ocrmypdf`, an external binary — weigh against the pydantic+stdlib footprint).
+  - **Direct Google Slides / Docs import** (parked here 2026-07-24, user's courses are Slides-based):
+    export-to-file works today (Download → PDF/PPTX/DOCX → `--ingest`); *live* import is the
+    online/OAuth axis, a reversal of the offline-first decision — its own project with an auth +
+    copyright surface.
+  - **`.doc`** (legacy binary Word) — no clean pure-Python reader; convert to `.docx`/PDF.
+  - **Layout/table fidelity.** Multi-column PDFs and tables extract as interleaved linear text; the
+    shaping pass mitigates but does not reconstruct structure. Table-aware extraction is a maybe.
+  - **PPTX depth.** Chart data, SmartArt, and embedded objects are not read (slide text + notes are).
+  - **Structure-aware PPTX** (surfaced 2026-07-24 on real art decks, `coursekit-test/source/`). The
+    extractor is flat; the decks carry structure it ignores: a TITLE-layout agenda slide, a small
+    per-slide text box repeating the section theme (the grouping — there are no PowerPoint sections),
+    a caption placeholder (artist/title/year), the image, and occasional notes. A structure-aware
+    mode could use the title slide as the page title, the repeated theme label as a section heading,
+    and role the shapes (caption vs section vs notes) → a real outline instead of a flat list with the
+    theme word repeated 8×. Somewhat tailored to this author's convention, but consistent enough to
+    detect. **Biggest gap for image-led courses:** text extraction yields captions + theme tags but
+    not the works themselves — a vision-captioning pass (item above) is what actually makes an art
+    course work.
+
 - **Non-video ingestion for the transcriber** (confirmed needed 2026-07-20): ART102/ART103 (photo,
-  digital literacy) have Canvas exports but no transcripts, so pages/quizzes can't generate for them
-  yet. The transcriber needs to ingest readings/PDFs/slides into the same `week-N.md` shape (idea
-  already parked above). This is videotranscriber-repo work; coursekit consumes the result unchanged.
+  digital literacy) have Canvas exports but no transcripts. NOTE: coursekit's own `--ingest` now
+  covers readings/PDFs/slides directly (2026-07-24), so this transcriber-side work is largely
+  superseded for the document case; it remains relevant only if video-specific ingestion is wanted.
 
 - Module Placement
   - Deferred once already. Needs the full-course cartridge format, whose empty `assessment_qti.xml`
