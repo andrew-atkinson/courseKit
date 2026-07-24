@@ -652,12 +652,35 @@ def bundle_files(entries: list[tuple], title: str) -> dict[str, str]:
     return files
 
 
+def bank_problems(bank) -> list[str]:
+    """Reasons a bank must NOT be emitted — each produces a package Canvas rejects with a generic,
+    unhelpful error, so we catch it here instead. Empty list = safe to emit.
+
+    - No groups, or a group with zero variants: emits a quiz section that draws from an empty pool.
+    - Not finalized: the generation did not complete, so the bank may be partial. (A completed run
+      always finalizes; a crash mid-generation — e.g. a question the model couldn't finish — leaves
+      it unfinalized, which is exactly the case to refuse.)
+    """
+    problems = []
+    if not bank.groups:
+        problems.append("bank has no question groups")
+    empty = sorted(gid for gid, g in bank.groups.items() if not g.variants)
+    if empty:
+        problems.append(f"empty question group(s): {', '.join(empty)}")
+    if not bank.finalized:
+        problems.append("bank was not finalized (generation did not complete)")
+    return problems
+
+
 def write_imscc(bank, quiz: dict, out_path) -> Path:
     """Write a Canvas QTI quiz package: a standard-deflate .zip, imsmanifest.xml at root.
 
     Extension is .zip (not .imscc) because this is a QTI Quiz Export — import it via Canvas's
     'QTI .zip file' option, not 'Canvas Course Export Package'.
     """
+    problems = bank_problems(bank)
+    if problems:  # refuse before any I/O — a broken bank fails opaquely in Canvas otherwise
+        raise ValueError(f"cannot emit quiz from this bank: {'; '.join(problems)}")
     files = package_files(bank, quiz)  # may raise NotImplementedError — do it before any I/O
     out_path = Path(out_path)
     if out_path.suffix != ".zip":
@@ -689,6 +712,10 @@ def _load_banks(path) -> tuple[list[tuple], list[tuple]]:
     entries, skipped = [], []
     for bj in jsons:
         b = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
+        probs = bank_problems(b)
+        if probs:  # a broken/unfinished bank — skip it, don't poison the whole package
+            skipped.append((bj, "; ".join(probs)))
+            continue
         quiz = _quiz_for(b, bj.parent / "quiz.json")
         try:
             _quiz_files(b, quiz)  # surfaces unsupported question types before we commit
@@ -738,6 +765,10 @@ def reemit(path) -> list[tuple]:
     results = []
     for bj in jsons:
         b = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
+        probs = bank_problems(b)
+        if probs:
+            results.append((bj, None, "; ".join(probs)))
+            continue
         quiz = _quiz_for(b, bj.parent / "quiz.json")
         out = bj.parent / f"{bj.parent.name}.zip"
         try:

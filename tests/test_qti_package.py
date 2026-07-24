@@ -21,6 +21,7 @@ def _mc_bank(run_id="run", n_groups=3):
                 group_id=gid, label=lbl, variant_summary=f"{gid} angle {lbl}",
                 question_text=f"Question {gid}{lbl}: what is `x < {i}`?", text_format="markdown",
                 options=["one", "two", "three", "four"], correct_index=i))
+    bankmod.finalize()          # set the finalized flag (out_dir is None, so nothing is written)
     b = bankmod.get()
     quiz = bankmod.pick_quiz(seed=1)
     return b, quiz
@@ -200,6 +201,7 @@ def test_reemit_skips_unsupported_types_without_aborting(tmp_path, monkeypatch):
         bankmod.put_variant(bankmod.NumVariant(
             group_id="c1", label=lbl, variant_summary=f"Count {lbl}",
             question_text="How many sides does the shape have?", answer=a))
+    bankmod.finalize()          # finalized, so it's skipped for the type reason, not the guard
     (tmp_path / "week-4").mkdir()
     (tmp_path / "week-4" / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
 
@@ -269,6 +271,7 @@ def test_bundle_skips_unsupported_without_losing_the_rest(tmp_path, monkeypatch)
         bankmod.put_variant(bankmod.NumVariant(
             group_id="c1", label=lbl, variant_summary=f"Count {lbl}",
             question_text="How many sides does the shape have?", answer=a))
+    bankmod.finalize()          # finalized: skipped for the type, not the bank guard
     wk = tmp_path / "week-4"
     wk.mkdir()
     (wk / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
@@ -282,3 +285,53 @@ def test_bundle_skips_unsupported_without_losing_the_rest(tmp_path, monkeypatch)
 def test_bundle_returns_none_when_nothing_usable(tmp_path):
     out, included, skipped = qti.bundle(tmp_path)
     assert out is None and included == []
+
+
+# ------------------------------------ guard: a broken/unfinished bank must not ship
+
+def _broken_bank():
+    """The real failure mode (week-7): one good group, one group created but never filled, and the
+    run never finalized — which emits a quiz section that draws from an empty pool -> Canvas
+    rejects the whole package with a generic error."""
+    bankmod.reset()
+    bankmod.init("broken", None, title="Broken week")
+    bankmod.create_group("c1", "A good concept", "multiple_choice")
+    for i, lbl in enumerate("ABCD"):
+        bankmod.put_variant(bankmod.MCVariant(
+            group_id="c1", label=lbl, variant_summary=f"c1 angle {lbl}",
+            question_text=f"Question c1{lbl}: choose the right option.",
+            options=["one", "two", "three", "four"], correct_index=i))
+    bankmod.create_group("c2", "An empty concept", "multiple_choice")   # never filled
+    return bankmod.get()                                                # not finalized; c2 empty
+
+
+def test_write_imscc_refuses_a_broken_bank(tmp_path):
+    b = _broken_bank()
+    with pytest.raises(ValueError, match="empty question group"):
+        qti.write_imscc(b, {"title": "x", "groups": []}, tmp_path / "x")
+    assert not (tmp_path / "x.zip").exists()          # nothing written
+
+
+def test_reemit_skips_a_broken_bank_with_a_clear_reason(tmp_path):
+    wk = tmp_path / "week-7"
+    wk.mkdir()
+    (wk / "bank.json").write_text(_broken_bank().model_dump_json(), encoding="utf-8")
+
+    bj, imscc, reason = qti.reemit(tmp_path)[0]
+    assert imscc is None
+    assert "empty question group(s): c2" in reason
+    assert "not finalized" in reason
+    assert not (wk / "week-7.zip").exists()           # no partial file
+
+
+def test_bundle_excludes_a_broken_bank_but_keeps_the_good_one(tmp_path):
+    _write_week(tmp_path, "week-3", "r3")             # good, finalized
+    wk = tmp_path / "week-7"
+    wk.mkdir()
+    (wk / "bank.json").write_text(_broken_bank().model_dump_json(), encoding="utf-8")
+
+    out, included, skipped = qti.bundle(tmp_path)
+    assert out is not None
+    assert [bj.parent.name for bj in included] == ["week-3"]
+    assert any("week-7" in str(bj) and "empty question group" in reason
+               for bj, reason in skipped)

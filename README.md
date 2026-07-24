@@ -41,7 +41,7 @@ Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint �
 [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest -q        # 489 tests, all offline — no model needed
+uv run pytest -q        # 492 tests, all offline — no model needed
 ```
 
 ## Quick start
