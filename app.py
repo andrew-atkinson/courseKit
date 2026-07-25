@@ -160,6 +160,9 @@ def main(argv=None) -> int:
     parser.add_argument("--raw", action="store_true",
                         help="with --ingest: extract text only, skip the local-LLM shaping pass")
     parser.add_argument("--max-iters", type=int, default=pipeline.DEFAULT_MAX_ITERS)
+    parser.add_argument("--detail", choices=("brief", "medium", "full"),
+                        help="how much of the week a page covers (overrides page.yaml `detail`); "
+                             "medium is the default. No effect on quizzes.")
     args = parser.parse_args(argv)
 
     if args.ingest:
@@ -211,6 +214,7 @@ def main(argv=None) -> int:
                 args.path, weeks=weeks, output_root=args.output_root,
                 provider=provider, model=model, dry_run=args.dry_run, max_iters=args.max_iters,
                 generator=gen,
+                config_overrides={"detail": args.detail} if args.detail else None,
             )
         except pipeline.ModelLoadError as e:
             print(str(e))

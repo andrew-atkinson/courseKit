@@ -41,7 +41,7 @@ Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint �
 [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest -q        # 493 tests, all offline — no model needed
+uv run pytest -q        # 496 tests, all offline — no model needed
 ```
 
 ## Quick start
@@ -73,6 +73,7 @@ output, Canvas import, and per-course configuration.
 | `app.py PATH`                   | Both quizzes and pages, every week found.                  |
 | `app.py PATH --pages`           | Only pages.                                                |
 | `app.py PATH --quizzes`         | Only quizzes.                                              |
+| `app.py PATH --pages --detail full` | Page depth: `brief` / `medium` / `full` (overrides `page.yaml`). |
 | `app.py PATH --output-root DIR` | Write elsewhere instead of with the course.                |
 | `app.py PATH --max-iters N`     | Cap model turns per week (default 80).                     |
 | `app.py --to-qti DIR`           | One Canvas quiz `.zip` per week. Model-free.               |

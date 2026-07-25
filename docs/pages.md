@@ -109,6 +109,24 @@ tends to run:
 Your references and examples render **below** all of that, as their own sections. So the shape a
 student sees is: the model's outline, then your curated links and embeds.
 
+### Page length — the `detail` knob
+
+How much of the week a page covers is a setting, not a prompt edit. Three levels:
+
+- **`brief`** — one tight paragraph or a short list of only the essential concepts.
+- **`medium`** — the default: today's teaching outline.
+- **`full`** — near-complete: every concept expanded, with a worked example next to each the material
+  supports.
+
+Set a course's default in `<course root>/.vtconfig/page.yaml`:
+
+```yaml
+detail: full
+```
+
+…or override it for a single run with `--detail brief|medium|full` (quizzes ignore it). The flag
+wins over the file.
+
 ### Steering the model per course
 
 The page prompts are files, and a course can override them. Drop a replacement at
