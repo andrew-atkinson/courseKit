@@ -22,6 +22,7 @@ color:
 glyphs:
   roles: { review: "○", concept: "■", practice: "▲", example: "●", summary: "◆" }
   tones: { note: "■", tip: "●", warning: "▲" }
+  key_terms: "▤"                       # a geometric definitions-list mark
 space:
   unit: 8
   section_gap: 48

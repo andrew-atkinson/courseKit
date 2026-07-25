@@ -234,6 +234,76 @@ def test_recap_header_does_not_double_a_generic_topic(fresh):
     assert "Recap Recap" not in html                # a generic heading falls back to just the label
 
 
+def _glossary_container_style(html):
+    import re
+    m = re.search(r'<div style="([^"]*)">\s*<div style="[^"]*font-size[^"]*">[^<]*Key Terms', html)
+    return m.group(1) if m else ""
+
+
+def test_standalone_glossary_is_a_framed_key_terms_block(fresh):
+    # a standalone glossary (its own block / the week's terms) reads as its own framed box, with a
+    # per-theme glyph marking it
+    for name in ("bauhaus", "terminal", "plotter", "studio"):
+        P.reset()
+        P.put_block(P.build_block(kind="glossary", block_id="g",
+                                  entries=[{"term": "Ha-ha", "definition": "a sunken wall"}]))
+        html = render_body(P.get(), style=dict(S.load_theme(name), _name=name))
+        theme = S.load_theme(name)
+        c = theme["color"]
+        assert "Key Terms" in html and "Ha-ha" in html, name
+        assert "border-radius" in _glossary_container_style(html), name  # a full framed box
+        assert f'color: {c["accent"]}' in html, name                     # label in the accent tone
+        assert theme["glyphs"]["key_terms"] in html, name                # the graphic mark
+
+
+def test_glossary_folds_into_a_concept_section(fresh):
+    # key terms under a concept, with more page after them, are specific to it: they fold in as a
+    # subsection — a top rule + label, no separate box
+    P.reset()
+    P.put_block(P.build_block(kind="heading", block_id="c", text="Landscape", level=2, role="concept"))
+    P.put_block(P.build_block(kind="bullets", block_id="b", items=["conflict on the land"]))
+    P.put_block(P.build_block(kind="glossary", block_id="g",
+                              entries=[{"term": "Sublime", "definition": "awe"}]))
+    P.put_block(P.build_block(kind="heading", block_id="c2", text="Beauty", level=2, role="concept"))
+    P.put_block(P.build_block(kind="bullets", block_id="b2", items=["the picturesque"]))
+    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    style = _glossary_container_style(html)
+    assert "Landscape · Key Terms" in html and "Sublime" in html         # label names its concept
+    assert "border-top" in style and "border-radius" not in style        # a rule, not a box
+
+
+def test_trailing_week_glossary_is_peeled_to_standalone(fresh):
+    # a glossary tacked onto the end of the last concept is the week's terms — it stands alone (a box),
+    # it does not fold into that concept
+    P.reset()
+    P.put_block(P.build_block(kind="heading", block_id="c", text="Landscape", level=2, role="concept"))
+    P.put_block(P.build_block(kind="bullets", block_id="b", items=["conflict on the land"]))
+    P.put_block(P.build_block(kind="glossary", block_id="g",
+                              entries=[{"term": "Sublime", "definition": "awe"}]))
+    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    assert "border-radius" in _glossary_container_style(html)            # framed, not folded
+
+
+def test_glossary_label_is_configurable(tmp_path):
+    (tmp_path / ".vtconfig").mkdir()
+    (tmp_path / ".vtconfig" / "style.yaml").write_text(
+        "theme: bauhaus\nglossary_label: Vocabulary\n", encoding="utf-8")
+    P.reset()
+    P.put_block(P.build_block(kind="glossary", block_id="g",
+                              entries=[{"term": "T", "definition": "d"}]))
+    html = render_body(P.get(), style=S.load_style(tmp_path))
+    assert "Vocabulary" in html and "Key Terms" not in html
+
+
+def test_terminal_glossary_sits_on_a_ground_for_legibility(fresh):
+    # in a dark identity the Key Terms frame carries its ground so the light ink stays readable
+    P.reset()
+    P.put_block(P.build_block(kind="glossary", block_id="g",
+                              entries=[{"term": "T", "definition": "d"}]))
+    html = render_body(P.get(), style=dict(S.load_theme("terminal"), _name="terminal"))
+    assert "background-color: #12333d" in html               # the petrol ground under the terms
+
+
 def test_a_non_review_section_is_not_a_recap(fresh):
     P.reset()
     P.put_block(P.build_block(kind="heading", block_id="c", text="Core Idea", level=2, role="concept"))

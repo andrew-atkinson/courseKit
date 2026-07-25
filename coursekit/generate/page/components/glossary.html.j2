@@ -1,5 +1,27 @@
-<ul style="font-family: {{ t.type.body_family }}; color: {{ t.color.ink }}; line-height: 1.7; list-style-type: none; margin: 0 0 {{ t.space.unit * 2 }}px 0; padding-left: 0;">
+{#- Key Terms. STANDALONE (its own section / the week's terms) → a framed box so the terms read as
+    their own thing. NESTED under a concept (specific to that topic) → it folds in as a subsection: a
+    top rule + the label + terms, no box, so it isn't a frame-within-a-frame. Either way a per-theme
+    glyph and the ACCENT-coloured label mark it — the label separates from the ink term words and is
+    sized by the theme's scale (floored at 17) so a display serif like studio's doesn't read too
+    small. Border/rule follow the theme's idiom (plotter dashed, etc.). -#}
+{%- set base = t.glossary_label if t.glossary_label else 'Key Terms' -%}
+{#- Folded under a concept, the label names that concept — "Landscape · Key Terms" — so the scope is
+    explicit, the way the recap composes "Still Life Recap". Standalone, it's just the base label. -#}
+{%- set label = (concept ~ ' · ' ~ base) if (nested and concept and base|lower not in concept|lower) else base -%}
+{%- set glyph = t.glyphs.key_terms if (t.glyphs and t.glyphs.key_terms) else '' -%}
+{%- set fstyle = t.shape.frame_style if t.shape.frame_style else 'solid' -%}
+{%- set fborder = t.color.frame_border if t.color.frame_border else t.color.muted -%}
+{%- set hs4 = t.type.heading_sizes[4] if (t.type.heading_sizes and 4 in t.type.heading_sizes) else 18 -%}
+{%- if nested -%}
+{%- set frame = "border-top: 1px " ~ fstyle ~ " " ~ fborder ~ "; padding-top: " ~ (t.space.unit * 2) ~ "px; " -%}
+{%- else -%}
+{%- set frame = (("background-color: " ~ t.color.surface ~ "; ") if t.color.surface else "") ~ "border: 1px " ~ fstyle ~ " " ~ fborder ~ "; border-radius: " ~ t.shape.radius ~ "px; padding: " ~ (t.space.unit * 2) ~ "px " ~ (t.space.unit * 3) ~ "px; " -%}
+{%- endif -%}
+<div style="{{ frame }}margin: {{ t.space.section_gap }}px 0 {{ t.space.unit * 2 }}px 0;">
+<div style="font-family: {{ t.type.heading_family }}; font-weight: {{ t.type.heading_weight }}; font-size: {{ [hs4, 17]|max }}px; color: {{ t.color.accent }}; margin: 0 0 {{ t.space.unit }}px 0;">{% if glyph %}{{ glyph }}&nbsp;&nbsp;{% endif %}{{ label }}</div>
+<ul style="font-family: {{ t.type.body_family }}; color: {{ t.color.ink }}; line-height: 1.7; list-style-type: none; margin: 0; padding-left: 0;">
 {%- for e in b.entries %}
-<li style="margin-bottom: {{ t.space.unit }}px; padding-left: 14px; border-left: {{ t.shape.border_width }}px solid {{ t.color.tints.note }};"><strong>{{ e.term }}</strong> <span style="color: {{ t.color.muted }};">—</span> {{ e.definition | md_inline }}</li>
+<li style="margin-bottom: {{ t.space.unit }}px;"><strong>{{ e.term }}</strong> <span style="color: {{ t.color.muted }};">— {{ e.definition | md_inline }}</span></li>
 {%- endfor %}
 </ul>
+</div>

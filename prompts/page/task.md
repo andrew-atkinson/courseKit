@@ -16,7 +16,10 @@ Organise this week into a single course page, working top to bottom:
    points. Keep bullets to short phrases.
 3. Where the material demonstrates something concrete — code, a worked example, a technique — put it
    next to the concept it illustrates (code goes verbatim in a code block).
-4. Add a short glossary of the week's key terms.
+4. Add the week's key terms as a **glossary** at the **end** of the page — it labels itself, needs no
+   separate heading, and renders as a framed "Key Terms" box. For terms specific to a single concept,
+   put a glossary *under that concept's heading* (with more concepts after it) instead, where it folds
+   into the concept as a subsection.
 5. Add a callout for any common pitfall or warning the material calls out.
 
 Give each block a short, stable block_id. Do not include any links, URLs, or references — those are

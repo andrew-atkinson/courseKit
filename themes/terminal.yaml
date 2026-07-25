@@ -35,6 +35,7 @@ color:
 glyphs:
   roles: { review: "↺", concept: "❯", practice: "▶", example: "▸", summary: "✔" }
   tones: { note: "i", tip: "+", warning: "!" }
+  key_terms: "#"                       # the shell tag/comment sigil
 space:
   unit: 8
   section_gap: 22

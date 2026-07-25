@@ -222,10 +222,12 @@ def load_style(course_root) -> dict:
         theme["space"] = dict(theme["space"])
         theme["space"]["density"] = selection["density"]
 
-    # The prior-week recap label is a teaching-vocabulary choice, not a visual one — a course sets it
-    # in style.yaml (`recap_label: "Last time"`), defaulting to "Recap".
+    # The recap and key-terms labels are teaching-vocabulary choices, not visual ones — a course sets
+    # them in style.yaml (`recap_label: "Last time"`, `glossary_label: "Vocabulary"`).
     if selection.get("recap_label"):
         theme["recap_label"] = str(selection["recap_label"])
+    if selection.get("glossary_label"):
+        theme["glossary_label"] = str(selection["glossary_label"])
 
     theme["_problems"] = problems
     return theme

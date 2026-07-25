@@ -196,6 +196,17 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
     if current:
         groups.append(current)
 
+    # The week's summary glossary lands at the very end, grouped with the last concept — but it isn't
+    # specific to that concept. Peel a run of trailing glossary blocks off the last section into their
+    # own standalone groups, so they render as clean framed "Key Terms" boxes rather than folding into
+    # (and inheriting the frame of) the last concept. A glossary that sits mid-page, under a concept
+    # with more sections after it, stays put and folds in.
+    if groups and any(b.kind == "heading" for b in groups[-1]):
+        tail = []
+        while len(groups[-1]) > 1 and groups[-1][-1].kind == "glossary":
+            tail.insert(0, groups[-1].pop())
+        groups.extend([g] for g in tail)
+
     shape = t.get("shape") or {}
     color = t.get("color") or {}
     # section_frame: none | card (a light card on the page) | panel (each section on the theme's
@@ -287,9 +298,16 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
         if framed and frame_roles:
             # a role outside the theme's frame list stays flat; role-less headings keep the default
             framed = role is None or role in frame_roles
+        # A glossary under a concept/example/practice/summary heading is specific to that topic, so
+        # it FOLDS IN — just the labelled terms, no separate box. A standalone glossary — its own
+        # section (a plain or "Key Terms" heading, or no heading) — keeps its full Key Terms frame.
+        topic_section = is_heading and role in ("concept", "example", "practice", "summary")
+        concept_name = group[0].text if topic_section else None
         rendered = [
             _env.get_template(f"{b.kind}.html.j2").render(
-                b=b.model_dump(), t=t, framed=framed, frame_pad=unit * 3).strip()
+                b=b.model_dump(), t=t, framed=framed, frame_pad=unit * 3,
+                nested=(b.kind == "glossary" and topic_section),
+                concept=concept_name).strip()
             for b in group
         ]
         parts.append(_panel("\n".join(rendered)) if framed else "\n".join(rendered))

@@ -24,6 +24,7 @@ color:
 glyphs:
   roles: { review: "◦", concept: "＋", practice: "✎", example: "◇", summary: "▣" }
   tones: { note: "◦", tip: "＋", warning: "△" }
+  key_terms: "≡"                       # an index/legend rule
 space:
   unit: 8
   section_gap: 44

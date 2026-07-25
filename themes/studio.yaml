@@ -24,6 +24,7 @@ color:
 glyphs:
   roles: { review: "·", concept: "—", practice: "✳", example: "❍", summary: "■" }
   tones: { note: "·", tip: "✳", warning: "▲" }
+  key_terms: "§"                       # the editorial section mark
 space:
   unit: 8
   section_gap: 64
