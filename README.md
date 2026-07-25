@@ -8,10 +8,10 @@ by default).
 
 Two generators today, both the same shape: point them at a week's transcript and they drive a local
 model through **tool calls** into a canonical JSON form, then emit platform files. Prose is never the
-artifact — the model *commits* each piece through a tool call, so a revision overwrites rather than
+artifact — the model _commits_ each piece through a tool call, so a revision overwrites rather than
 piling up (an early free-text version kept losing final questions among the model's own drafts).
 
-- **Quizzes** — 5 concepts × 4 variants; each concept becomes a Canvas *question group* that draws one
+- **Quizzes** — 5 concepts × 4 variants; each concept becomes a Canvas _question group_ that draws one
   variant at random, so every student gets a different version. `bank.json` → Canvas QTI `.zip`
   (+ GIFT). → [Generating quizzes](docs/quizzes.md)
 - **Pages** — the week's narrative page: a teaching outline (headings, concept bullets, code, glossary)
@@ -33,7 +33,7 @@ generators sit on, is the whole architecture. See
 ## Install
 
 ```bash
-git clone <this repo> && cd coursekit
+git clone https://github.com/andrew-atkinson/quizbot.git && cd coursekit
 uv sync --group dev
 ```
 
@@ -41,7 +41,7 @@ Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint �
 [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest -q        # 488 tests, all offline — no model needed
+uv run pytest -q        # 493 tests, all offline — no model needed
 ```
 
 ## Quick start
@@ -65,23 +65,23 @@ output, Canvas import, and per-course configuration.
 
 ## Commands
 
-| Command                         | What it does                                |
-| ------------------------------- | ------------------------------------------- |
-| `app.py PATH --dry-run`         | List the weeks it would process. No model.  |
-| `app.py PATH --week 3`          | Generate one week. Repeatable.              |
-| `app.py PATH --weeks 3-8`       | Generate an inclusive range.                |
-| `app.py PATH`                   | Both quizzes and pages, every week found.   |
-| `app.py PATH --pages`           | Only pages.                                 |
-| `app.py PATH --quizzes`         | Only quizzes.                               |
-| `app.py PATH --output-root DIR` | Write elsewhere instead of with the course. |
-| `app.py PATH --max-iters N`     | Cap model turns per week (default 80).      |
-| `app.py --to-qti DIR`           | One Canvas quiz `.zip` per week. Model-free.|
-| `app.py --to-qti DIR --bundle`  | One `.zip` for all quizzes. Model-free.     |
-| `app.py --to-html DIR`          | Re-render pages from `page.json`. Model-free.|
-| `app.py --to-cc DIR`            | One Canvas `.imscc` of all pages. Model-free.|
+| Command                         | What it does                                               |
+| ------------------------------- | ---------------------------------------------------------- |
+| `app.py PATH --dry-run`         | List the weeks it would process. No model.                 |
+| `app.py PATH --week 3`          | Generate one week. Repeatable.                             |
+| `app.py PATH --weeks 3-8`       | Generate an inclusive range.                               |
+| `app.py PATH`                   | Both quizzes and pages, every week found.                  |
+| `app.py PATH --pages`           | Only pages.                                                |
+| `app.py PATH --quizzes`         | Only quizzes.                                              |
+| `app.py PATH --output-root DIR` | Write elsewhere instead of with the course.                |
+| `app.py PATH --max-iters N`     | Cap model turns per week (default 80).                     |
+| `app.py --to-qti DIR`           | One Canvas quiz `.zip` per week. Model-free.               |
+| `app.py --to-qti DIR --bundle`  | One `.zip` for all quizzes. Model-free.                    |
+| `app.py --to-html DIR`          | Re-render pages from `page.json`. Model-free.              |
+| `app.py --to-cc DIR`            | One Canvas `.imscc` of all pages. Model-free.              |
 | `app.py --ingest DIR`           | Documents (PDF/docx/odt/pptx/txt/md) → `output/week-N.md`. |
-| `app.py --ingest DIR --raw`     | Same, extract only — no model, fully offline. |
-| `uv run pytest -q`              | Run the test suite. Fully offline.          |
+| `app.py --ingest DIR --raw`     | Same, extract only — no model, fully offline.              |
+| `uv run pytest -q`              | Run the test suite. Fully offline.                         |
 
 Exit codes: `0` success · `1` a unit failed to finalize · `2` the model could not be loaded.
 
@@ -96,8 +96,8 @@ The README is the high-level read; the detail lives in [`docs/`](docs/):
   your supplements), the supplements YAML (references, examples, embeds — including pasted `<iframe>`
   snippets), and re-rendering model-free.
 - **[The domain profile](docs/domain-profile.md)** — one `.vtconfig/domain.md` per course that pins
-  every generator to the right knowledge domain (p5.js, not Processing) and *corrects a transcript
-  that drifts*. The main defence against plausible-but-wrong output.
+  every generator to the right knowledge domain (p5.js, not Processing) and _corrects a transcript
+  that drifts_. The main defence against plausible-but-wrong output.
 - **[Page design](docs/design.md)** — the four visual identities (bauhaus, terminal, plotter,
   studio), the `style.yaml` a course picks a theme with, section roles (where design meets
   pedagogy), and the guardrails (Canvas allowlist, WCAG, alt-text) that keep a theme shippable.

@@ -11,7 +11,7 @@ Somethings are just ideas and not necessarily to be implemented, this is just a 
     front matter points at `aacontent.b-cdn.net`, the staging copy used to feed the transcriber. The
     Canvas course does not reference that domain at all: students watch videos embedded from
     **Panopto** (`example.hosted.panopto.com`). Linking the CDN URL would send students out of
-    Canvas to a parallel copy.
+    Canvas to a parallel copy.v
   - **Per-video Panopto links aren't reliably recoverable.** The Panopto GUIDs live in the Canvas
     page embeds, but their titles are course-authored ("Rotations", "Shearing") while the transcripts
     use filename-derived ones ("2 for loops"). Some embeds have `title=""`. Any auto-matching would
@@ -39,8 +39,8 @@ Somethings are just ideas and not necessarily to be implemented, this is just a 
 - in prompts/pages/system.md it is assuming that this is only for coding. We need a level of abstraction for different types of content. What if this was a photo or art course? This would be useless. It also seems that both the system and task files are project specific and so should live in the project folder, but should also be strucutred by generated out of the content.
 - voice - the current voice is very dry and factual. and borrrrring.
 - **Syntax highlighting for code blocks — and the deeper idea behind it** (user, 2026-07-20). The
-  user's insight: code highlighting makes *semantic* distinctions (keyword / string / comment /
-  number) through color, and that maps to *pedagogic* distinctions (concept / example / caveat).
+  user's insight: code highlighting makes _semantic_ distinctions (keyword / string / comment /
+  number) through color, and that maps to _pedagogic_ distinctions (concept / example / caveat).
   Two threads:
   1. **Highlight `code` blocks.** Tokenise with a lexer (Pygments) and emit **inline-styled**
      `<span>`s (Pygments' `noclasses=True` inline formatter → sanitizer-safe; no `<style>` block).
@@ -50,7 +50,7 @@ Somethings are just ideas and not necessarily to be implemented, this is just a 
      Pygments would be a new dependency; confirm it's Canvas-safe first.
   2. **The mapping made explicit.** The `terminal` identity already does this at the page level —
      section `role` → segment-chip hue is exactly "token type → color". Worth naming as a design
-     principle: color is reserved for *semantic/pedagogic signal*, never decoration (which is also
+     principle: color is reserved for _semantic/pedagogic signal_, never decoration (which is also
      taste-skill's anti-slop rule and CLT signaling). The role→color system and code→color system
      should share one palette per theme.
 
@@ -72,7 +72,7 @@ page work.
    consistent with pages. See [[content-shape-domain-profile]] equivalent for pages.
 2. **Number of questions + variations, parameterized.** `quiz.yaml` `questions: N` (default 5) and
    `variants: M` (default 4); generalize the correct-answer-position rule from the hard 4 to M. Two
-   enhancements: (a) an *analysis-suggested* question count — a pass over the week's material proposes
+   enhancements: (a) an _analysis-suggested_ question count — a pass over the week's material proposes
    how many concepts it can fairly assess; (b) variants driven by class size (more students → more
    variants to reduce overlap) or simply professor-set.
 
@@ -81,19 +81,19 @@ page work.
 Surfaced running pages on real art decks (Still Lives wk6, History Landscape wk7). Confirmed against
 the generated `page.json`.
 
-1. **Prior-week review needs a distinct graphic treatment (all 4 themes).** The page already emits a
+1. ✅ **DONE (branch `design-review-glossary`).** Prior-week review needs a distinct graphic treatment (all 4 themes). The page already emits a
    `role=review` opener that recaps the previous week (confirmed: wk7 opened "Review: The Constructed
-   Image" recapping wk6's still-life themes). A look-back should *read* as a different topic — its own
+   Image" recapping wk6's still-life themes). A look-back should _read_ as a different topic — its own
    graphic quality (a "previously / recap" band), distinct from current-week content. Build on the
    existing heading `role` system in the renderer + each theme. NOTE: the recap is currently
    **emergent** (the model does it from the prompt's "recap earlier weeks" line), not a real
-   cross-week mechanism — the generator never sees the prior week. A *reliable* spaced-learning
+   cross-week mechanism — the generator never sees the prior week. A _reliable_ spaced-learning
    feature (deliberately feeding prior-week concepts into the next week's generation) is a separate,
    bigger item.
 2. **Variable summary length / detail level.** Introduce a `detail` control with ~3 settings: (1) one
    paragraph of key concepts, (2) today's medium outline, (3) near-complete detail. A generation knob
    — `page.yaml` `detail: brief|medium|full` (or a CLI flag) selecting a different task instruction.
-3. **Key-terms / glossary needs clear demarcation (all 4 themes).** The glossary rendered directly
+3. ✅ **DONE (branch `design-review-glossary`).** Key-terms / glossary needs clear demarcation (all 4 themes). Now a labelled "Key Terms" frame (accent label + per-theme glyph, `glossary_label` configurable); a standalone/week glossary is a framed box, a concept-specific one folds in as a subsection ("Concept · Key Terms"). The glossary rendered directly
    under the last concept heading ("Landscape and Violence") with no separation, so the terms
    (Picturesque, French Formal Garden, Ha-ha, Sublime, New Topographics) misread as part of that
    section. Give the glossary its own labeled frame ("Key Terms"), visually distinct, regardless of
@@ -107,6 +107,13 @@ the generated `page.json`.
 
 ### Next Items
 
+- **CLI command list needs restructuring (2026-07-24, later — not now).** The `app.py` command table
+  (README "Commands") has grown cumbersome and hard to distinguish — generation flags, re-emit
+  utilities (`--to-qti`/`--to-html`/`--to-cc`), and ingest all sit in one flat list, several doing
+  subtly different things. It needs a clearer structure — likely **subcommands** grouping by phase
+  (e.g. `generate` / `emit` / `ingest`) rather than a flat flag soup — so the surface is legible.
+  Scope: `app.py` arg parsing + the README table + `docs/`. Deferred.
+
 - **Document ingest — known limitations / future iterations** (shipped 2026-07-24 as
   `coursekit/ingest/`; supports PDF · docx · odt · pptx incl. speaker notes · txt/md, offline,
   `--ingest [--raw]`). Deferred to later iterations, roughly in value order:
@@ -116,7 +123,7 @@ the generated `page.json`.
   - **OCR for scanned PDFs.** A scanned page (image of text) extracts empty. Needs an OCR step
     (offline: tesseract/`ocrmypdf`, an external binary — weigh against the pydantic+stdlib footprint).
   - **Direct Google Slides / Docs import** (parked here 2026-07-24, user's courses are Slides-based):
-    export-to-file works today (Download → PDF/PPTX/DOCX → `--ingest`); *live* import is the
+    export-to-file works today (Download → PDF/PPTX/DOCX → `--ingest`); _live_ import is the
     online/OAuth axis, a reversal of the offline-first decision — its own project with an auth +
     copyright surface.
   - **`.doc`** (legacy binary Word) — no clean pure-Python reader; convert to `.docx`/PDF.
