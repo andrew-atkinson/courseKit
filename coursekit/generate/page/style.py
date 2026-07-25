@@ -120,6 +120,26 @@ def validate_theme(theme: dict) -> list[str]:
     if frame_bg and _check_hex("frame_bg", frame_bg) and ok_ink and contrast_ratio(ink, frame_bg) < 4.5:
         problems.append(f"ink on frame_bg ({frame_bg}) fails WCAG AA")
 
+    # The recap answers (and other secondary text) are `muted` on the page ground — it must stay
+    # legible there, since a recap's question is ink but its answer recedes to muted.
+    page_muted = color.get("muted")
+    if page_muted and _check_hex("muted", page_muted) and contrast_ratio(page_muted, surface) < 4.5:
+        problems.append(f"muted {page_muted} on the surface fails WCAG AA "
+                        f"({contrast_ratio(page_muted, surface):.1f}:1 < 4.5:1)")
+
+    # A theme may give the recap its own ground (recap_bg) + palette (recap_ink question, recap_muted
+    # answer) — a light-mode note on a dark identity. Validate THAT pair, not the page ink.
+    recap_bg = color.get("recap_bg")
+    if recap_bg and _check_hex("recap_bg", recap_bg):
+        r_ink = color.get("recap_ink", ink)
+        r_muted = color.get("recap_muted", color.get("muted", ink))
+        if _check_hex("recap_ink", r_ink) and contrast_ratio(r_ink, recap_bg) < 4.5:
+            problems.append(f"recap question {r_ink} on recap_bg {recap_bg} fails WCAG AA "
+                            f"({contrast_ratio(r_ink, recap_bg):.1f}:1 < 4.5:1)")
+        if _check_hex("recap_muted", r_muted) and contrast_ratio(r_muted, recap_bg) < 4.5:
+            problems.append(f"recap answer {r_muted} on recap_bg {recap_bg} fails WCAG AA "
+                            f"({contrast_ratio(r_muted, recap_bg):.1f}:1 < 4.5:1)")
+
     # Segment chips (terminal's Powerlevel10k language): role-colored pills; the chip text
     # (segment_ink) must clear AA on every chip color.
     segments = color.get("segments") or {}
@@ -201,6 +221,11 @@ def load_style(course_root) -> dict:
         theme.setdefault("space", {})
         theme["space"] = dict(theme["space"])
         theme["space"]["density"] = selection["density"]
+
+    # The prior-week recap label is a teaching-vocabulary choice, not a visual one — a course sets it
+    # in style.yaml (`recap_label: "Last time"`), defaulting to "Recap".
+    if selection.get("recap_label"):
+        theme["recap_label"] = str(selection["recap_label"])
 
     theme["_problems"] = problems
     return theme

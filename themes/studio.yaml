@@ -11,6 +11,7 @@ type:
 color:
   ink: "#222222"
   muted: "#6b6b6b"
+  recap_border: "#ddd9d6"
   accent: "#9c2d2d"
   tints:
     note: "#f5f5f4"

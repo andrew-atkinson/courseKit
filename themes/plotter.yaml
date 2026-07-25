@@ -11,6 +11,7 @@ type:
 color:
   ink: "#2e3338"
   muted: "#646b73"
+  recap_border: "#c9d1d6"
   accent: "#0b6e80"            # riso teal ink, AA on white
   tints:
     note: "#eef2f4"

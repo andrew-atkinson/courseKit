@@ -218,11 +218,73 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
                 f'border-radius: {radius}px; padding: {unit * 3}px; margin: 0 0 {gap}px 0;">\n'
                 f'{inner}\n</div>')
 
+    # A `review` section is a block-level Recap CONTAINER: a distinct box in the theme's border idiom
+    # (terminal a linear petrol rule, plotter dashed, studio a hairline) holding one accordion per
+    # recall question. A theme may give the recap its own ground + palette (terminal's light-mode
+    # note), so the box has good contrast whether it sits on a light page or the dark panels' gaps.
+    type_ = t.get("type") or {}
+    heading_family = type_.get("heading_family", "sans-serif")
+    body_family = type_.get("body_family", heading_family)
+    heading_weight = type_.get("heading_weight", 700)
+    review_glyph = ((t.get("glyphs") or {}).get("roles") or {}).get("review", "↺")
+    recap_label = t.get("recap_label", "Recap")     # course-set in style.yaml; no assumed cadence
+    recap_border = color.get("recap_border", color.get("frame_border", color.get("muted", "#cccccc")))
+    r_ink = color.get("recap_ink", color.get("ink"))          # question text (dark on the recap ground)
+    r_muted = color.get("recap_muted", color.get("muted"))    # answer text, receded but legible
+    r_bg = color.get("recap_bg")                              # a distinct ground; None on light themes
+    # the question is larger but only medium-weight (capped below a heavy theme heading, so it reads
+    # as a prompt, not a shout; a light heading like studio's 400 is left as-is).
+    q_weight = min(int(heading_weight), 500)
+    # fallback (non-question) recap content renders in the recap palette so it stays legible on r_bg
+    t_recap = dict(t)
+    t_recap["color"] = {**color, "ink": r_ink, "muted": r_muted}
+
+    def _recap_qa(question: str, answer_html: str) -> str:
+        """One recall question, its own accordion. The QUESTION dominates — larger, medium weight,
+        the recap's ink; the revealed answer recedes (smaller, muted). The native marker rotates."""
+        return (
+            f'<details style="border-top: 1px {frame_style} {recap_border}; '
+            f'padding: {unit}px 0; margin: 0;">\n'
+            f'<summary style="cursor: pointer; font-family: {heading_family}; '
+            f'font-weight: {q_weight}; font-size: 18px; color: {r_ink};">{question}</summary>\n'
+            f'<div style="color: {r_muted}; font-family: {body_family}; font-size: 15px; '
+            f'line-height: 1.55; padding: {unit}px 0 0 {unit * 2}px;">{answer_html}</div>\n</details>')
+
+    def _recap(title: str, body_blocks) -> str:
+        """The block-level recap: a distinct bordered container with a header and one accordion per
+        question. The header names the prior topic when the model supplies one — "Still Life Recap" —
+        otherwise just the label. The container is NOT collapsible; it recedes by being quiet."""
+        topic = (title or "").strip()
+        label = (f"{topic} {recap_label}"
+                 if topic and topic.lower() not in ("recap", "review", recap_label.lower())
+                 else recap_label)
+        header = (f'<div style="font-family: {heading_family}; font-weight: {heading_weight}; '
+                  f'font-size: 17px; color: {r_ink}; margin: 0 0 {unit}px 0;">'
+                  f'{review_glyph}&nbsp;&nbsp;{escape(label)}</div>')
+        inner = []
+        for b in body_blocks:
+            if b.kind == "details":
+                inner.append(_recap_qa(str(escape(b.summary)), _md_inline(b.text)))
+            else:  # fallback if the model didn't phrase the recap as questions
+                inner.append(_env.get_template(f"{b.kind}.html.j2").render(
+                    b=b.model_dump(), t=t_recap, framed=False, frame_pad=0).strip())
+        bg = f"background-color: {r_bg}; " if r_bg else ""
+        return (f'<div style="{bg}border: 1px {frame_style} {recap_border}; '
+                f'border-radius: {radius}px; padding: {unit * 2}px {unit * 3}px; '
+                f'margin: 0 0 {gap}px 0;">\n{header}\n' + "\n".join(inner) + "\n</div>")
+
     parts = []
     for group in groups:
-        framed = frame in ("card", "panel") and group[0].kind == "heading"
+        is_heading = group[0].kind == "heading"
+        role = getattr(group[0], "role", None) if is_heading else None
+
+        if role == "review":
+            # the review heading names the prior topic; its questions are the following details blocks
+            parts.append(_recap(group[0].text, group[1:]))
+            continue
+
+        framed = frame in ("card", "panel") and is_heading
         if framed and frame_roles:
-            role = getattr(group[0], "role", None)
             # a role outside the theme's frame list stays flat; role-less headings keep the default
             framed = role is None or role in frame_roles
         rendered = [

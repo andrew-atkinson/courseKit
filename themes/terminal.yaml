@@ -12,6 +12,10 @@ color:
   surface: "#12333d"           # the deep petrol-blue terminal ground; the whole page sits on it
   ink: "#e7eef0"
   muted: "#93a7ac"
+  recap_bg: "#dbe6e9"          # light-mode recap: a pale note, set off from the dark page…
+  recap_ink: "#12333d"         # …with dark petrol question text (high contrast on the pale ground)
+  recap_muted: "#41616b"       # the answer, receded but still legible
+  recap_border: "#3f6b78"      # a linear petrol rule that defines the pale box against the page
   accent: "#5ec8b0"            # bright terminal teal — links, inline emphasis; AA on the ground
   segment_ink: "#ffffff"
   frame_border: "#20505d"

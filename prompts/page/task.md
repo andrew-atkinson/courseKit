@@ -5,8 +5,13 @@ description: "The brief: organise a week's material into a page"
 ---
 Organise this week into a single course page, working top to bottom:
 
-1. Open with a short `REVIEW` heading and a few bullets recapping what earlier weeks set up (only if
-   the material points back to them).
+1. If the week builds on earlier ones, open with a **recap**: add a heading with `role: review`
+   whose text **names the topic you are recapping** — the prior week's theme, e.g. "Still Life"
+   (it renders as "Still Life Recap"). Then add **two to four `add_details`, one per recall question** —
+   each summary is a question the student answers from memory ("What did last week establish about
+   X?") and each text is the answer. They render as accordions inside a Recap box, so the student
+   predicts before revealing. Make the questions genuinely worth answering, not trivial. Skip the
+   recap entirely if the material doesn't look back.
 2. Add a heading for each key concept the week teaches, with bullets underneath capturing the main
    points. Keep bullets to short phrases.
 3. Where the material demonstrates something concrete — code, a worked example, a technique — put it

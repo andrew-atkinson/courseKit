@@ -187,18 +187,59 @@ def test_studio_theme_valid_and_quiet():
 
 # ------------------------------------ role-based framing + surface + a11y
 
-def test_roles_select_which_topics_get_frames(fresh):
-    # plotter frames concept/practice/example; a review section stays flat
+def test_review_is_a_recap_container_of_question_accordions(fresh):
+    # a review section is a block-level Recap CONTAINER (a bordered box in the theme's idiom) holding
+    # one accordion per recall question — the container is not itself collapsible.
+    for name, rborder in (("bauhaus", "#d4d4d4"), ("terminal", "#3f6b78"),
+                          ("plotter", "#c9d1d6"), ("studio", "#ddd9d6")):
+        P.reset()
+        P.put_block(P.build_block(kind="heading", block_id="r", text="Recap", level=2, role="review"))
+        P.put_block(P.build_block(kind="details", block_id="q1", summary="What is X?", text="X is a thing."))
+        P.put_block(P.build_block(kind="details", block_id="q2", summary="What is Y?", text="Y is another."))
+        html = render_body(P.get(), style=dict(S.load_theme(name), _name=name))
+        assert rborder in html, name                 # the container's theme-idiom border
+        assert html.count("<details") == 2, name     # one accordion per question, not one for the recap
+        assert "What is X?" in html and "What is Y?" in html, name
+        # the question dominates (recap ink) and the revealed answer recedes (recap muted)
+        c = S.load_theme(name)["color"]
+        q_color, a_color = c.get("recap_ink", c["ink"]), c.get("recap_muted", c["muted"])
+        assert f'color: {q_color}' in html and f'color: {a_color}' in html, name
+
+
+def test_terminal_recap_is_a_light_note_defined_by_a_linear_border(fresh):
+    # terminal's recap is a pale box with DARK text (readable) set off from the dark page by a rule
     P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="r", text="Recap", level=3, role="review"))
-    P.put_block(P.build_block(kind="bullets", block_id="rb", items=["old stuff"]))
-    P.put_block(P.build_block(kind="heading", block_id="c", text="Core Idea", level=3, role="concept"))
-    P.put_block(P.build_block(kind="paragraph", block_id="cp", text="the idea"))
-    html = render_body(P.get(), style=dict(S.load_theme("plotter"), _name="plotter"))
-    assert html.count("1px dashed") == 1        # only the concept topic is framed
-    idx_recap = html.index("Recap")
-    idx_frame = html.index("1px dashed")
-    assert idx_frame > idx_recap                # and the frame is the later (concept) section
+    P.put_block(P.build_block(kind="heading", block_id="r", text="Recap", level=2, role="review"))
+    P.put_block(P.build_block(kind="details", block_id="q", summary="Recall?", text="Yes."))
+    html = render_body(P.get(), style=dict(S.load_theme("terminal"), _name="terminal"))
+    assert "background-color: #dbe6e9" in html        # the pale recap ground
+    assert "color: #12333d" in html                   # dark petrol question text (high contrast)
+    assert "#3f6b78" in html                          # the linear border that defines the box
+    assert "1px" in html.split("background-color: #dbe6e9")[1][:80]   # a thin (1px) border, not heavy
+
+
+def test_recap_header_names_the_prior_topic(fresh):
+    P.reset()
+    P.put_block(P.build_block(kind="heading", block_id="r", text="Still Life", level=2, role="review"))
+    P.put_block(P.build_block(kind="details", block_id="q", summary="Q?", text="A."))
+    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    assert "Still Life Recap" in html               # topic + label composed
+
+
+def test_recap_header_does_not_double_a_generic_topic(fresh):
+    P.reset()
+    P.put_block(P.build_block(kind="heading", block_id="r", text="Recap", level=2, role="review"))
+    P.put_block(P.build_block(kind="details", block_id="q", summary="Q?", text="A."))
+    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    assert "Recap Recap" not in html                # a generic heading falls back to just the label
+
+
+def test_a_non_review_section_is_not_a_recap(fresh):
+    P.reset()
+    P.put_block(P.build_block(kind="heading", block_id="c", text="Core Idea", level=2, role="concept"))
+    P.put_block(P.build_block(kind="details", block_id="d", summary="Predict?", text="answer"))
+    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    assert "Recap" not in html                       # no recap label for a non-review section
 
 
 def test_role_glyph_renders_in_accent(fresh):

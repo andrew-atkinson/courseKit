@@ -14,7 +14,9 @@ course teaches — code, worked examples, images, cases, or plain explanation. T
 above, when present, says which; otherwise take it from the material itself. Build the backbone with:
 
 - **Headings** structure it — one per key section. Every page needs at least one. Give each heading a
-  `role` so a student can scan the page by section type: `review` (recap), `concept` (a core idea),
+  `role` so a student can scan the page by section type: `review` (opens a recap of earlier weeks —
+  follow it with `add_details` recall questions, which become accordions in a Recap box), `concept`
+  (a core idea),
   `example` (a worked demonstration), `practice` (something to do), `summary` (a wrap-up).
 - **Bullets** carry key points under a heading — short phrases, not paragraphs.
 - **Paragraphs** for the connective explanation a concept needs.
