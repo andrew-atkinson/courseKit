@@ -8,75 +8,109 @@ videotranscriber (separate repo at `~/video_transcription`) is unchanged since t
 test count lives only in `README.md`, where a meta-test (`tests/test_docs_facts.py`) keeps it honest —
 it is deliberately not repeated here, because a number stated in two places rots in one of them.
 
-## Two views
+## Three views
 
-The system is two independent tools that meet through files, and a single pipeline inside this repo.
-Those are different stories, so they get different diagrams — the first shows *how the tools connect*,
-the second shows *what happens inside coursekit*. (Module-level dependencies are the third view,
-[below](#dependency-direction).)
+Three stories, three diagrams. First the **system in four layers** — who provides what, where the
+files live, what coursekit actually *is*, and where the output goes (read this one first). Then **what
+happens inside coursekit** (the pipeline waist). Module-level dependencies are the third view,
+[below](#dependency-direction).
 
-### View 1 — two tools, one bus
+### The system, in four layers
 
 ```mermaid
-flowchart LR
-    media[/"lecture video"/]
-    docs[/"readings · PDF<br/>slides · docx"/]
-    seed[/"prior Canvas export<br/>imsmanifest.xml · optional"/]
+flowchart TB
+    prof(("faculty"))
 
-    subgraph VT [" videotranscriber · separate repo "]
-        direction TB
-        vtpipe["transcribe → describe<br/>→ analyze → format"]
-        vtctx["vt_context.py"]
+    subgraph L1 [" ① what faculty provides "]
+        direction LR
+        video[/"lecture video"/]
+        docs[/"readings · PDF<br/>slides · docx"/]
+        export[/"prior Canvas export<br/>optional"/]
     end
 
-    subgraph BUS [" .vtconfig/ · the course-directory bus "]
+    vt["videotranscriber<br/>separate tool · media → text"]
+
+    subgraph L2 [" ② the course folder on disk "]
         direction TB
-        ctx["context.yaml<br/>course · weeks · modules"]
-        md["output/week-N.md<br/>transcripts"]
-        cfg["quiz.yaml · page.yaml<br/>pages/*.yaml · style.yaml"]
+        ctx["<b>.vtconfig/context.yaml</b><br/>course · weeks · modules"]
+        ycfg["<b>.vtconfig/</b> quiz.yaml · page.yaml<br/>style.yaml · supplements<br/><i>(faculty-editable)</i>"]
+        wk["week-N.md<br/>the week's text"]
+        ir["bank.json · page.json · IR<br/>+ .gift · QTI .zip · .html · .imscc"]
     end
 
-    subgraph CK [" coursekit · this repo "]
-        direction TB
-        ingest["ingest<br/>docs → week-N.md"]
-        gen["generate<br/>bank.json · page.json"]
-        emit["emit<br/>.gift · QTI .zip · .html · .imscc"]
-        gen --> emit
+    subgraph L3 [" ③ coursekit · a set of programs "]
+        direction LR
+        ingest["ingest"]
+        generate["generate"]
+        emit["emit"]
     end
+    llm[["an LLM — local (LM Studio)<br/>or a hosted API"]]
 
-    canvas([" Canvas · delivery "])
+    canvas([" ④ Canvas · delivery "])
 
-    media --> vtpipe
+    prof --> video & docs & export
+    prof -. "edits by hand" .-> ycfg
+
+    video --> vt
+    vt -. "writes" .-> wk
+    vt -. "writes" .-> ctx
+    export -. "seed · once" .-> ctx
+
     docs --> ingest
-    seed -. "seed structure · once" .-> vtctx
-    vtpipe --> md
-    ingest -. "writes" .-> md
-    vtctx --> ctx
-    BUS --> CK
-    emit -- "import" --> canvas
+    ingest -. "writes" .-> wk
+    ingest -. "shape pass" .-> llm
+
+    wk --> generate
+    ctx -. "read" .-> generate
+    ycfg -. "read" .-> generate
+    generate <--> llm
+    generate -. "writes" .-> ir
+
+    ir --> emit
+    ycfg -. "supplements · style" .-> emit
+    emit -. "writes" .-> ir
+    emit --> canvas
 ```
 
-**Neither tool imports the other; the contract is the course directory.** The transcriber writes
-`context.yaml` + `week-N.md`; coursekit reads them. That file boundary is what lets them stay
-separate repos with disjoint runtimes — the transcriber keeps `mlx-whisper` and its Apple-Silicon
-stack; coursekit stays pydantic + stdlib.
+The pieces fall into four layers. The two things this makes explicit — because the old diagram hid
+them — are that **`.vtconfig/` is just local files in the course's own folder, created by the tools
+but freely hand-editable by faculty**, and that **coursekit is a set of programs that *drive* an LLM
+(local or hosted), not a model itself**.
 
-**The transcriber is not the only way to produce `week-N.md`.** coursekit has its own light
-**ingest** adapter (`coursekit/ingest/`) that turns documents — PDF, slides, `.docx`/`.odt`, plain
-text — into the same `week-N.md` the generators read, so a course with no video (a readings- or
-slides-based one) still works end to end. It writes the identical text contract and imports none of
-the transcriber's stack. The transcriber is the media→text adapter; ingest is the document→text one —
-two front doors onto the same bus.
+**① What faculty provides.** The raw material for a week: a lecture video, or readings / PDFs / slides
+(`.docx`, `.odt`), or — for a course already living in Canvas — a prior course export. Nothing here is
+coursekit-specific; it is what the instructor already has.
 
-**No dependency cycle — Canvas is a sink, optionally a one-time seed.** The generated artifacts import
-into Canvas; that is the delivery. Separately, when a course already lives in Canvas, a *prior*
-export's `imsmanifest.xml` can seed `context.yaml` with the real module and week titles (CC101
-records `sources: [filesystem, canvas_manifest]`). That is a workflow loop across a course's life, not
-a coupling: `vt_context.py` reads an export **file**, and coursekit writes an import **package** —
-nothing calls or imports Canvas, and `context.yaml` builds fine from a filesystem scan alone (the seed
-is dashed because it is optional).
+**② The course folder on disk.** A plain local directory — the course's own folder, marked by a
+`.vtconfig/` subfolder — holding two kinds of file:
 
-### View 2 — the coursekit pipeline (the waist)
+- **the `.vtconfig/` reference:** `context.yaml` (course · weeks · modules) and the per-tool config
+  (`quiz.yaml`, `page.yaml`, `style.yaml`, the per-week supplements, prompt overrides). The tools
+  create these, but they are **faculty-editable** — a professor changes a theme, tunes a prompt, adds
+  a supplement link, or fixes a week title by hand in an ordinary text editor. It is a *local
+  reference coursekit both writes and reads*, not a hidden store.
+- **the generated files:** `week-N.md` (the week's text), the `bank.json` / `page.json` IR, and the
+  emitted artifacts (`.gift`, QTI `.zip`, `.html`, `.imscc`).
+
+Everything is plain, versionable files in the course folder — never a database. coursekit **writes**
+here (week text, IR, artifacts) and **reads** here (config); the transcriber writes here too
+(`context.yaml`, `week-N.md`). That file boundary is why the two tools stay separate repos with
+disjoint runtimes — the transcriber keeps `mlx-whisper` and its Apple-Silicon stack; coursekit stays
+pydantic + stdlib — and neither imports the other.
+
+**③ coursekit — a set of programs.** Three programs run locally: **ingest** (documents → `week-N.md`),
+**generate** (week text → `bank.json`/`page.json`), **emit** (IR → Canvas files). Generate — and
+ingest's optional shaping pass — **call an LLM, either one you host locally (LM Studio by default) or
+a hosted API.** coursekit holds no model of its own; it drives whichever provider is configured, which
+is what lets the whole thing run offline when the LLM is local. (The transcriber is the *media→text*
+front door; ingest is the *document→text* one — two ways onto the same folder.)
+
+**④ Delivery — Canvas.** The emitted artifacts import into Canvas (a QTI `.zip`, or an `.imscc` course
+package). Canvas is a **sink**. The one loop back is optional and one-time: a *prior* Canvas export can
+seed `context.yaml` with real module and week titles — a file read, not a live coupling, and
+`context.yaml` builds fine from a filesystem scan alone.
+
+### Inside coursekit — the pipeline (the waist)
 
 ```mermaid
 flowchart LR
@@ -127,15 +161,13 @@ knows only `reset · tools · run_tool_calls · is_finalized · nudge · result`
 pages. That is how the page generator reused the whole driver without touching `run_unit`, and why a
 third generator would too.
 
-## The course directory is the integration bus
+## Finding the course folder
 
-The transcriber writes `.vtconfig/context.yaml`; quizbot walks up from its input to find it (the way
-git finds `.git`) and reads week titles and module names. **Neither tool imports the other — the
-contract is a file on disk.**
-
-That is what lets them stay separate repos without drifting: the transcriber keeps `mlx-whisper` and
-its Apple-Silicon dependency; quizbot's runtime stays pydantic + stdlib. It also degrades gracefully
-— no `.vtconfig` means quizbot infers the week from the filename.
+Layer ② is located, not configured: coursekit **walks up from its input** to find the `.vtconfig/`
+marker (the way git finds `.git`) and reads `context.yaml` for week titles and module names. It
+**degrades gracefully** — no `.vtconfig/` at all means coursekit infers the week from the filename, so
+a loose `week-3.md` still works. (`.vtconfig/` is the transcriber-era name; a rename to something
+tool-neutral is noted in the backlog.)
 
 ## Dependency direction
 
