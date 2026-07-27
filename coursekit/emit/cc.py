@@ -259,8 +259,20 @@ def package_files(entries: list[tuple], course_title: str) -> dict[str, str]:
     return files
 
 
+def _week_order(page) -> tuple:
+    """Sort key that orders week-2 before week-10 (numeric), not lexically — so the module's page
+    order in Canvas follows the weeks. Non-week pages sort last, by slug. Matches how the course
+    cartridge orders its week modules (`cartridge._week_sort`)."""
+    from coursekit.courseconfig import week_key
+    k = week_key(page.week_ref) if page.week_ref else None
+    if k and k.isdigit():
+        return (0, int(k), "")
+    return (1, 0, page.week_ref or page.slug or "")
+
+
 def _load_pages(path) -> list[tuple]:
-    """Every committed `page.json` under `path`, each with its course supplements and theme.
+    """Every committed `page.json` under `path`, each with its course supplements and theme, in
+    week order.
 
     Mirrors `emit/html.reemit`: supplements and style are resolved at package time by walking up to
     the `.vtconfig/` root, so the cartridge carries the same styled body a re-render would.
@@ -276,6 +288,7 @@ def _load_pages(path) -> list[tuple]:
         root = find_root(pj)
         supp = load_supplements(root, page.week_ref or page.slug)
         entries.append((page, supp, load_style(root)))
+    entries.sort(key=lambda e: _week_order(e[0]))   # week-2 before week-10, not lexical
     return entries
 
 
