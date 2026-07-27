@@ -73,6 +73,28 @@ def test_fenced_code_indentation_is_re_flushed():
     ]
 
 
+def test_plain_math_is_rewritten_for_canvas_mathjax():
+    # Canvas renders MathJax in \(…\) but not bare $…$; $A_m$ would ship as literal source
+    body = qti.mattext("what does the amplitude ($A_m$) represent?", "plain")
+    html_level = ET.fromstring(f"<m>{body}</m>").text
+    assert "\\(A_m\\)" in html_level and "$A_m$" not in html_level
+
+
+def test_prose_dollars_are_not_treated_as_math():
+    body = qti.mattext("it costs $5 and $10 total", "plain")   # no \, _ or ^ → left alone
+    assert "$5 and $10" in ET.fromstring(f"<m>{body}</m>").text
+
+
+def test_literal_backslash_n_is_repaired_to_a_code_block():
+    # a model wrote '\n' as literal backslash-n, leaving the fence unmatched and the code mangled
+    qt = ("In the following p5.js code, what does the second parameter represent? "
+          "\\n\\n```javascript\\nfft = new p5.FFT(0.8, 512);\\n```")
+    body = qti.mattext(qt, "markdown")
+    html_level = ET.fromstring(f"<m>{body}</m>").text
+    assert "<pre>fft = new p5.FFT(0.8, 512);</pre>" in html_level
+    assert "\\n" not in html_level             # no literal escape leaked through
+
+
 def test_ampersand_double_escapes_like_the_export():
     # HTML '&nbsp;' -> XML '&amp;nbsp;'  (the export's tell).
     body = qti.mattext("a b", "plain")  # non-breaking space escapes to &nbsp; ? no—raw nbsp

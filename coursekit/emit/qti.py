@@ -41,19 +41,37 @@ MANIFEST_NS = (
 
 _BACKTICK = re.compile(r"`([^`]*)`")
 _FENCE = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)   # ```lang\n …code… ``` (multi-line)
+# $…$ that looks like math (contains \, _ or ^) — Canvas renders MathJax in \(…\) but NOT bare $…$,
+# so `$A_m$` would ship as literal source. A prose dollar ($5) has none of those and is left alone.
+_QUIZ_MATH = re.compile(r"\$([^$\n]*[\\_^][^$\n]*)\$")
+
+
+def _mathjax(escaped: str) -> str:
+    """Rewrite math-looking $…$ to the \\(…\\) delimiters Canvas's MathJax actually renders."""
+    return _QUIZ_MATH.sub(r"\\(\1\\)", escaped)
+
+
+def _fix_escapes(text: str) -> str:
+    """Repair a model that wrote LITERAL `\\n`/`\\t` (backslash-n) instead of real newlines — the
+    tell is literal escapes with no real newline anywhere, which left a ```` ``` ```` fence unmatched
+    and the code mangled. Only fire on that signature, so real text (and `\\n` inside a code string)
+    is untouched."""
+    if "\\n" in text and "\n" not in text:
+        text = text.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "")
+    return text
 
 
 # ----------------------------------------------------------------- escaping
 
 def _md_segment(text: str) -> str:
-    """A non-fenced markdown run: inline `code` → <code>, and newlines → <br/> so a multi-line stem
-    doesn't collapse to one line (HTML folds whitespace)."""
+    """A non-fenced markdown run: inline `code` → <code>, math $…$ → \\(…\\), and newlines → <br/> so
+    a multi-line stem doesn't collapse to one line (HTML folds whitespace)."""
     parts, pos = [], 0
     for m in _BACKTICK.finditer(text):
-        parts.append(html.escape(text[pos:m.start()], quote=False).replace("\n", "<br/>"))
+        parts.append(_mathjax(html.escape(text[pos:m.start()], quote=False)).replace("\n", "<br/>"))
         parts.append(f"<code>{html.escape(m.group(1), quote=False)}</code>")
         pos = m.end()
-    parts.append(html.escape(text[pos:], quote=False).replace("\n", "<br/>"))
+    parts.append(_mathjax(html.escape(text[pos:], quote=False)).replace("\n", "<br/>"))
     return "".join(parts)
 
 
@@ -108,6 +126,7 @@ def _to_html(text: str, text_format: str) -> str:
     what a code-completion question needs; without it the code collapsed to one unreadable line.
     """
     if text_format == "markdown":
+        text = _fix_escapes(text)   # real newlines back, so a mis-escaped fence renders
         out, pos = [], 0
         for m in _FENCE.finditer(text):
             out.append(_md_segment(text[pos:m.start()]))
@@ -118,7 +137,7 @@ def _to_html(text: str, text_format: str) -> str:
     elif text_format == "html":
         body = text  # already HTML; trust it
     else:
-        body = html.escape(text, quote=False)
+        body = _mathjax(html.escape(text, quote=False))   # plain: still rescue $…$ math
     return f"<div>{body}</div>"
 
 
