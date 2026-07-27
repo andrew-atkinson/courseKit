@@ -743,6 +743,22 @@ def _quiz_for(bank, quiz_json_path: Path) -> dict:
                        for gid in sorted(bank.groups)]}
 
 
+def _incomplete_reason(bank) -> str | None:
+    """Why a bank.json must not be emitted: an incomplete generation run would ship a broken quiz.
+
+    The concrete break is an **empty group** — a concept the model opened but never filled — which
+    otherwise sails through as a phantom question that draws nothing, so the quiz is silently short
+    (week 9's `c5` was exactly this). `bank.validate_final` catches it at generation time and refuses
+    to finalize; emit re-checks it because a partial, autosaved `bank.json` is still on disk."""
+    if not bank.groups:
+        return "no question groups"
+    empty = [gid for gid, g in bank.groups.items() if not g.variants]
+    if empty:
+        return (f"group '{empty[0]}' has no variants — generation did not complete "
+                f"(finalized={getattr(bank, 'finalized', False)}); regenerate this week")
+    return None
+
+
 def _load_banks(path) -> tuple[list[tuple], list[tuple]]:
     """(entries, skipped) for every bank.json under path. entries are (bank, quiz, bank_json)."""
     from coursekit.generate.quiz.bank import Bank
@@ -751,6 +767,10 @@ def _load_banks(path) -> tuple[list[tuple], list[tuple]]:
     entries, skipped = [], []
     for bj in jsons:
         b = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
+        reason = _incomplete_reason(b)
+        if reason:
+            skipped.append((bj, reason))
+            continue
         quiz = _quiz_for(b, bj.parent / "quiz.json")
         try:
             _quiz_files(b, quiz)  # surfaces unsupported question types before we commit
@@ -800,6 +820,10 @@ def reemit(path) -> list[tuple]:
     results = []
     for bj in jsons:
         b = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
+        reason = _incomplete_reason(b)
+        if reason:
+            results.append((bj, None, reason))
+            continue
         quiz = _quiz_for(b, bj.parent / "quiz.json")
         out = bj.parent / f"{bj.parent.name}.zip"
         try:

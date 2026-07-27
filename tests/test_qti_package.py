@@ -182,6 +182,35 @@ def test_reemit_synthesises_quiz_when_quiz_json_missing(tmp_path):
     assert reason is None and imscc.exists()
 
 
+def test_reemit_skips_a_bank_with_an_empty_group(tmp_path):
+    # a concept the model opened but never filled would ship a silently-short quiz (week 9's c5);
+    # emit must skip it with a reason, not package a partial bank
+    _mc_bank(n_groups=2)
+    bankmod.create_group("c3", "Unfinished concept", "multiple_choice")   # opened, no variants
+    wk = tmp_path / "week-9"
+    wk.mkdir()
+    (wk / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
+
+    bank_json, imscc, reason = qti.reemit(tmp_path)[0]
+    assert imscc is None
+    assert "c3" in reason and "no variants" in reason
+    assert not (wk / "week-9.zip").exists()   # nothing written for the broken bank
+
+
+def test_bundle_skips_the_incomplete_bank_but_keeps_the_rest(tmp_path):
+    good, _ = _mc_bank(run_id="good")
+    (tmp_path / "week-3").mkdir()
+    (tmp_path / "week-3" / "bank.json").write_text(good.model_dump_json(), encoding="utf-8")
+    _mc_bank(run_id="bad", n_groups=2)
+    bankmod.create_group("c3", "Unfinished", "multiple_choice")
+    (tmp_path / "week-9").mkdir()
+    (tmp_path / "week-9" / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
+
+    out, included, skipped = qti.bundle(tmp_path)
+    assert out is not None and len(included) == 1        # the good week bundled
+    assert any("c3" in reason for _, reason in skipped)  # the broken one reported
+
+
 def test_reemit_skips_unsupported_types_without_aborting(tmp_path, monkeypatch):
     # Every modelled type emits now, so simulate an unsupported one to exercise the skip path.
     def _unsupported(v, run_id):
