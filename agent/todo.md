@@ -6,6 +6,18 @@ Somethings are just ideas and not necessarily to be implemented, this is just a 
 
 ### List items
 
+- in the code completion question - the code given in the question is very poorly formatted (mostly no linebreaks) and difficult to read.
+- creating a calendar - sense of pedagogic cadence.
+- Question evaluator: we need a llm loop in the question generation that checks the validity of the question from a pedagogic/meaning perspective, and maybe from a student perspective. This is an example of a question that was generated for week 3 of the CC101 course: "Why is manual repetition problematic when changing a parameter like the radius of a shape?" The "correct" answer is "Changing one parameter requires manual updates to all subsequent lines." However, the question is missing some very important context: 1, it makes no mention that there's a row of circles, at all, 2, it makes no mention that all the circles are needed to change size in the question; 3, changing one circle's size is only important if the others need to change size (an aesthetic decision). So, the question should have some preamble – something like "you're drawing a horizontal row of circles, and need to make them a little smaller... Why is manual repetition problematic when changing a parameter like the radius of a shape?" An additional, separate, loop needs to check the content of the question. What is needed to ensure a cold read by another pass. Is it a different model? Clearing the memory? A specific prompt?
+- when the course export is imported, the pages are out of order because it is using string precedent ordering: e.g. 1, 10, 2, 3, 4. Can we look at a way of specifying page orders, and presumably ordering other content? PS - this might be fixed. It seems to work this time in the canvas.docker. What's going on?
+- pytest only outputs a list of dots – not very communicative. It should at least log out what it is testing.
+- one idea for a color scheme generator - main color, secondary (main color at 60% saturation) and contrast (main color but rotated 117º on the hue wheel).
+- In Terminal the chevron sometimes leaks over to the next line breaking the visual idea. let's look at mobile break points for type and legibility, aesthetic and so on. Look at all the design languages.
+- in Terminal the inline code quotes e.g. (`loadJson()`) display a very light text on a near white background. Complete Nonsense in terms of design and WCAG. As WCAG at least can be deterministic, is it possible to write a tool that can _really_ check this. Please we need a more robust round of visual checks and I think need to implement some front end screen grab testing. PS: when imported on the local canvas docker, the text is black in a white box. What's going on here?
+- it seems that the programs are assuming that the weeks will be in a form of 'week-X', which is definitely not always going to be the case.
+  - if working from a canvas export, we need a way to understand the course structure from the imscc.
+  - if working from some content (video at the moment, but could be otehrwise), we need a way to either assess and store what the organization is, or ask the user to input the data.
+  - if generating content largely anew, we need a way to create structures that would work across the various generators.
 - the quiz instructions should say what videos the questions are from. Ideally it would provide a link to the video, so the student could review it. It also should introduce the quiz better.
   - **Investigated 2026-07-18 — the obvious approach won't work.** The `video_url` in the transcript
     front matter points at `aacontent.b-cdn.net`, the staging copy used to feed the transcriber. The
@@ -107,6 +119,9 @@ the generated `page.json`.
 
 ### Next Items
 
+- ✅ **DONE (branch `page-detail-level`).** CLI restructured into subcommands (`ingest` / `generate` /
+  `emit qti|html|cc`), reachable as the `coursekit` command; each phase's flags live on its own
+  subcommand. Original note kept below for context.
 - **CLI command list needs restructuring (2026-07-24, later — not now).** The `app.py` command table
   (README "Commands") has grown cumbersome and hard to distinguish — generation flags, re-emit
   utilities (`--to-qti`/`--to-html`/`--to-cc`), and ingest all sit in one flat list, several doing

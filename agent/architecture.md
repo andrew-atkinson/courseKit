@@ -98,9 +98,11 @@ flowchart LR
 **The waist.** Each artifact family has one canonical IR — quizzes converge on `bank.json`, pages on
 `page.json` — and every emitter reads only its IR (gift/qti from `bank.json`; html/cc from
 `page.json`). Adding a platform costs one emitter, not one converter per input, and re-emitting needs
-no model: `--to-qti`, `--to-html`, and `--to-cc` rebuild from the committed JSON. A Canvas **API**
-emitter is the gated third delivery path — it will read the same two IRs, so it is one more emitter,
-not a new pipeline.
+no model: `emit qti`, `emit html`, and `emit cc` rebuild from the committed JSON. `emit course`
+(`emit/cartridge.py`) sits one level up — it assembles *both* IRs into one Common Cartridge of week
+modules, via a `CartridgeSource` per content type (pages, quizzes today; discussions/assignments
+next), so a new content type is one source, not a new assembler. A Canvas **API** emitter is the
+gated third delivery path — it will read the same IRs, so it is one more emitter, not a new pipeline.
 
 **The one seam above the waist** — `generate/base.py` — is what the driver speaks: `pipeline.loop`
 knows only `reset · tools · run_tool_calls · is_finalized · nudge · result`, nothing about quizzes or

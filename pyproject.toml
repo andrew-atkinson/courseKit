@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "coursekit"
 version = "0.1.0"
@@ -36,6 +40,15 @@ dependencies = [
     "uvicorn[standard]>=0.46.0",
     "wikipedia>=1.4.0",
 ]
+
+[project.scripts]
+coursekit = "coursekit.cli:main"
+
+# The repo root holds non-package dirs (tests/, agent/, prompts/, themes/, app.py), so the wheel
+# target is explicit. An *editable* install (uv sync's default) keeps prompts/ and themes/ resolvable
+# from the repo root via the loaders' relative paths (coursekit/prompts.py, style.py).
+[tool.hatch.build.targets.wheel]
+packages = ["coursekit"]
 
 [dependency-groups]
 dev = [

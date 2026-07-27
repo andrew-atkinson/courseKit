@@ -8,6 +8,7 @@ the model-load handling, the per-unit reset — without copying it. The LLM clie
 pipeline is testable with a fake and carries no env or network assumptions of its own.
 """
 
+from dataclasses import replace
 from pathlib import Path
 
 from coursekit import courseconfig
@@ -126,8 +127,12 @@ def loop(messages, provider, model, generator: Generator | None = None, *,
 
 
 def run_unit(unit: Unit, provider, model, generator: Generator | None = None, *,
-             max_iters: int = DEFAULT_MAX_ITERS) -> RunResult:
-    """Generate and finalize one unit's artifact, writing to unit.output_dir."""
+             max_iters: int = DEFAULT_MAX_ITERS, config_overrides: dict | None = None) -> RunResult:
+    """Generate and finalize one unit's artifact, writing to unit.output_dir.
+
+    `config_overrides` (e.g. {"detail": "brief"} from a CLI flag) win over the course's config file,
+    so a one-off run can override what page.yaml/quiz.yaml sets without editing it.
+    """
     gen = generator or _default_generator()
     out = Path(unit.output_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -138,6 +143,8 @@ def run_unit(unit: Unit, provider, model, generator: Generator | None = None, *,
     # (which discover binds to quiz.yaml) — a combined run drives both generators over one unit, and
     # the page pass must read page.yaml, not the quiz's. Absent config degrades to defaults.
     cfg = courseconfig.load(unit.transcript_path, config_name=f"{gen.category}.yaml")
+    if config_overrides:
+        cfg = replace(cfg, config={**(cfg.config or {}), **config_overrides})
     transcript = unit.transcript_path.read_text(encoding="utf-8")
     messages = gen.build_messages(unit, transcript, cfg)
 
@@ -163,11 +170,12 @@ def _week_matches(ref, unit: Unit) -> bool:
 
 def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
                dry_run: bool = False, max_iters: int = DEFAULT_MAX_ITERS,
-               generator: Generator | None = None) -> list[RunResult]:
+               generator: Generator | None = None, config_overrides: dict | None = None) -> list[RunResult]:
     """Discover units under `path`, optionally filter to `weeks`, and run each with `generator`
     (default: the quiz generator).
 
     `dry_run` returns the planned units (with resolved output dirs) without calling the model.
+    `config_overrides` are per-run config values (e.g. from CLI flags) that win over the course file.
     """
     # The output tree (quizzes/, pages/, …) is the generator's, so a course can hold both.
     subdir = getattr(generator, "artifacts_subdir", "quizzes")
@@ -178,4 +186,5 @@ def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
     if dry_run:
         return [RunResult(u, finalized=False, output_dir=u.output_dir) for u in units]
 
-    return [run_unit(u, provider, model, generator, max_iters=max_iters) for u in units]
+    return [run_unit(u, provider, model, generator, max_iters=max_iters,
+                     config_overrides=config_overrides) for u in units]

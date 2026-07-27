@@ -2,7 +2,7 @@
 
 A page's *content* is neutral (`page.json`); its *look* is a **theme** resolved at render time. A
 course picks one theme, the renderer draws every component in that theme's inline styles, and the
-same neutral page can be re-rendered in any theme — model-free — with `--to-html`.
+same neutral page can be re-rendered in any theme — model-free — with `coursekit emit html`.
 
 The system's first principle: **taste lives in the themes, not the model.** The model decides
 *meaning* (what kind of section this is); the theme decides *look*. And **colour is reserved for
@@ -21,7 +21,7 @@ density: comfortable    # optional: comfortable | compact
 Then generate (or re-render) pages — the theme applies at render, so switching it is instant:
 
 ```bash
-uv run python app.py --to-html "<course root>/pages"
+uv run coursekit emit html "<course root>/pages"
 ```
 
 ## The four identities
