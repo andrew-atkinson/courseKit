@@ -1,11 +1,64 @@
 # Todos
 
+## Flow of work — where each idea acts (triaged 2026-07-27)
+
+The raw ideas live in the dump below; this is the actionable read, filed by the pipeline phase each
+touches (ingest → generate → emit → design → new generators → meta). Effort is rough: **S** ~hours ·
+**M** ~a day or two · **L** its own increment. _New_ = added this session.
+
+**Ingest** (documents → `week-N.md`)
+
+- Structure-aware PPTX — title slide → page title, repeated theme label → section, caption/notes roles. **M.** Biggest text-side lever for art decks.
+- Vision captioning of slide/PDF images (the works themselves, not just captions). **L.** The real unlock for image-led courses.
+- OCR for scanned PDFs **M**; `.doc` legacy + table/layout fidelity **S–M**, low priority.
+
+**Generate · quizzes**
+
+- **Generalize beyond coding** — drop the hard-coded code-completion `c5`; let the domain profile steer question forms. **M.** Standing BLOCKER for non-coding quizzes → do first.
+- Parameterize question/variant counts (`quiz.yaml` `questions`/`variants`). **M.**
+- Question evaluator: a cold-read pass checking pedagogic validity + missing context. **M–L.**
+- _New:_ code-completion code is unreadable (no linebreaks) — formatting bug in the question body. **S–M.**
+- Name the source video per question (`video_title` is in the front matter) **S**; spaced-learning quiz drawing prior-week banks **M** (infra: `qti.bundle`).
+
+**Generate · pages**
+
+- Extract deck images for inclusion (`pptx image.blob`; copyright gate). **M.**
+- Syntax highlighting for `code` blocks (Pygments inline, theme palette). **M.**
+- Voice: less dry/factual — prompt work. **S–M.**
+
+**Emit**
+
+- _New:_ align `emit cc` page order with `emit course` (numeric week sort, not string `1,10,2`). **S.** — `emit course` already sorts numerically via `cartridge._week_sort`; `cc.py` still lexical.
+- Link each quiz to its Canvas week page (`$WIKI_REFERENCE$/pages/<slug>`). **S–M**, needs one Canvas test.
+- Discussions and assignments+rubrics as new `CartridgeSource`s (the `emit course` seam is ready; module placement is already handled). **M** each.
+- Canvas API emitter — **L**, gated on a local Canvas; file emitters stay first-class.
+
+**Design system**
+
+- _Known:_ Terminal inline-code contrast fails WCAG — and add real visual/screenshot testing so this class of bug is caught. **M**, correctness + test infra.
+- Terminal chevron line-wrap + mobile breakpoints across all four themes. **M.**
+- Colour-scheme helper (main · secondary at 60% sat · contrast at +117° hue). **S.**
+
+**New generators (course-level)**
+
+- _New:_ calendar / pedagogic cadence — reasons over the whole course (`context.yaml` + all weeks), the first course-scope generator. **L.**
+- Lecture notes · study guides · assignments · discussion prompts — each is the proven seam (IR + tools + emitter). **L** each.
+
+**DX / meta**
+
+- _New:_ pytest logs only dots — set `addopts = "-v"` (or per-test ids) so it says what it tests. **S**, trivial.
+- Course structure isn't always `week-N` — read it from a Canvas `imscc`, or ask the user. **M**, cross-cuts ingest + discover.
+- Repo rename quizbot → coursekit **M** (structural debt; the trigger — generator #2 — is long past); transcriber onto the spine, provider union **L**, cross-repo.
+
+**Suggested first pass (quick, high-signal):** pytest `-v` (S) → `emit cc` ordering (S) → code-completion formatting (S–M) → then the quiz-generalization blocker (M).
+
 ## feature list dump
 
 Somethings are just ideas and not necessarily to be implemented, this is just a holding place but can be referenced to move the project forward.
 
 ### List items
 
+- .vtconfig is an obselete title, which should be rename when the videotranscriber is integrated. perhaps rename to .coursekit? does .vtconfig live inside that?
 - in the code completion question - the code given in the question is very poorly formatted (mostly no linebreaks) and difficult to read.
 - creating a calendar - sense of pedagogic cadence.
 - Question evaluator: we need a llm loop in the question generation that checks the validity of the question from a pedagogic/meaning perspective, and maybe from a student perspective. This is an example of a question that was generated for week 3 of the CC101 course: "Why is manual repetition problematic when changing a parameter like the radius of a shape?" The "correct" answer is "Changing one parameter requires manual updates to all subsequent lines." However, the question is missing some very important context: 1, it makes no mention that there's a row of circles, at all, 2, it makes no mention that all the circles are needed to change size in the question; 3, changing one circle's size is only important if the others need to change size (an aesthetic decision). So, the question should have some preamble – something like "you're drawing a horizontal row of circles, and need to make them a little smaller... Why is manual repetition problematic when changing a parameter like the radius of a shape?" An additional, separate, loop needs to check the content of the question. What is needed to ensure a cold read by another pass. Is it a different model? Clearing the memory? A specific prompt?

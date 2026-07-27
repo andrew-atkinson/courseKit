@@ -1,12 +1,12 @@
-# Toolkit architecture
+  # Toolkit architecture
 
 Source of truth for the structural diagrams. Kept in `agent/` alongside the other tracked references.
 Presented version: <https://claude.ai/code/artifact/e0d099ed-016c-4911-a75d-7805d5dbffe0>
 
-Verified 23 July 2026 against quizbot branch `coursekit-spine`. The videotranscriber (separate repo
-at `~/video_transcription`) is unchanged since the 19 July pass. The test count lives only in
-`README.md`, where a meta-test (`tests/test_docs_facts.py`) keeps it honest — it is deliberately not
-repeated here, because a number stated in two places rots in one of them.
+Verified 27 July 2026 against `main` (through the CLI-subcommands + `emit course` work). The
+videotranscriber (separate repo at `~/video_transcription`) is unchanged since the 19 July pass. The
+test count lives only in `README.md`, where a meta-test (`tests/test_docs_facts.py`) keeps it honest —
+it is deliberately not repeated here, because a number stated in two places rots in one of them.
 
 ## Two views
 
@@ -20,6 +20,7 @@ the second shows *what happens inside coursekit*. (Module-level dependencies are
 ```mermaid
 flowchart LR
     media[/"lecture video"/]
+    docs[/"readings · PDF<br/>slides · docx"/]
     seed[/"prior Canvas export<br/>imsmanifest.xml · optional"/]
 
     subgraph VT [" videotranscriber · separate repo "]
@@ -37,16 +38,19 @@ flowchart LR
 
     subgraph CK [" coursekit · this repo "]
         direction TB
+        ingest["ingest<br/>docs → week-N.md"]
         gen["generate<br/>bank.json · page.json"]
-        emit["emit<br/>.gift · QTI .zip · .html · pages .imscc"]
+        emit["emit<br/>.gift · QTI .zip · .html · .imscc"]
         gen --> emit
     end
 
     canvas([" Canvas · delivery "])
 
     media --> vtpipe
+    docs --> ingest
     seed -. "seed structure · once" .-> vtctx
     vtpipe --> md
+    ingest -. "writes" .-> md
     vtctx --> ctx
     BUS --> CK
     emit -- "import" --> canvas
@@ -56,6 +60,13 @@ flowchart LR
 `context.yaml` + `week-N.md`; coursekit reads them. That file boundary is what lets them stay
 separate repos with disjoint runtimes — the transcriber keeps `mlx-whisper` and its Apple-Silicon
 stack; coursekit stays pydantic + stdlib.
+
+**The transcriber is not the only way to produce `week-N.md`.** coursekit has its own light
+**ingest** adapter (`coursekit/ingest/`) that turns documents — PDF, slides, `.docx`/`.odt`, plain
+text — into the same `week-N.md` the generators read, so a course with no video (a readings- or
+slides-based one) still works end to end. It writes the identical text contract and imports none of
+the transcriber's stack. The transcriber is the media→text adapter; ingest is the document→text one —
+two front doors onto the same bus.
 
 **No dependency cycle — Canvas is a sink, optionally a one-time seed.** The generated artifacts import
 into Canvas; that is the delivery. Separately, when a course already lives in Canvas, a *prior*
@@ -69,6 +80,8 @@ is dashed because it is optional).
 
 ```mermaid
 flowchart LR
+    docs[/"PDF · slides · docx"/] --> ing["ingest.py"]
+    ing -. "writes" .-> md
     md[/"week-N.md<br/>+ context.yaml"/] --> disc["discover.py<br/>units"]
     disc --> pipe["pipeline.py<br/>run_course · run_unit · loop"]
 
@@ -89,10 +102,15 @@ flowchart LR
     render --> html["html.py"] --> hout[/".html"/]
     render --> cc["cc.py"] --> imscc[/"pages .imscc"/]
 
+    bank --> crt["cartridge.py<br/>emit course"]
+    page --> crt
+    crt --> crs[/"course .imscc"/]
+
     supp[/"pages/*.yaml<br/>style.yaml"/] -. "merged in render" .-> render
 
-    zip -- "QTI import" --> canvas(["<b>Canvas</b>"])
-    imscc -- "course import" --> canvas
+    zip -- "import" --> canvas(["<b>Canvas</b>"])
+    imscc -- "import" --> canvas
+    crs -- "import" --> canvas
 ```
 
 **The waist.** Each artifact family has one canonical IR — quizzes converge on `bank.json`, pages on
@@ -221,11 +239,18 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
    its own importer; without it webcontent lands in Files) and places them in one module via
    `course_settings/module_meta.xml` + the manifest's `<organizations>` tree. Never ships
    `course_settings.xml`, so it can't mutate the target course. Ground-truthed against the CC101
-   export; a first import confirmed the styled body survives Canvas's sanitizer. **Open:** confirming
-   the Pages/modules import in situ, and a real-model page run through LM Studio (the offline slice is
-   proven with a fake provider).
-5. **Migrate the transcriber onto the spine** — providers first, taking the union of capabilities.
-6. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class.
+   export; the Pages/modules import is **confirmed in situ**, styled body surviving Canvas's sanitizer.
+5. ✅ **The design system** — themes as full identities (bauhaus · terminal · plotter · studio) resolved
+   at render time, a Canvas CSS allowlist + WCAG guardrails, and section roles where design meets
+   pedagogy (recap component, glossary "Key Terms" frame). See `docs/design.md`.
+6. ✅ **Document ingest** (`coursekit/ingest/`) — PDF/pptx/docx/odt/txt/md → `week-N.md`, so non-video
+   courses work; `--raw` stays fully offline. coursekit's own front door onto the bus (View 1).
+7. ✅ **The whole-course cartridge + CLI shape** — `emit course` assembles pages *and* quizzes into one
+   `.imscc` of week modules via a `CartridgeSource` per content type (extensible to discussions/
+   assignments); the CLI became phase subcommands (`ingest` / `generate` / `emit`) under a `coursekit`
+   command. Import **confirmed in situ**.
+8. **Migrate the transcriber onto the spine** — providers first, taking the union of capabilities.
+9. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class.
 
 ## Not yet closed
 

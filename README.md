@@ -1,6 +1,6 @@
 # coursekit
 
-Turns a course's lecture transcripts into Canvas-ready artifacts — randomized **quizzes** and course **pages** — using a local, tool-calling LLM. It runs fully offline against a model you host (LM Studio by default).
+Turns a course's lecture transcripts — or its readings and slides — into Canvas-ready artifacts: randomized **quizzes** and course **pages**, using a local, tool-calling LLM. It runs fully offline against a model you host (LM Studio by default).
 
 ## What it does
 
@@ -8,6 +8,8 @@ Two generators today, both the same shape: point them at a week's transcript and
 
 - **Quizzes** — 5 concepts × 4 variants; each concept becomes a Canvas _question group_ that draws one variant at random, so every student gets a different version. `bank.json` → Canvas QTI `.zip` (+ GIFT). → [Generating quizzes](docs/quizzes.md)
 - **Pages** — the week's narrative page: a teaching outline (headings, concept bullets, code, glossary) the model builds from the transcript, plus instructor-supplied references and embeds. `page.json` → Canvas-safe HTML. → [Course pages](docs/pages.md)
+
+Two supporting phases bracket the generators. **Ingest** turns documents (PDF, slides, `.docx`) into the same week text the generators read, so a course with no video still works. **Emit** packages the canonical JSON into Canvas files, model-free — up to a whole-course `.imscc` that imports pages *and* quizzes as week modules in one go.
 
 Every input converges on one **canonical form** (`bank.json`, `page.json`) that the emitters read — so adding a platform is one emitter, not a rewrite. That, plus a shared spine (`coursekit/`) both generators sit on, is the whole architecture. See [agent/architecture.md](agent/architecture.md) for the map.
 
@@ -50,11 +52,11 @@ uv run coursekit generate "/path/to/course export" --quizzes --week 3
 
 ## Commands
 
-The CLI has three verbs, one per phase:
+The CLI is three verbs, in the order work flows through them:
 
-- **`ingest`** (documents → week text), ingest creates detailed documents about the weeks class
-- **`generate`** (week text → quizzes/pages, the model), generate turns those documents into pages, or quizzes.
-- **`emit`** (canonical JSON → Canvas packages, model-free). emit creates imscc packages that can be imported into canvas
+- **`ingest`** — turn a week's documents (PDF, slides, `.docx`) into the week text the generators read.
+- **`generate`** — turn that week text into quizzes and pages (the model-driven step).
+- **`emit`** — package the canonical JSON into Canvas files, model-free — up to a whole-course `.imscc`.
 
 | Ingest Commands               | What it does                                               | Uses LLM |
 | ----------------------------- | ---------------------------------------------------------- | -------- |
