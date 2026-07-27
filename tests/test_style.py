@@ -440,3 +440,19 @@ def test_answers_are_hidden_by_default(fresh):
     html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
     assert "<details open" not in html and "<details  open" not in html   # no open attr -> collapsed
     assert "the answer" in html                                           # but present in the DOM
+
+
+def test_colour_scheme_from_a_seed():
+    import colorsys
+    sch = S.colour_scheme("#1d3fbf")   # bauhaus cobalt
+    assert set(sch) == {"main", "secondary", "contrast"}
+    for v in sch.values():
+        assert re.fullmatch(r"#[0-9a-f]{6}", v), v          # valid hex
+
+    def hls(hx):
+        h = hx.lstrip("#")
+        return colorsys.rgb_to_hls(*(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)))
+
+    m, sec, con = hls(sch["main"]), hls(sch["secondary"]), hls(sch["contrast"])
+    assert sec[2] < m[2]                                     # secondary is less saturated
+    assert abs(((con[0] - m[0]) * 360) % 360 - 117) < 2      # contrast hue rotated ~117°

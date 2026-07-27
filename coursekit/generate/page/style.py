@@ -76,6 +76,36 @@ def contrast_ratio(a: str, b: str) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
+def _hex_to_rgb(h: str) -> tuple[float, float, float]:
+    h = h.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    return tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+
+
+def _rgb_to_hex(rgb) -> str:
+    return "#" + "".join(f"{round(max(0.0, min(1.0, c)) * 255):02x}" for c in rgb)
+
+
+def colour_scheme(main: str) -> dict:
+    """A three-colour starting scheme from one seed, for authoring a new theme's palette:
+
+    - **main** — the seed, as given.
+    - **secondary** — the main desaturated to 60% of its saturation (a quieter partner).
+    - **contrast** — the main's hue rotated 117° round the wheel (a near-triad accent).
+
+    Returns `{"main", "secondary", "contrast"}` as hex. A starting point, not a guarantee — run the
+    results through `contrast_ratio` / `validate_theme` before shipping them in a theme.
+    """
+    import colorsys
+    h, l, s = colorsys.rgb_to_hls(*_hex_to_rgb(main))
+    secondary = colorsys.hls_to_rgb(h, l, s * 0.6)
+    contrast = colorsys.hls_to_rgb((h + 117 / 360) % 1.0, l, s)
+    return {"main": _rgb_to_hex(_hex_to_rgb(main)),
+            "secondary": _rgb_to_hex(secondary),
+            "contrast": _rgb_to_hex(contrast)}
+
+
 WHITE = "#ffffff"   # Canvas renders pages on white. A theme may declare its own color.surface
                     # (a full-bleed panel the renderer wraps content in); contrast is then
                     # validated against that surface instead.
