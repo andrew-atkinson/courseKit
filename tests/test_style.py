@@ -440,3 +440,16 @@ def test_answers_are_hidden_by_default(fresh):
     html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
     assert "<details open" not in html and "<details  open" not in html   # no open attr -> collapsed
     assert "the answer" in html                                           # but present in the DOM
+
+
+def test_inline_code_is_a_legible_chip_in_every_theme():
+    # a bare <code> inherited the page ink and went light-on-white in the terminal panel gaps;
+    # it now renders as a self-contained chip in the theme's validated code pair, AA on its own bg
+    for name in ("bauhaus", "terminal", "plotter", "studio"):
+        P.reset()
+        P.put_block(P.build_block(kind="paragraph", block_id="p", text="Call `loadJSON()` first."))
+        html = render_body(P.get(), style=dict(S.load_theme(name), _name=name))
+        style = re.search(r'<code style="([^"]*)">', html).group(1)
+        bg = re.search(r"background-color: (#[0-9a-fA-F]+)", style).group(1)
+        fg = re.search(r"(?:^|; )color: (#[0-9a-fA-F]+)", style).group(1)
+        assert S.contrast_ratio(fg, bg) >= 4.5, f"{name}: inline code {fg} on {bg}"

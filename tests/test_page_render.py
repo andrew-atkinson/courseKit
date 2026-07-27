@@ -39,7 +39,7 @@ def test_inline_markdown_in_prose(fresh):
     body = render_body(_page_with(
         dict(kind="paragraph", block_id="p", text="a **bold** and `code` and *em*")))
     assert "<strong>bold</strong>" in body
-    assert "<code>code</code>" in body
+    assert "<code" in body and ">code</code>" in body   # a code chip (styled per theme)
     assert "<em>em</em>" in body
 
 

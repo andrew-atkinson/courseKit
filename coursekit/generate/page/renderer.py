@@ -77,6 +77,12 @@ def _render_math(s: str) -> str:
     return _PAREN_MATH.sub(_span, _DOLLAR_MATH.sub(_span, s))
 
 
+# The inline-code chip style, set per render from the active theme (render_body). A self-contained
+# chip — the theme's WCAG-validated code_bg/code_fg pair — so `code` reads on ANY ground (a dark
+# terminal panel, or the white gaps between panels, where a bare unstyled <code> went light-on-white).
+_INLINE_CODE_STYLE = ""
+
+
 def _md_inline(value) -> Markup:
     """Escape, resolve inline math, then apply inline Markdown (**bold**, *italic*, `code`).
     Escaping first means every later pass acts on safe text and a user's `<` is already `&lt;`."""
@@ -84,7 +90,8 @@ def _md_inline(value) -> Markup:
     s = _render_math(s)
     s = _BOLD.sub(r"<strong>\1</strong>", s)
     s = _ITAL.sub(r"<em>\1</em>", s)
-    s = _CODE.sub(r"<code>\1</code>", s)
+    tag = f'<code style="{_INLINE_CODE_STYLE}">' if _INLINE_CODE_STYLE else "<code>"
+    s = _CODE.sub(lambda m: f"{tag}{m.group(1)}</code>", s)
     return Markup(s)
 
 
@@ -209,6 +216,15 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
 
     shape = t.get("shape") or {}
     color = t.get("color") or {}
+    # Inline `code` renders as a self-contained chip in the theme's validated code_bg/code_fg pair, so
+    # it stays legible on any ground (used by _md_inline). Fixes terminal's inline code going light on
+    # the white panel gaps.
+    global _INLINE_CODE_STYLE
+    _c_bg = color.get("code_bg", color.get("surface") or "#f2f2f0")
+    _c_fg = color.get("code_fg", color.get("ink") or "#111111")
+    _mono = (t.get("type") or {}).get("mono_family", "ui-monospace, Menlo, monospace")
+    _INLINE_CODE_STYLE = (f"background-color: {_c_bg}; color: {_c_fg}; "
+                          f"font-family: {_mono}; padding: 1px 5px; border-radius: 3px;")
     # section_frame: none | card (a light card on the page) | panel (each section on the theme's
     # own surface colour, so a dark identity breaks into separate petrol panels with white gaps
     # between them, rather than one flowing slab).
