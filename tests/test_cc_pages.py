@@ -237,3 +237,16 @@ def test_write_imscc_none_when_no_pages(tmp_path):
     empty = tmp_path / "empty"
     empty.mkdir()
     assert cc.write_imscc(empty) is None
+
+
+def test_pages_order_by_week_number_not_lexically(tmp_path):
+    # week-2 must precede week-10 in the module; a lexical sort ("week-10" < "week-2") would flip them
+    for wk, slug, title in (("week-10", "week-10-data", "Week 10: Data"),
+                            ("week-2", "week-2-loops", "Week 2: Loops")):
+        d = tmp_path / "pages" / wk
+        d.mkdir(parents=True)
+        pg = _page(page_id=f"c-{wk}", title=title, slug=slug, week_ref=wk)
+        (d / "page.json").write_text(pg.model_dump_json(), encoding="utf-8")
+    out = cc.write_imscc(tmp_path)
+    mm = zipfile.ZipFile(out).read("course_settings/module_meta.xml").decode("utf-8")
+    assert mm.index("Week 2: Loops") < mm.index("Week 10: Data")
