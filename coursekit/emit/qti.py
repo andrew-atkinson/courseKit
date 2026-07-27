@@ -39,20 +39,37 @@ MANIFEST_NS = (
     'http://www.imsglobal.org/xsd/imsmd_v1p2p2.xsd"')
 
 _BACKTICK = re.compile(r"`([^`]*)`")
+_FENCE = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)   # ```lang\n …code… ``` (multi-line)
 
 
 # ----------------------------------------------------------------- escaping
 
+def _md_segment(text: str) -> str:
+    """A non-fenced markdown run: inline `code` → <code>, and newlines → <br/> so a multi-line stem
+    doesn't collapse to one line (HTML folds whitespace)."""
+    parts, pos = [], 0
+    for m in _BACKTICK.finditer(text):
+        parts.append(html.escape(text[pos:m.start()], quote=False).replace("\n", "<br/>"))
+        parts.append(f"<code>{html.escape(m.group(1), quote=False)}</code>")
+        pos = m.end()
+    parts.append(html.escape(text[pos:], quote=False).replace("\n", "<br/>"))
+    return "".join(parts)
+
+
 def _to_html(text: str, text_format: str) -> str:
-    """The HTML body (level 1): real <div>/<code> tags, content HTML-escaped so code renders."""
+    """The HTML body (level 1): real <div>/<code>/<pre> tags, content HTML-escaped so code renders.
+
+    A fenced ```` ``` ```` block becomes a <pre> so its line breaks and indentation survive — this is
+    what a code-completion question needs; without it the code collapsed to one unreadable line.
+    """
     if text_format == "markdown":
-        parts, pos = [], 0
-        for m in _BACKTICK.finditer(text):
-            parts.append(html.escape(text[pos:m.start()], quote=False))
-            parts.append(f"<code>{html.escape(m.group(1), quote=False)}</code>")
+        out, pos = [], 0
+        for m in _FENCE.finditer(text):
+            out.append(_md_segment(text[pos:m.start()]))
+            out.append(f"<pre>{html.escape(m.group(1).rstrip(chr(10)), quote=False)}</pre>")
             pos = m.end()
-        parts.append(html.escape(text[pos:], quote=False))
-        body = "".join(parts)
+        out.append(_md_segment(text[pos:]))
+        body = "".join(out)
     elif text_format == "html":
         body = text  # already HTML; trust it
     else:

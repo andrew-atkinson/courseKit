@@ -44,6 +44,18 @@ def test_markdown_code_becomes_code_tag():
     assert html_level.startswith("<div>") and html_level.endswith("</div>")
 
 
+def test_markdown_fenced_block_becomes_pre_preserving_line_breaks():
+    # a code-completion stem: the fenced block must keep its newlines (a <pre>), not collapse to one
+    code = "for (let i = 0; i < 3; i++) {\n  circle(i * 20, 50, 10);\n}"
+    body = qti.mattext(f"Complete the loop:\n```js\n{code}\n```", "markdown")
+    html_level = ET.fromstring(f"<m>{body}</m>").text
+    assert "<pre>" in html_level and "</pre>" in html_level
+    inside = html_level.split("<pre>")[1].split("</pre>")[0]
+    assert "\n" in inside                             # real line breaks survive inside <pre>
+    assert "circle(i * 20, 50, 10);" in inside        # the (escaped) code body is intact
+    assert "Complete the loop:<br/>" in html_level    # the stem's own newline became a <br/>
+
+
 def test_ampersand_double_escapes_like_the_export():
     # HTML '&nbsp;' -> XML '&amp;nbsp;'  (the export's tell).
     body = qti.mattext("a b", "plain")  # non-breaking space escapes to &nbsp; ? no—raw nbsp
