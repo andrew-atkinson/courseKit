@@ -27,7 +27,7 @@ uv sync --group dev     # also installs the `coursekit` command (editable)
 Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint — see [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest -q        # 512 tests, all offline — no model needed
+uv run pytest           # 512 tests, all offline — no model needed (names each, not just dots)
 ```
 
 ## Quick start
@@ -81,7 +81,7 @@ The CLI has three verbs, one per phase:
 
 | Test Command       | What it does        | Uses LLM |
 | ------------------ | ------------------- | -------- |
-| `uv run pytest -q` | Run the test suite. | x        |
+| `uv run pytest`    | Run the test suite. | x        |
 
 Exit codes: `0` success · `1` a unit failed to finalize · `2` the model could not be loaded.
 
