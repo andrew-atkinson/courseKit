@@ -47,6 +47,16 @@ def test_user_message_still_starts_the_tool_sequence():
     assert "variant_summary" in user
 
 
+def test_task_brief_is_subject_neutral():
+    # the blocker fix: no group is hard-wired to code-completion, so a non-coding course generates
+    user = build_messages("body")[1]["content"]
+    assert "c5: a code-completion" not in user      # not a fixed, forced group any more
+    assert "c1 to c4" not in user
+    # code-completion is offered conditionally, and the domain note carries the specifics
+    assert "domain note" in user
+    assert "where it fits" in user or "contains code" in user
+
+
 def test_is_pure_no_env_dependency(monkeypatch):
     # Importing context.py used to read TRANSCRIPTION at import time; it must not now.
     monkeypatch.delenv("TRANSCRIPTION", raising=False)
