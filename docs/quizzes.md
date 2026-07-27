@@ -7,7 +7,7 @@ The canonical artifact is `bank.json`; the emitters (GIFT, QTI) read only it. Ad
 ## See what it would do (free, no model)
 
 ```bash
-uv run python app.py "/path/to/course export" --dry-run
+uv run coursekit generate "/path/to/course export" --dry-run
 ```
 
 Lists every week it found and where each would be written — a cheap check before spending model time.
@@ -15,9 +15,9 @@ Lists every week it found and where each would be written — a cheap check befo
 ## Generate
 
 ```bash
-uv run python app.py "/path/to/course export" --week 3      # one week
-uv run python app.py "/path/to/course export" --weeks 3-8   # an inclusive range
-uv run python app.py "/path/to/course export"               # every week found
+uv run coursekit generate "/path/to/course export" --week 3      # one week
+uv run coursekit generate "/path/to/course export" --weeks 3-8   # an inclusive range
+uv run coursekit generate "/path/to/course export"               # every week found
 ```
 
 `PATH` is a markdown file **or** a directory. Given a directory it picks up per-week transcripts
@@ -50,10 +50,10 @@ QTI generation is **model-free** — it reads `bank.json`, so you can re-export 
 
 ```bash
 # one .zip per week, written beside each bank.json
-uv run python app.py --to-qti "/path/to/course export/quizzes"
+uv run coursekit emit qti "/path/to/course export/quizzes"
 
 # OR one package containing every week — a single Canvas import
-uv run python app.py --to-qti "/path/to/course export/quizzes" --bundle
+uv run coursekit emit qti "/path/to/course export/quizzes" --bundle
 ```
 
 Then in Canvas: **Import Content → Content Type: "QTI .zip file"** → upload the `.zip`.
