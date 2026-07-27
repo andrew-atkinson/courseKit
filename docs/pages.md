@@ -15,8 +15,8 @@ The canonical artifact is `page.json` (typed blocks); the renderer turns it into
 ## Generate
 
 ```bash
-uv run python app.py "/path/to/course export" --pages --week 3      # one week
-uv run python app.py "/path/to/course export" --pages               # every week
+uv run coursekit generate "/path/to/course export" --pages --week 3      # one week
+uv run coursekit generate "/path/to/course export" --pages               # every week
 ```
 
 Output lands in a `pages/` tree beside the course, alongside `quizzes/`:
@@ -89,11 +89,24 @@ Adding or changing a supplement shouldn't cost a model run. After you've generat
 its YAML and re-render everything, model-free:
 
 ```bash
-uv run python app.py --to-html "<course root>/pages"
+uv run coursekit emit html "<course root>/pages"
 ```
 
 This reads each `page.json` and its current supplements and rewrites the HTML — instant, no model.
 Refresh the page in your browser to see the change.
+
+### The whole course in one cartridge
+
+To hand Canvas a single import that brings in **both pages and quizzes**, organised into week modules:
+
+```bash
+uv run coursekit emit course "/path/to/course export"
+```
+
+This writes one `course.imscc` (model-free) — every week becomes a Canvas **module** holding that
+week's page and its quiz. Import via **Import Content → Canvas Course Export Package**. (`emit cc`
+stays the pages-only cartridge; `emit qti` the quizzes-only `.zip`.) The assembler is open to more
+content types — discussions, assignments, and rubrics are the next sources to add.
 
 ## What makes a good page
 
