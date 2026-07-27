@@ -11,6 +11,7 @@ schemaLocations, which ElementTree's namespace handling fights.
 import hashlib
 import html
 import re
+import textwrap
 import zipfile
 from pathlib import Path
 
@@ -56,6 +57,50 @@ def _md_segment(text: str) -> str:
     return "".join(parts)
 
 
+_LINE_COMMENT = re.compile(r"//.*$")
+_STR_LITERAL = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|`(?:\\.|[^`\\])*`')
+
+
+def _reindent(code: str, unit: str = "  ") -> str:
+    """Re-indent brace-delimited code by nesting depth, discarding whatever indentation the model
+    wrote — every line sits at `unit * depth`, so a block is consistent even when the model indented
+    it inconsistently line-to-line. Only `{}` drive depth (parens/brackets balance within a line in
+    practice), and braces inside line comments or string literals are ignored."""
+    out, depth = [], 0
+    for raw in code.split("\n"):
+        s = raw.strip()
+        if not s:
+            out.append("")
+            continue
+        scan = _STR_LITERAL.sub("", _LINE_COMMENT.sub("", s))
+        here = depth - 1 if s[0] == "}" else depth      # a line that starts by closing dedents first
+        out.append(unit * max(0, here) + s)
+        depth = max(0, depth + scan.count("{") - scan.count("}"))
+    return "\n".join(out)
+
+
+def _clean_code(code: str) -> str:
+    """Tidy a fenced block's indentation before it goes in a <pre>. Models mis-indent the code they
+    write — line 1 flush, the rest shoved right, and often inconsistently line-to-line (a sibling
+    statement deeper than its neighbour), which a uniform dedent cannot repair.
+
+    For brace-delimited code we re-indent from scratch by nesting depth (`_reindent`), which is robust
+    to that inconsistency. For brace-less snippets we fall back to stripping a spurious common base
+    off the lines after a flush first line. `textwrap.dedent` runs first for the simple uniform case.
+    """
+    code = textwrap.dedent(code.strip("\n"))
+    if "{" in code and "}" in code:
+        return _reindent(code)
+    lines = code.split("\n")
+    if len(lines) > 1 and lines[0][:1] not in (" ", "\t"):
+        tail = [ln for ln in lines[1:] if ln.strip()]
+        base = min((len(ln) - len(ln.lstrip()) for ln in tail), default=0)
+        if base:
+            lines = [lines[0]] + [ln[base:] if ln.strip() else ln for ln in lines[1:]]
+            code = "\n".join(lines)
+    return code
+
+
 def _to_html(text: str, text_format: str) -> str:
     """The HTML body (level 1): real <div>/<code>/<pre> tags, content HTML-escaped so code renders.
 
@@ -66,7 +111,7 @@ def _to_html(text: str, text_format: str) -> str:
         out, pos = [], 0
         for m in _FENCE.finditer(text):
             out.append(_md_segment(text[pos:m.start()]))
-            out.append(f"<pre>{html.escape(m.group(1).rstrip(chr(10)), quote=False)}</pre>")
+            out.append(f"<pre>{html.escape(_clean_code(m.group(1)), quote=False)}</pre>")
             pos = m.end()
         out.append(_md_segment(text[pos:]))
         body = "".join(out)

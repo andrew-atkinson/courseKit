@@ -56,6 +56,23 @@ def test_markdown_fenced_block_becomes_pre_preserving_line_breaks():
     assert "Complete the loop:<br/>" in html_level    # the stem's own newline became a <br/>
 
 
+def test_fenced_code_indentation_is_re_flushed():
+    # the real quiz bug: models mis-indent code — line 1 flush, the rest shoved right, and often
+    # INCONSISTENTLY (here the gap line sits deeper than its sibling rect). Re-indenting by brace
+    # depth throws the bad indentation away and rebuilds it, so siblings land at the same depth.
+    stem = ("```js\nfor (let i = 0; i < 5; i++) {\n            ________ // Gap here\n"
+            "          rect(0, 0, 100 * i, 100 * i);\n        }\n```")
+    body = qti.mattext(f"Complete:\n{stem}", "markdown")
+    html_level = ET.fromstring(f"<m>{body}</m>").text
+    inside = html_level.split("<pre>")[1].split("</pre>")[0]
+    assert inside.split("\n") == [
+        "for (let i = 0; i &lt; 5; i++) {",    # '<' is html-escaped (the code renders correctly)
+        "  ________ // Gap here",              # sibling statements now at the same depth (2 spaces)
+        "  rect(0, 0, 100 * i, 100 * i);",
+        "}",
+    ]
+
+
 def test_ampersand_double_escapes_like_the_export():
     # HTML '&nbsp;' -> XML '&amp;nbsp;'  (the export's tell).
     body = qti.mattext("a b", "plain")  # non-breaking space escapes to &nbsp; ? no—raw nbsp
