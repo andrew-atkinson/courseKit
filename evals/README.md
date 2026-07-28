@@ -21,6 +21,6 @@ uv run pytest evals/
 MODEL_NAME=<model> uv run pytest evals/
 ```
 
-The fixture is [`examples/synthetic-course`](../examples/synthetic-course/) — a transcript that is the
-only material the critic may trust, a bank with one sound question and four planted flaws, and an
-`EXPECTED.md` answer key.
+The fixtures are [`examples/synthetic/<domain>`](../examples/synthetic/) — coding, biology, prelaw,
+and photo, each a transcript (the only material the critic may trust), a bank of sound questions +
+planted flaws, and an `expected.json` answer key. See that folder's README for the scorecard format.
