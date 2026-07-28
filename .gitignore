@@ -31,3 +31,5 @@ setup.md
 examples/**/quiz-review.md
 # dumped by synthesize.write_fixtures — regenerable from synthesize.py, which is the source of truth
 examples/synthetic/generated/
+# saved scorecard runs (model-dependent run artifacts, not source)
+evals/results/

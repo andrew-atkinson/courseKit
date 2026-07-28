@@ -8,8 +8,11 @@ label per question. The label IS the construction, not a second file that can dr
 
 What is mechanical vs authored, stated honestly:
   * wrong-answer    — a pure mutation: move the marked answer to a wrong option. Perfectly labelled.
-  * garbled-syntax  — a marked token is corrupted deterministically (`_garble`): a code/notation token
-                      is unbalanced — exactly what a mis-emitted expression looks like.
+  * garbled-syntax  — an ANSWER-CRITICAL span of the stem is mangled into a corrupted rendering
+                      (`_garble`: mojibake), so the information needed to answer is present-but-
+                      unreadable. Distinct from missing-context, where the information is simply absent.
+                      (First pass unbalanced a bracket instead, which left the answer derivable — the
+                      critic reasonably PASSed it, so the corruption now destroys answerability.)
   * missing-context — authored per seed: the answer-determining specifics are removed so the stem is
                       unanswerable. A believable version is domain-specific, so it is written.
   * out-of-scope    — an authored pool per domain: well-formed, correct questions about material the
@@ -37,8 +40,9 @@ class Seed:
     """A sound multiple-choice question, structured so its flaw derivations are exact.
 
     `stripped` is the missing-context rendering: the same question with the answer-determining
-    specifics removed, so it cannot be answered as written. `garble` is a token that occurs verbatim
-    in `text`; `_garble` corrupts it to synthesize garbled notation.
+    specifics removed, so it cannot be answered as written. `garble` is an answer-critical span that
+    occurs verbatim in `text`; `_garble` mangles it into an unreadable rendering, so the garbled
+    variant is unanswerable because the key content is corrupt (not merely ugly).
     """
     concept: str
     text: str
@@ -66,21 +70,11 @@ class OutOfScope:
 
 
 def _garble(token: str) -> str:
-    """A deterministic, visibly-broken rendering of a token — to synthesize garbled notation.
-
-    A code/notation token carrying separators or brackets is unbalanced (drop the semicolons, then the
-    final closing bracket): a dropped `)` or missing `;` is precisely how a mis-emitted expression
-    reads. A token with neither is wrapped in an unclosed inline-math delimiter, mirroring the real
-    `$A_m$` mis-render this project has been bitten by.
-    """
-    if any(c in token for c in ";)]}"):
-        broken = token.replace(";", "")
-        for close in ")]}":
-            i = broken.rfind(close)
-            if i != -1:
-                return broken[:i] + broken[i + 1:]
-        return broken
-    return "$" + token + "\\"
+    """A corrupted-rendering artifact standing in for an answer-critical span — the real failure modes
+    this project has hit (mojibake, a span that failed to render). The original characters do NOT
+    survive, so the information the question needed is present-but-unreadable. A short run rather than
+    one glyph so it reads as 'this text is corrupt', not a single typo."""
+    return "�" * max(3, min(len(token), 7))
 
 
 def _mc(group_id: str, text: str, options: tuple[str, ...], correct: int, concept: str) -> MCVariant:
@@ -207,29 +201,33 @@ _CODING = DomainSpec(
             text="How many times does the body of `for (let i = 0; i < 5; i++)` run?",
             options=("3", "4", "5", "6"), correct=2,
             stripped="How many times does the body of the loop run?",
-            garble="for (let i = 0; i < 5; i++)",
+            garble="i < 5",
         ),
         Seed(
             concept="final loop variable value",
             text="After `for (let i = 0; i < 5; i++) {}` finishes, what value does `i` hold?",
             options=("4", "5", "6", "0"), correct=1,
             stripped="After the loop finishes, what value does `i` hold?",
-            garble="for (let i = 0; i < 5; i++)",
+            garble="i < 5",
         ),
         Seed(
-            concept="increment timing",
-            text="In `for (let i = 0; i < 5; i++)`, when does `i++` run relative to the body?",
-            options=("Before each pass", "After each pass", "Only once at the start",
-                     "Only once at the end"), correct=1,
-            stripped="When does the increment run relative to the loop body?",
-            garble="for (let i = 0; i < 5; i++)",
+            # Replaced the old "increment timing" seed: its stripped stem was universally
+            # answerable ("after each pass" regardless of the loop), so it was never really
+            # missing-context. This one's answer depends on the loop's bound, which the stripped
+            # version omits.
+            concept="values the counter takes",
+            text="Through `for (let i = 0; i < 5; i++)`, which values does `i` take inside the body?",
+            options=("0, 1, 2, 3", "0, 1, 2, 3, 4", "1, 2, 3, 4, 5",
+                     "0, 1, 2, 3, 4, 5"), correct=1,
+            stripped="Which values does `i` take inside the loop body?",
+            garble="i < 5",
         ),
         Seed(
             concept="loop drawing a row",
             text="`for (let i = 0; i < 5; i++) { circle(i * 40, 50, 20); }` draws how many circles?",
             options=("1", "4", "5", "10"), correct=2,
             stripped="The loop draws how many circles?",
-            garble="circle(i * 40, 50, 20)",
+            garble="i < 5",
         ),
     ),
     out_of_scope=(
@@ -266,16 +264,19 @@ _BIOLOGY = DomainSpec(
             options=("No energy at all", "Energy from ATP", "Only osmosis",
                      "A lower temperature"), correct=1,
             stripped="This process requires which of the following?",
-            garble="(moving a substance up its gradient)",
+            garble="up its gradient",
         ),
         Seed(
+            # Stripped stem drops the process name, making it genuinely ambiguous across the
+            # material: a *solute* diffuses toward lower concentration, whereas *water* in osmosis
+            # moves toward higher — so without "osmosis"/"water" it cannot be answered.
             concept="osmosis direction",
-            text="In osmosis, water crosses the membrane (a selectively permeable one) toward the "
-                 "side that has what?",
-            options=("Lower solute concentration", "Higher solute concentration",
-                     "Equal water already", "More channel proteins"), correct=1,
-            stripped="Water moves across toward the side that has what?",
-            garble="(a selectively permeable one)",
+            text="In osmosis, water crosses a selectively permeable membrane toward the side with "
+                 "which solute level?",
+            options=("Higher solute concentration", "Lower solute concentration",
+                     "Equal on both sides", "Zero solute"), correct=0,
+            stripped="A substance crosses the membrane toward the side with which solute level?",
+            garble="selectively permeable membrane",
         ),
         Seed(
             concept="facilitated diffusion energy",
@@ -284,7 +285,7 @@ _BIOLOGY = DomainSpec(
             options=("Energy from ATP", "No energy", "Energy from sunlight",
                      "Energy from heat"), correct=1,
             stripped="How much energy does this kind of diffusion need?",
-            garble="(through channel or carrier proteins)",
+            garble="How much energy does it need",
         ),
         Seed(
             concept="passive diffusion direction",
@@ -293,7 +294,7 @@ _BIOLOGY = DomainSpec(
             options=("Low to high concentration", "High to low concentration",
                      "Only across proteins", "Against the gradient"), correct=1,
             stripped="This movement goes from where to where?",
-            garble="(down its concentration gradient)",
+            garble="from where to where",
         ),
     ),
     out_of_scope=(
@@ -328,7 +329,7 @@ _PRELAW = DomainSpec(
             options=("A bargained-for exchange of value", "A written signature",
                      "A cooling-off period", "A government filing"), correct=0,
             stripped="It is best described as what?",
-            garble="(as taught this week)",
+            garble="best described as what",
         ),
         Seed(
             concept="mirror-image counter-offer",
@@ -337,7 +338,7 @@ _PRELAW = DomainSpec(
             options=("An acceptance", "A counter-offer", "Consideration",
                      "A binding contract"), correct=1,
             stripped="Is this reply an acceptance or a counter-offer?",
-            garble="(rather than matching them)",
+            garble="a reply that changes the offer's terms",
         ),
         Seed(
             concept="offer definition",
@@ -345,15 +346,19 @@ _PRELAW = DomainSpec(
             options=("A clear expression of willingness to contract on specified terms",
                      "A completed payment", "A judge's ruling", "An exchange of value"), correct=0,
             stripped="How is it best described?",
-            garble="(in the formation of a contract)",
+            garble="best described as what",
         ),
         Seed(
-            concept="acceptance and the terms",
-            text="Acceptance of an offer (to form a contract) must be what, relative to the terms?",
-            options=("An unqualified agreement matching the terms", "A partial agreement",
-                     "A change to the terms", "Irrelevant to the terms"), correct=0,
-            stripped="What must acceptance be, relative to the terms?",
-            garble="(to form a contract)",
+            # Replaced the old "acceptance and the terms" seed: its stripped stem was still a
+            # complete, answerable rule question. This one's answer depends on a specific reply that
+            # the stripped version does not show.
+            concept="acceptance validity in a scenario",
+            text="A reply agrees to every one of the offer's terms without changing any of them. "
+                 "Is it a valid acceptance?",
+            options=("Yes, it is a valid acceptance", "No, it is a counter-offer",
+                     "Only if notarized", "Only with new consideration"), correct=0,
+            stripped="Is the reply a valid acceptance?",
+            garble="every one of the offer's terms",
         ),
     ),
     out_of_scope=(
@@ -391,7 +396,7 @@ _PHOTO = DomainSpec(
             options=("Narrower, letting in less light", "Wider, letting in more light",
                      "Closed completely", "Unrelated to light"), correct=1,
             stripped="The lens opening is what?",
-            garble="(for example f/2.8)",
+            garble="smaller f-number",
         ),
         Seed(
             concept="shutter speed trade-off",
@@ -399,7 +404,7 @@ _PHOTO = DomainSpec(
             options=("More noise", "Motion blur", "A shallower depth of field",
                      "A higher f-number"), correct=1,
             stripped="It lets in more light but introduces what?",
-            garble="(all else equal)",
+            garble="longer shutter speed",
         ),
         Seed(
             concept="ISO trade-off",
@@ -407,7 +412,7 @@ _PHOTO = DomainSpec(
             options=("Motion blur", "Visible noise", "A wider aperture",
                      "Depth of field"), correct=1,
             stripped="Raising it makes the image brighter but adds what?",
-            garble="(the sensor's sensitivity)",
+            garble="Raising the ISO",
         ),
         Seed(
             concept="aperture and depth of field",
@@ -415,7 +420,7 @@ _PHOTO = DomainSpec(
             options=("Deep depth of field", "Shallow depth of field", "No depth of field",
                      "Depth of field is set by ISO"), correct=1,
             stripped="Which depth of field does it give?",
-            garble="(a smaller f-number such as f/2.8)",
+            garble="wider aperture",
         ),
     ),
     out_of_scope=(

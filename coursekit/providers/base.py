@@ -73,10 +73,14 @@ class Provider(ABC):
         messages.append({"role": "user", "content": text})
 
     def chat(self, *, model: str, messages: list, temperature: float | None = None,
-             max_tokens: int | None = None) -> str:
+             max_tokens: int | None = None, seed: int | None = None) -> str:
         """A plain completion: messages in, assistant text out — no tools. For prose→prose passes
         (e.g. reshaping raw extracted document text into a teaching-ready week doc). Not abstract so
-        existing tool-only providers keep working; a provider that can't complete says so loudly."""
+        existing tool-only providers keep working; a provider that can't complete says so loudly.
+
+        `seed`, when the endpoint honours it, makes N reads at the same temperature genuinely
+        *different* samples rather than the same one — which is the difference between multi-read
+        adding catches and being a no-op. Omitted from the request when None."""
         raise NotImplementedError(f"{type(self).__name__} does not implement plain chat()")
 
     def check_fit(self, model: str) -> tuple[bool | None, str]:

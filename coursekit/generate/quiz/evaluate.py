@@ -20,10 +20,12 @@ from coursekit import prompts
 EVALUATE_CATEGORY = "quiz"
 
 
-# The critic reads at a moderate temperature ON PURPOSE: multi-read only helps if the reads vary, and
-# a local model catches a *different* subset of flaws each pass. Union across N reads recovers most.
+# The critic reads at a moderate temperature so multi-read *can* vary. But measured on the default
+# local model (a near-greedy QAT gemma) the reads agreed on 71/72 questions even with distinct seeds —
+# union recovered nothing — so the default is a single read. Raise `reads` (or, more promisingly, vary
+# the *model* across reads) only for a critic model that actually samples diversely. See evals/scorecard.py.
 READ_TEMPERATURE = 0.4
-DEFAULT_READS = 3
+DEFAULT_READS = 1
 
 
 @dataclass
@@ -84,12 +86,16 @@ def _parse_verdict(reply: str) -> tuple[str, str, str]:
     return verdict, concern, fix
 
 
-def _one_read(critic: str, transcript: str, v, provider, model: str) -> tuple[str, str, str]:
+def _one_read(critic: str, transcript: str, v, provider, model: str,
+              *, seed: int | None = None) -> tuple[str, str, str]:
     user = (f"The week's teaching material:\n<material>\n{transcript}\n</material>\n\n"
             f"The question to review:\n{_format_question(v)}\n\nEvaluate this question.")
     messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]
+    kwargs = {"model": model, "messages": messages, "temperature": READ_TEMPERATURE}
+    if seed is not None:            # only sent when asked for, so a seed-less read is byte-for-byte as before
+        kwargs["seed"] = seed
     try:
-        reply = provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE)
+        reply = provider.chat(**kwargs)
         return _parse_verdict(reply)
     except Exception as e:   # a provider hiccup on one read shouldn't abort the review
         return "ERROR", f"critic call failed: {e}"[:160], ""
@@ -108,6 +114,15 @@ def _union(reads: list[tuple[str, str, str]]) -> tuple[str, str, str, int]:
     return "ERROR", "every read failed", "", 0
 
 
+def _reads_for(critic, transcript, v, provider, model, reads, seed_base=None):
+    """The per-read outcomes for one variant: `reads` independent cold reads, each seeded distinctly
+    when `seed_base` is given. Returns [(verdict, concern, fix), ...]. The single gather that both the
+    Finding-producing evaluate_bank and the raw-verdict read_verdicts sit on."""
+    return [_one_read(critic, transcript, v, provider, model,
+                      seed=None if seed_base is None else seed_base + i)
+            for i in range(max(1, reads))]
+
+
 def evaluate_bank(bank, transcript: str, provider, model: str, *, week: str = "",
                   project_root=None, reads: int = DEFAULT_READS) -> list[Finding]:
     """Cold-read every variant `reads` times and union the verdicts — several independent fresh reads,
@@ -117,11 +132,27 @@ def evaluate_bank(bank, transcript: str, provider, model: str, *, week: str = ""
     findings = []
     for g in bank.groups.values():
         for v in g.variants.values():
-            results = [_one_read(critic, transcript, v, provider, model) for _ in range(max(1, reads))]
+            results = _reads_for(critic, transcript, v, provider, model, reads)
             verdict, concern, fix, n_flag = _union(results)
             findings.append(Finding(week, g.group_id, v.label, v.question_text.strip(),
                                     verdict, concern, fix, n_flag=n_flag, n_reads=len(results)))
     return findings
+
+
+def read_verdicts(bank, transcript: str, provider, model: str, *, reads: int = DEFAULT_READS,
+                  seed_base: int | None = None, project_root=None) -> list[tuple[str, str, str, list[str]]]:
+    """Every variant's per-read verdicts, WITHOUT the union collapse — the raw material a scoring
+    harness needs to see what each cold read caught and what the union adds. Returns
+    (group_id, label, stem, [verdict per read]). When `seed_base` is set, read i uses seed
+    `seed_base + i`, so the reads are distinct samples rather than the same one repeated."""
+    critic = prompts.load(EVALUATE_CATEGORY, "critic", project_root=project_root).body
+    out = []
+    for g in bank.groups.values():
+        for v in g.variants.values():
+            reads_out = _reads_for(critic, transcript, v, provider, model, reads, seed_base)
+            verdicts = [verdict for verdict, _, _ in reads_out]
+            out.append((g.group_id, v.label, v.question_text.strip(), verdicts))
+    return out
 
 
 def evaluate_course(path, *, weeks=None, provider, model, out_path=None,

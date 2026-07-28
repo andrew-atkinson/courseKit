@@ -128,14 +128,13 @@ def test_every_bank_round_trips_through_pydantic():
 
 # ---- the corruption primitive ---------------------------------------------
 
-def test_garble_unbalances_brackets_and_drops_separators():
-    assert _garble("for (let i = 0; i < 5; i++)") == "for (let i = 0 i < 5 i++"
-    assert _garble("circle(i * 40, 50, 20)") == "circle(i * 40, 50, 20"
-    assert _garble("(a selectively permeable one)") == "(a selectively permeable one"
-
-
-def test_garble_wraps_a_plain_token_in_broken_math():
-    assert _garble("f/2.8") == "$f/2.8\\"
+def test_garble_destroys_the_span_it_replaces():
+    """The corruption must not leave the original characters recoverable — that is what makes the
+    garbled variant unanswerable rather than merely ugly (the first-pass bug)."""
+    g = _garble("i < 5")
+    assert set(g) == {"�"}                 # a corrupted-rendering run, nothing else
+    assert "5" not in g and "i" not in g   # the answer-critical characters do not survive
+    assert _garble("x") != "x"             # even a 1-char span is mangled (min run length)
 
 
 # ---- the on-disk dump ------------------------------------------------------

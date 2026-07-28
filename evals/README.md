@@ -24,3 +24,30 @@ MODEL_NAME=<model> uv run pytest evals/
 The fixtures are [`examples/synthetic/<domain>`](../examples/synthetic/) — coding, biology, prelaw,
 and photo, each a transcript (the only material the critic may trust), a bank of sound questions +
 planted flaws, and an `expected.json` answer key. See that folder's README for the scorecard format.
+
+## The scorecard harness (`scorecard.py`)
+
+The pytest above is a tolerant pass/fail *guard*. For the actual measurement — recall **by flaw
+type**, false-flag rate on the sound questions, and per-read-vs-union (does an extra cold read add
+catches, or is multi-read a no-op on this model?) — run the harness, which scores the critic over the
+larger **generated** set (`synthesize_all()`, ~72 labelled cases) rather than the 24-question hand-set:
+
+```bash
+uv run python evals/scorecard.py                             # 1 read (default), per-read seeds on
+uv run python evals/scorecard.py --reads 5                   # more cold reads
+uv run python evals/scorecard.py --model qwen/qwen3.6-35b-a3b # a different critic model (LM Studio JIT-loads it)
+uv run python evals/scorecard.py --seed-base none            # seeds off, to compare read variance
+```
+
+Every run is saved to `evals/results/<timestamp>-<model>-r<reads>.md` (gitignored) — the scorecard
+plus a per-question table showing exactly which questions flagged, missed, or false-flagged, so runs
+and models are comparable after the fact. To diff two runs on the questions they share (e.g. a slow
+reasoning model vs a fast one):
+
+```bash
+uv run python evals/compare.py evals/results/<runA>.md evals/results/<runB>.md
+```
+
+The scoring math lives in
+[`coursekit/generate/quiz/scoring.py`](../coursekit/generate/quiz/scoring.py) and is unit-tested
+offline (`tests/test_scoring.py`) — the harness only gathers the verdicts.

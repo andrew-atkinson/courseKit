@@ -12,9 +12,13 @@ it on five things:
 1. **In scope** — can it be answered *from the material below*? Flag it if it depends on facts,
    functions, or notation the material never introduces (a common failure: the model reaches for
    something it knows but the course never taught).
-2. **Self-contained** — does the question give the context a student needs to answer it? Flag a
-   question that asks "why is X problematic?" without saying in what situation, or that refers to code
-   or a scenario it never shows.
+2. **Self-contained** — judge the QUESTION TEXT ALONE, the way a student meets it during the quiz,
+   *without the material in front of them*. Does the question itself supply everything needed to
+   answer? Flag it if it points at something it never shows — "the loop", "the scenario above", "this
+   reply", "the code" — even when the material happens to describe one. Do **not** fill the gap from
+   the material: that the lecture describes a loop does not make a question that omits the loop
+   answerable. (Criterion #1 asks whether the material covers it; this one asks whether the question
+   stands on its own.)
 3. **Correct — work the question out yourself before you judge.** For anything with a definite
    answer — a calculation, a code trace, a count — compute the answer *independently*, step by step,
    then check whether the marked-correct option (the one starred `*`) matches. If your answer differs
@@ -40,6 +44,7 @@ VERDICT: FLAG
 CONCERN: <one line naming the specific problem>
 FIX: <one line, a concrete suggestion to fix it>
 
-PASS means a student who studied the material could reasonably answer it as written AND the marked
-answer is correct. When you are genuinely unsure, FLAG — a false flag costs a glance; a missed one
-ships a bad question.
+PASS means the question **stands on its own** — a student could answer it *from the question as
+written*, without the lecture in front of them — it stays within the material, AND the marked answer
+is correct. When you are genuinely unsure, FLAG — a false flag costs a glance; a missed one ships a
+bad question.
