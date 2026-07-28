@@ -21,6 +21,22 @@ uv run pytest evals/ -s                 # with a model running; -s shows the sco
 EVAL_READS=5 uv run pytest evals/ -s    # more cold reads per question
 ```
 
-To grow the set: add another `examples/synthetic/<domain>/` with the same three files, or add
-questions to an existing domain's bank + `expected.json`. Regenerate the `bank.json`/`expected.json`
-with the builder in the repo history if you prefer editing Python to editing JSON by hand.
+## The hand-set vs the generator
+
+The four folders above are the original **hand-authored** set — 24 questions, small enough to read in
+one sitting. Alongside them, [`coursekit/generate/quiz/synthesize.py`](../../coursekit/generate/quiz/synthesize.py)
+**generates** a larger labelled set deterministically: from a handful of sound seed questions per
+domain it derives the same four flaw kinds, one exact label per question, so the answer key is the
+construction rather than a second file that can drift. `wrong-answer` and `garbled-syntax` are true
+mechanical mutations; `missing-context` and `out-of-scope` are authored per seed (a believable version
+of each is domain-specific). It runs no model.
+
+A scoring harness imports `synthesize_all()` directly (Bank objects + expected-verdict map — no disk
+needed). To eyeball the fixtures instead:
+
+```bash
+uv run python -m coursekit.generate.quiz.synthesize   # dumps to examples/synthetic/generated/ (gitignored)
+```
+
+To grow either set: add a domain folder / bank questions for the hand-set, or add `Seed`s and
+`OutOfScope`s to a `DomainSpec` in `synthesize.py` — each new seed yields four more labelled cases.
