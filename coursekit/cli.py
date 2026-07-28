@@ -216,10 +216,11 @@ def _cmd_emit_course(args) -> int:
 def _cmd_evaluate(args) -> int:
     from coursekit.generate.quiz import evaluate as ev
     provider = _build_provider()
-    model = os.getenv("MODEL_NAME") or courseconfig.load(
-        args.path, config_name="evaluate.yaml").value("model")
+    cfg = courseconfig.load(args.path, config_name="evaluate.yaml")
+    model = os.getenv("MODEL_NAME") or cfg.value("model")
+    reads = int(args.reads or cfg.value("reads", ev.DEFAULT_READS))
     findings, review = ev.evaluate_course(
-        args.path, weeks=_parse_weeks(args), provider=provider, model=model)
+        args.path, weeks=_parse_weeks(args), provider=provider, model=model, reads=reads)
     if not findings:
         print("No quizzes found to evaluate (need a generated bank.json under the course).")
         return 1
@@ -295,6 +296,8 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("path", help="the course (its quizzes/ tree + transcripts)")
     pv.add_argument("--week", action="append", metavar="N", help="a week to review, repeatable")
     pv.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
+    pv.add_argument("--reads", type=int, metavar="N",
+                    help="cold reads per question, unioned (default 3; more = better recall, more calls)")
     pv.set_defaults(func=_cmd_evaluate)
 
     return parser
