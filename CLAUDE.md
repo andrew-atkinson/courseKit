@@ -25,7 +25,7 @@ converter per input. This is why QTI export needs no model.
   `README.md`, enforced by [tests/test_docs_facts.py](tests/test_docs_facts.py). Don't repeat it
   elsewhere — a number in two files rots in one. Decorative counts that show a ratio get a `~`.
 - **Claims about the transcriber are read, not reconstructed.** Its source is on disk (below). Read it
-  before stating what it does; earlier reconstructions from its *outputs* were wrong.
+  before stating what it does; earlier reconstructions from its _outputs_ were wrong.
 
 ## Ground truth on disk
 
@@ -47,12 +47,10 @@ converter per input. This is why QTI export needs no model.
 
 - **Per-tool config files are separate.** `context.yaml` (course structure) is shared; the
   transcriber's `config.yaml` and quizbot's `quiz.yaml` are each private to their tool.
-  `coursekit/courseconfig.py` is the shared *mechanism*; each tool owns its *file*.
+  `coursekit/courseconfig.py` is the shared _mechanism_; each tool owns its _file_.
 - **Content boundary: instructor-authored material only, never student submissions.** Keeps the
   project out of FERPA scope. Relevant before anyone proposes auto-grading.
 - **File emitters stay first-class**, even once a Canvas API emitter exists — many faculty can't get a
   token, and a reviewable `.zip` is worth more than an API call. Any API path defaults to dry-run.
-- **The institutional Canvas token goes in `.env` (gitignored) only when API work begins** — never committed,
-  never logged.
 - **The quizbot→coursekit rename is triggered by generator #2, not a date.** Until then the spine is
   built in place. Don't do the rename mid-feature.
