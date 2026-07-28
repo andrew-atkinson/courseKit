@@ -51,3 +51,12 @@ uv run python evals/compare.py evals/results/<runA>.md evals/results/<runB>.md
 The scoring math lives in
 [`coursekit/generate/quiz/scoring.py`](../coursekit/generate/quiz/scoring.py) and is unit-tested
 offline (`tests/test_scoring.py`) — the harness only gathers the verdicts.
+
+The **page** critic has the same treatment: `evals/page_scorecard.py` scores it over labelled synthetic
+page sections (`coursekit/generate/page/synthesize.py` — sound facts plus planted `contradiction`,
+`garbled`, and `out-of-scope` sections), reusing the same scoring math.
+
+```bash
+uv run python evals/page_scorecard.py                        # 1 read/section, all domains
+uv run python evals/page_scorecard.py --model qwen/qwen3.6-27b
+```

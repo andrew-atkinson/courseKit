@@ -188,12 +188,13 @@ def evaluate_course(path, *, weeks=None, provider, model, out_path=None,
     return findings, out_path
 
 
-def render_review(findings: list[Finding]) -> str:
-    """A Markdown review of the flagged (and errored) questions — the passing ones are omitted."""
+def render_review(findings: list[Finding], *, title: str = "Quiz review", noun: str = "question") -> str:
+    """A Markdown review of the flagged (and errored) items — the passing ones are omitted. `title`
+    and `noun` let the page critic reuse this verbatim (Page review / section)."""
     review = [f for f in findings if f.verdict != "PASS"]     # FLAG + ERROR both want a look
-    lines = [f"# Quiz review — {len(review)} of {len(findings)} question(s) flagged", ""]
+    lines = [f"# {title} — {len(review)} of {len(findings)} {noun}(s) flagged", ""]
     if not review:
-        lines.append("Every question passed the cold read. Nothing to review.")
+        lines.append(f"Every {noun} passed the cold read. Nothing to review.")
         return "\n".join(lines) + "\n"
     for f in review:
         stem = f.stem if len(f.stem) <= 140 else f.stem[:137] + "…"

@@ -13,9 +13,9 @@ surface is self-describing and the couplings are structural rather than a footgu
     coursekit emit html PATH
     coursekit emit cc   PATH
 
-A `generate` run that produces quizzes ends with a report-only cold-read review of them (the same pass
-as `coursekit evaluate`), surfacing flagged questions and writing quiz-review.md. `--no-review` skips
-it; it is also skipped, harmlessly, when no critic model is configured.
+A `generate` run ends with a report-only cold-read review of what it produced — flagged questions to
+quiz-review.md, flagged page sections to page-review.md — each read against the week's own material.
+`--no-review` skips it; it is also skipped, harmlessly, when no critic model is configured.
 
 All orchestration lives in pipeline.py and the emitters; this only parses args, builds the provider,
 and prints summaries. Reachable as the `coursekit` command (an editable install) or `python app.py`.
@@ -122,6 +122,31 @@ def _review_quizzes(args, provider) -> None:
         print(f"-> {review}")
 
 
+def _review_pages(args, provider) -> None:
+    """The page equivalent of _review_quizzes — cold-read each generated page section against the
+    week's material (report-only). Same best-effort contract: never fails the generate."""
+    from coursekit.generate.page import evaluate as pev
+    model, reads = _critic_model_and_reads(args.path)
+    if not model:
+        print("\n(skipping page review: no critic model — set MODEL_NAME or evaluate.yaml `model:`)")
+        return
+    print("\nReviewing the generated pages (cold read)…")
+    try:
+        findings, review = pev.evaluate_course_pages(
+            args.path, weeks=_parse_weeks(args), provider=provider, model=model, reads=reads)
+    except Exception as e:
+        print(f"(page review skipped: {type(e).__name__}: {e})")
+        return
+    if not findings:
+        return
+    flagged = [f for f in findings if f.flagged]
+    print(f"Page review: {len(flagged)} of {len(findings)} section(s) flagged.")
+    for f in flagged:
+        print(f"  [{f.verdict}] {f.week} {f.group_id}/{f.label}: {f.concern}")
+    if review:
+        print(f"-> {review}")
+
+
 # ---------------------------------------------------------------- ingest
 
 def _cmd_ingest(args) -> int:
@@ -182,9 +207,12 @@ def _cmd_generate(args) -> int:
         _print_summary(results, dry_run=args.dry_run)
         incomplete = incomplete or (not args.dry_run and any(not r.finalized for r in results))
 
-    # Report-only quality gate: cold-read the new quizzes right after generating them (default on).
-    if not args.dry_run and args.review and any(g.category == "quiz" for g in generators):
-        _review_quizzes(args, provider)
+    # Report-only quality gate: cold-read the new artifacts right after generating them (default on).
+    if not args.dry_run and args.review:
+        if any(g.category == "quiz" for g in generators):
+            _review_quizzes(args, provider)
+        if any(g.category == "page" for g in generators):
+            _review_pages(args, provider)
 
     return 1 if incomplete else 0
 

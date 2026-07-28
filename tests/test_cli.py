@@ -146,3 +146,28 @@ def test_review_quizzes_skips_without_a_critic_model(tmp_path, monkeypatch, caps
     out = capsys.readouterr().out
     assert "skipping quiz review" in out
     assert not (course / "quizzes" / "quiz-review.md").exists()   # nothing written, generate unharmed
+
+
+def _write_page_course(tmp_path):
+    from coursekit.generate.page import page as pagemod
+    course = tmp_path / "course"
+    (course / "output").mkdir(parents=True)
+    (course / "output" / "week-3.md").write_text("loops and iteration", encoding="utf-8")
+    pd = course / "pages" / "week-3"
+    pd.mkdir(parents=True)
+    pagemod.reset()
+    pagemod.init("p1", None, title="Week 3", week_ref="week-3", slug="week-3")
+    pagemod.put_block(pagemod.build_block("heading", block_id="h1", text="Loops", level=2))
+    pagemod.put_block(pagemod.build_block(
+        "paragraph", block_id="b2", text="Recursion OUTOFSCOPE is the tool this week."))
+    (pd / "page.json").write_text(pagemod.get().model_dump_json(), encoding="utf-8")
+    return course
+
+
+def test_review_pages_flags_and_writes_a_review(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("MODEL_NAME", "m")
+    course = _write_page_course(tmp_path)
+    cli._review_pages(_review_args(course), _FakeCritic("OUTOFSCOPE"))
+    out = capsys.readouterr().out
+    assert "section(s) flagged" in out
+    assert (course / "pages" / "page-review.md").exists()
