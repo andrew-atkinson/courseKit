@@ -54,6 +54,11 @@ def test_emit_course_routes_to_the_course_cartridge():
     assert args.func is cli._cmd_emit_course and args.path == "/course"
 
 
+def test_evaluate_routes_with_week_filter():
+    args = _parse("evaluate", "/course", "--week", "3")
+    assert args.func is cli._cmd_evaluate and args.path == "/course" and args.week == ["3"]
+
+
 def test_ingest_routes_with_raw():
     args = _parse("ingest", "/docs", "--raw")
     assert args.func is cli._cmd_ingest and args.path == "/docs" and args.raw

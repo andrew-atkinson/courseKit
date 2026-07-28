@@ -213,6 +213,25 @@ def _cmd_emit_course(args) -> int:
     return 0
 
 
+def _cmd_evaluate(args) -> int:
+    from coursekit.generate.quiz import evaluate as ev
+    provider = _build_provider()
+    model = os.getenv("MODEL_NAME") or courseconfig.load(
+        args.path, config_name="evaluate.yaml").value("model")
+    findings, review = ev.evaluate_course(
+        args.path, weeks=_parse_weeks(args), provider=provider, model=model)
+    if not findings:
+        print("No quizzes found to evaluate (need a generated bank.json under the course).")
+        return 1
+    flagged = [f for f in findings if f.flagged]
+    print(f"Reviewed {len(findings)} question(s); {len(flagged)} flagged.")
+    for f in flagged:
+        print(f"  [{f.verdict}] {f.week} {f.group_id}/{f.label}: {f.concern}")
+    if review:
+        print(f"\n-> {review}")
+    return 0 if not flagged else 1
+
+
 # ---------------------------------------------------------------- parser
 
 def build_parser() -> argparse.ArgumentParser:
@@ -270,6 +289,13 @@ def build_parser() -> argparse.ArgumentParser:
                           help="ONE Canvas .imscc of the WHOLE course — pages AND quizzes, in week modules")
     eco.add_argument("path", help="the course root (its pages/ and quizzes/ trees)")
     eco.set_defaults(func=_cmd_emit_course)
+
+    # evaluate — cold-read quality review of generated quizzes (uses the model)
+    pv = sub.add_parser("evaluate", help="cold-read review of generated quizzes; flags weak questions")
+    pv.add_argument("path", help="the course (its quizzes/ tree + transcripts)")
+    pv.add_argument("--week", action="append", metavar="N", help="a week to review, repeatable")
+    pv.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
+    pv.set_defaults(func=_cmd_evaluate)
 
     return parser
 
