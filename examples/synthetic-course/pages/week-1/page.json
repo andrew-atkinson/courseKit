@@ -1,0 +1,39 @@
+{
+  "page_id": "synthetic-week-1",
+  "page_type": "week_intro",
+  "title": "Week 1: Loops",
+  "week_ref": "week-1",
+  "slug": "week-1-loops",
+  "blocks": {
+    "h1": {
+      "block_id": "h1",
+      "kind": "heading",
+      "text": "The for loop",
+      "level": 2,
+      "role": "concept"
+    },
+    "b1": {
+      "block_id": "b1",
+      "kind": "bullets",
+      "items": [
+        "Runs the body a set number of times",
+        "i takes 0..4 for `i < 5`"
+      ]
+    },
+    "h2": {
+      "block_id": "h2",
+      "kind": "heading",
+      "text": "Fourier analysis",
+      "level": 2,
+      "role": "concept"
+    },
+    "b2": {
+      "block_id": "b2",
+      "kind": "bullets",
+      "items": [
+        "Use p5.FFT to split a sound into frequencies"
+      ]
+    }
+  },
+  "finalized": false
+}
