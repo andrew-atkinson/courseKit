@@ -1,0 +1,146 @@
+{
+  "run_id": "synthetic-biology",
+  "title": "Membrane transport",
+  "source": "week-1.md",
+  "groups": {
+    "c1": {
+      "group_id": "c1",
+      "concept_title": "sound",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c1",
+          "label": "A",
+          "question_text": "Which process moves a substance down its concentration gradient without using energy?",
+          "variant_summary": "sound",
+          "text_format": "plain",
+          "options": [
+            "Active transport",
+            "Passive diffusion",
+            "The sodium-potassium pump",
+            "Endocytosis"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 1,
+          "feedback": null
+        }
+      }
+    },
+    "c2": {
+      "group_id": "c2",
+      "concept_title": "sound",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c2",
+          "label": "A",
+          "question_text": "What supplies the energy for the sodium-potassium pump?",
+          "variant_summary": "sound",
+          "text_format": "plain",
+          "options": [
+            "Sunlight",
+            "ATP",
+            "Osmosis",
+            "Body heat"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 1,
+          "feedback": null
+        }
+      }
+    },
+    "c3": {
+      "group_id": "c3",
+      "concept_title": "out-of-scope",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c3",
+          "label": "A",
+          "question_text": "In the Krebs cycle, how many molecules of ATP are produced per turn?",
+          "variant_summary": "out-of-scope",
+          "text_format": "plain",
+          "options": [
+            "One",
+            "Two",
+            "Twelve",
+            "Thirty-six"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 0,
+          "feedback": null
+        }
+      }
+    },
+    "c4": {
+      "group_id": "c4",
+      "concept_title": "wrong-answer",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c4",
+          "label": "A",
+          "question_text": "Osmosis moves water from a region of ___ solute concentration to a region of ___ solute concentration.",
+          "variant_summary": "wrong-answer",
+          "text_format": "plain",
+          "options": [
+            "higher; lower",
+            "lower; higher",
+            "equal; equal",
+            "high; high"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 0,
+          "feedback": null
+        }
+      }
+    },
+    "c5": {
+      "group_id": "c5",
+      "concept_title": "missing-context",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c5",
+          "label": "A",
+          "question_text": "Does the substance require energy to cross the membrane?",
+          "variant_summary": "missing-context",
+          "text_format": "plain",
+          "options": [
+            "Yes",
+            "No",
+            "Only at night",
+            "It depends on the weather"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 1,
+          "feedback": null
+        }
+      }
+    },
+    "c6": {
+      "group_id": "c6",
+      "concept_title": "garbled-syntax",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c6",
+          "label": "A",
+          "question_text": "What is the function of the aqua>=porin carrier-pump in acti^ve osmosis?",
+          "variant_summary": "garbled-syntax",
+          "text_format": "plain",
+          "options": [
+            "Transport",
+            "Storage",
+            "It is not a real structure",
+            "Respiration"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 2,
+          "feedback": null
+        }
+      }
+    }
+  },
+  "finalized": true
+}

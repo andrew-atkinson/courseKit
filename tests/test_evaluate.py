@@ -51,6 +51,28 @@ def test_evaluate_bank_cold_reads_each_variant_and_flags_the_match():
     assert "not in the material" in flagged[0].concern
 
 
+class _FlakyCritic:
+    """FLAGs the marked question on only its FIRST read, PASSes it after — models the variance that
+    multi-read exists to absorb."""
+    def __init__(self, marker):
+        self.marker = marker
+        self.seen = 0
+
+    def chat(self, *, model, messages, temperature=None, max_tokens=None):
+        if self.marker in messages[1]["content"]:
+            self.seen += 1
+            if self.seen == 1:
+                return "VERDICT: FLAG\nCONCERN: caught on read 1\nFIX: rewrite"
+        return "VERDICT: PASS\nCONCERN:\nFIX:"
+
+
+def test_union_flags_when_any_read_flags():
+    # a flaw caught on only 1 of 3 reads must still end up flagged — the whole point of multi-read
+    findings = ev.evaluate_bank(_bank(), "t", _FlakyCritic("OUTOFSCOPE"), "m", reads=3)
+    b = next(f for f in findings if f.label == "B")
+    assert b.flagged and b.n_flag == 1 and b.n_reads == 3
+
+
 def test_evaluate_bank_survives_a_flaky_critic():
     class _Boom:
         def chat(self, **kw):

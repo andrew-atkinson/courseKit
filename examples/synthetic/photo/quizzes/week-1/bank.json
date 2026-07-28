@@ -1,0 +1,146 @@
+{
+  "run_id": "synthetic-photo",
+  "title": "Exposure",
+  "source": "week-1.md",
+  "groups": {
+    "c1": {
+      "group_id": "c1",
+      "concept_title": "sound",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c1",
+          "label": "A",
+          "question_text": "Which control sets the depth of field?",
+          "variant_summary": "sound",
+          "text_format": "plain",
+          "options": [
+            "Shutter speed",
+            "Aperture",
+            "ISO",
+            "White balance"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 1,
+          "feedback": null
+        }
+      }
+    },
+    "c2": {
+      "group_id": "c2",
+      "concept_title": "sound",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c2",
+          "label": "A",
+          "question_text": "Raising the ISO makes the image brighter but adds ___.",
+          "variant_summary": "sound",
+          "text_format": "plain",
+          "options": [
+            "motion blur",
+            "noise",
+            "depth of field",
+            "nothing"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 1,
+          "feedback": null
+        }
+      }
+    },
+    "c3": {
+      "group_id": "c3",
+      "concept_title": "out-of-scope",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c3",
+          "label": "A",
+          "question_text": "How does the rule of thirds guide where to place a subject?",
+          "variant_summary": "out-of-scope",
+          "text_format": "plain",
+          "options": [
+            "Along the third lines",
+            "At the exact centre",
+            "At the edges",
+            "Randomly"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 0,
+          "feedback": null
+        }
+      }
+    },
+    "c4": {
+      "group_id": "c4",
+      "concept_title": "wrong-answer",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c4",
+          "label": "A",
+          "question_text": "A larger f-number (f/16) lets in ___ light than a smaller one (f/2.8).",
+          "variant_summary": "wrong-answer",
+          "text_format": "plain",
+          "options": [
+            "more",
+            "less",
+            "the same",
+            "no"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 0,
+          "feedback": null
+        }
+      }
+    },
+    "c5": {
+      "group_id": "c5",
+      "concept_title": "missing-context",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c5",
+          "label": "A",
+          "question_text": "Which control should you raise?",
+          "variant_summary": "missing-context",
+          "text_format": "plain",
+          "options": [
+            "Aperture",
+            "Shutter speed",
+            "ISO",
+            "It depends on the goal"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 2,
+          "feedback": null
+        }
+      }
+    },
+    "c6": {
+      "group_id": "c6",
+      "concept_title": "garbled-syntax",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c6",
+          "label": "A",
+          "question_text": "What does the apert>=ure/shutter>=ISO expose() triangle return?",
+          "variant_summary": "garbled-syntax",
+          "text_format": "plain",
+          "options": [
+            "An image",
+            "A number",
+            "It is not valid",
+            "A color"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 2,
+          "feedback": null
+        }
+      }
+    }
+  },
+  "finalized": true
+}

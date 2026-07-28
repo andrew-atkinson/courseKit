@@ -1,0 +1,146 @@
+{
+  "run_id": "synthetic-coding",
+  "title": "Loops in p5.js",
+  "source": "week-1.md",
+  "groups": {
+    "c1": {
+      "group_id": "c1",
+      "concept_title": "sound",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c1",
+          "label": "A",
+          "question_text": "How many times does the body of `for (let i = 0; i < 5; i++)` run?",
+          "variant_summary": "sound",
+          "text_format": "plain",
+          "options": [
+            "3",
+            "4",
+            "5",
+            "6"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 2,
+          "feedback": null
+        }
+      }
+    },
+    "c2": {
+      "group_id": "c2",
+      "concept_title": "sound",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c2",
+          "label": "A",
+          "question_text": "After `for (let i = 0; i < 5; i++)` finishes, what is the value of i?",
+          "variant_summary": "sound",
+          "text_format": "plain",
+          "options": [
+            "4",
+            "5",
+            "6",
+            "0"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 1,
+          "feedback": null
+        }
+      }
+    },
+    "c3": {
+      "group_id": "c3",
+      "concept_title": "out-of-scope",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c3",
+          "label": "A",
+          "question_text": "In `new p5.FFT(0.8, 512)`, what does the second argument set?",
+          "variant_summary": "out-of-scope",
+          "text_format": "plain",
+          "options": [
+            "Smoothing",
+            "Frequency bins",
+            "Sample rate",
+            "Gain"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 1,
+          "feedback": null
+        }
+      }
+    },
+    "c4": {
+      "group_id": "c4",
+      "concept_title": "missing-context",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c4",
+          "label": "A",
+          "question_text": "Why is manual repetition problematic when changing a parameter?",
+          "variant_summary": "missing-context",
+          "text_format": "plain",
+          "options": [
+            "Slower to run",
+            "You must edit every line by hand",
+            "Uses more memory",
+            "Breaks the canvas"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 1,
+          "feedback": null
+        }
+      }
+    },
+    "c5": {
+      "group_id": "c5",
+      "concept_title": "wrong-answer",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c5",
+          "label": "A",
+          "question_text": "In `for (let i = 0; i < 3; i++)`, how many times does the body run?",
+          "variant_summary": "wrong-answer",
+          "text_format": "plain",
+          "options": [
+            "2",
+            "3",
+            "4",
+            "5"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 0,
+          "feedback": null
+        }
+      }
+    },
+    "c6": {
+      "group_id": "c6",
+      "concept_title": "garbled-syntax",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c6",
+          "label": "A",
+          "question_text": "What does the expression `for.let i >== inc()` evaluate to in the sketch?",
+          "variant_summary": "garbled-syntax",
+          "text_format": "plain",
+          "options": [
+            "Zero",
+            "The loop count",
+            "Undefined",
+            "A color"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 1,
+          "feedback": null
+        }
+      }
+    }
+  },
+  "finalized": true
+}

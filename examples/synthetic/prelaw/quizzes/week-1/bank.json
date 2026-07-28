@@ -1,0 +1,146 @@
+{
+  "run_id": "synthetic-prelaw",
+  "title": "Contract formation",
+  "source": "week-1.md",
+  "groups": {
+    "c1": {
+      "group_id": "c1",
+      "concept_title": "sound",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c1",
+          "label": "A",
+          "question_text": "Which three elements must be present to form a contract?",
+          "variant_summary": "sound",
+          "text_format": "plain",
+          "options": [
+            "Offer, breach, remedy",
+            "Offer, acceptance, consideration",
+            "Duty, breach, damages",
+            "Motive, act, harm"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 1,
+          "feedback": null
+        }
+      }
+    },
+    "c2": {
+      "group_id": "c2",
+      "concept_title": "sound",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c2",
+          "label": "A",
+          "question_text": "Under the mirror-image rule, a reply that changes the offer's terms is ___.",
+          "variant_summary": "sound",
+          "text_format": "plain",
+          "options": [
+            "a valid acceptance",
+            "a counter-offer",
+            "consideration",
+            "a remedy"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 1,
+          "feedback": null
+        }
+      }
+    },
+    "c3": {
+      "group_id": "c3",
+      "concept_title": "out-of-scope",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c3",
+          "label": "A",
+          "question_text": "What does 'mens rea' require the prosecution to prove?",
+          "variant_summary": "out-of-scope",
+          "text_format": "plain",
+          "options": [
+            "A guilty mind",
+            "An offer",
+            "Consideration",
+            "Delivery"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 0,
+          "feedback": null
+        }
+      }
+    },
+    "c4": {
+      "group_id": "c4",
+      "concept_title": "wrong-answer",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c4",
+          "label": "A",
+          "question_text": "Consideration is best defined as ___.",
+          "variant_summary": "wrong-answer",
+          "text_format": "plain",
+          "options": [
+            "the price printed on the goods",
+            "a bargained-for exchange of value",
+            "the signature on the contract",
+            "the date of the agreement"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 0,
+          "feedback": null
+        }
+      }
+    },
+    "c5": {
+      "group_id": "c5",
+      "concept_title": "missing-context",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c5",
+          "label": "A",
+          "question_text": "Was the acceptance in this scenario valid?",
+          "variant_summary": "missing-context",
+          "text_format": "plain",
+          "options": [
+            "Yes",
+            "No",
+            "Partly",
+            "It was withdrawn"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 0,
+          "feedback": null
+        }
+      }
+    },
+    "c6": {
+      "group_id": "c6",
+      "concept_title": "garbled-syntax",
+      "question_type": "multiple_choice",
+      "variants": {
+        "A": {
+          "group_id": "c6",
+          "label": "A",
+          "question_text": "Does the offeree's accept>=ance under the mirror bind the offror>=party?",
+          "variant_summary": "garbled-syntax",
+          "text_format": "plain",
+          "options": [
+            "Yes",
+            "No",
+            "Only in writing",
+            "It is not a coherent question"
+          ],
+          "kind": "multiple_choice",
+          "correct_index": 3,
+          "feedback": null
+        }
+      }
+    }
+  },
+  "finalized": true
+}
