@@ -7,10 +7,15 @@ surface is self-describing and the couplings are structural rather than a footgu
 
     coursekit ingest   PATH [--raw]
     coursekit generate PATH [--quizzes | --pages] [--week N ...] [--weeks A-B]
-                            [--detail brief|medium|full] [--dry-run] [--max-iters N] [--output-root DIR]
+                            [--detail brief|medium|full] [--dry-run] [--max-iters N]
+                            [--output-root DIR] [--no-review]
     coursekit emit qti  PATH [--bundle]
     coursekit emit html PATH
     coursekit emit cc   PATH
+
+A `generate` run that produces quizzes ends with a report-only cold-read review of them (the same pass
+as `coursekit evaluate`), surfacing flagged questions and writing quiz-review.md. `--no-review` skips
+it; it is also skipped, harmlessly, when no critic model is configured.
 
 All orchestration lives in pipeline.py and the emitters; this only parses args, builds the provider,
 and prints summaries. Reachable as the `coursekit` command (an editable install) or `python app.py`.
@@ -81,6 +86,42 @@ def _print_summary(results, *, dry_run: bool) -> None:
     print(f"\n{len(results)} unit(s).")
 
 
+def _critic_model_and_reads(path, reads_override=None):
+    """Resolve the quiz critic's model (MODEL_NAME env, else evaluate.yaml `model:`) and read count.
+    Model is None when nothing is configured — callers decide whether that is fatal or a skip."""
+    from coursekit.generate.quiz import evaluate as ev
+    cfg = courseconfig.load(path, config_name="evaluate.yaml")
+    model = os.getenv("MODEL_NAME") or cfg.value("model")
+    reads = int(reads_override or cfg.value("reads", ev.DEFAULT_READS))
+    return model, reads
+
+
+def _review_quizzes(args, provider) -> None:
+    """Cold-read the just-generated quizzes and surface flags (report-only). Best-effort by design: a
+    missing or unreachable critic model prints a note and returns — a review problem must never sink an
+    otherwise-good generate. Scopes to the same weeks the run produced."""
+    from coursekit.generate.quiz import evaluate as ev
+    model, reads = _critic_model_and_reads(args.path)
+    if not model:
+        print("\n(skipping quiz review: no critic model — set MODEL_NAME or evaluate.yaml `model:`)")
+        return
+    print("\nReviewing the generated quizzes (cold read)…")
+    try:
+        findings, review = ev.evaluate_course(
+            args.path, weeks=_parse_weeks(args), provider=provider, model=model, reads=reads)
+    except Exception as e:                       # never let the review abort a finished generate
+        print(f"(quiz review skipped: {type(e).__name__}: {e})")
+        return
+    if not findings:
+        return
+    flagged = [f for f in findings if f.flagged]
+    print(f"Quiz review: {len(flagged)} of {len(findings)} question(s) flagged.")
+    for f in flagged:
+        print(f"  [{f.verdict}] {f.week} {f.group_id}/{f.label}: {f.concern}")
+    if review:
+        print(f"-> {review}")
+
+
 # ---------------------------------------------------------------- ingest
 
 def _cmd_ingest(args) -> int:
@@ -140,6 +181,10 @@ def _cmd_generate(args) -> int:
             print(f"\n=== {gen.category} ===")
         _print_summary(results, dry_run=args.dry_run)
         incomplete = incomplete or (not args.dry_run and any(not r.finalized for r in results))
+
+    # Report-only quality gate: cold-read the new quizzes right after generating them (default on).
+    if not args.dry_run and args.review and any(g.category == "quiz" for g in generators):
+        _review_quizzes(args, provider)
 
     return 1 if incomplete else 0
 
@@ -216,9 +261,10 @@ def _cmd_emit_course(args) -> int:
 def _cmd_evaluate(args) -> int:
     from coursekit.generate.quiz import evaluate as ev
     provider = _build_provider()
-    cfg = courseconfig.load(args.path, config_name="evaluate.yaml")
-    model = os.getenv("MODEL_NAME") or cfg.value("model")
-    reads = int(args.reads or cfg.value("reads", ev.DEFAULT_READS))
+    model, reads = _critic_model_and_reads(args.path, args.reads)
+    if not model:
+        print("No critic model configured (set MODEL_NAME or evaluate.yaml `model:`).")
+        return 1
     findings, review = ev.evaluate_course(
         args.path, weeks=_parse_weeks(args), provider=provider, model=model, reads=reads)
     if not findings:
@@ -266,7 +312,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help=f"cap model turns per week (default {pipeline.DEFAULT_MAX_ITERS})")
     pg.add_argument("--output-root", metavar="DIR",
                     help="write under DIR/<course>/<week> instead of with the course")
-    pg.set_defaults(func=_cmd_generate)
+    pg.add_argument("--no-review", dest="review", action="store_false",
+                    help="skip the automatic cold-read review of the generated quizzes")
+    pg.set_defaults(func=_cmd_generate, review=True)
 
     # emit — canonical JSON → LMS packages (model-free)
     pe = sub.add_parser("emit", help="canonical JSON → LMS packages (model-free)")

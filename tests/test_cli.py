@@ -6,6 +6,7 @@ from argparse import Namespace
 import pytest
 
 from coursekit import cli
+from coursekit.generate.quiz import bank as bankmod
 
 
 def _gen_args(*, quizzes=False, pages=False):
@@ -83,3 +84,65 @@ def test_a_bare_path_with_no_verb_errors():
 def test_emit_requires_a_target():
     with pytest.raises(SystemExit):
         _parse("emit")
+
+
+# ---- generate's report-only quiz review (step 5) ----
+
+def test_generate_runs_the_review_by_default():
+    assert _parse("generate", "/course").review is True
+
+
+def test_no_review_flag_disables_it():
+    assert _parse("generate", "/course", "--no-review").review is False
+
+
+class _FakeCritic:
+    """FLAGs any question containing `marker`, else PASS (accepts seed, like the real provider)."""
+    def __init__(self, marker=None):
+        self.marker = marker
+
+    def chat(self, *, model, messages, temperature=None, max_tokens=None, seed=None):
+        q = messages[1]["content"]
+        if self.marker and self.marker in q:
+            return "VERDICT: FLAG\nCONCERN: not in the material\nFIX: ground it"
+        return "VERDICT: PASS\nCONCERN:\nFIX:"
+
+
+def _write_course(tmp_path):
+    course = tmp_path / "course"
+    (course / "output").mkdir(parents=True)
+    (course / "output" / "week-3.md").write_text("loops and iteration", encoding="utf-8")
+    qd = course / "quizzes" / "week-3"
+    qd.mkdir(parents=True)
+    bankmod.reset()
+    bankmod.init("run", None, title="Week 3", source="week-3.md")
+    bankmod.create_group("c1", "Loops", "multiple_choice")
+    for i, lbl in enumerate("ABCD"):
+        bankmod.put_variant(bankmod.MCVariant(
+            group_id="c1", label=lbl, variant_summary=f"angle {lbl}",
+            question_text=f"Q{lbl}: loops {'OUTOFSCOPE' if lbl == 'B' else 'here'}?",
+            options=["one", "two", "three", "four"], correct_index=i))
+    (qd / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
+    return course
+
+
+def _review_args(course):
+    return Namespace(path=str(course), week=None, weeks=None)
+
+
+def test_review_quizzes_flags_and_writes_a_review(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("MODEL_NAME", "m")
+    course = _write_course(tmp_path)
+    cli._review_quizzes(_review_args(course), _FakeCritic("OUTOFSCOPE"))
+    out = capsys.readouterr().out
+    assert "1 of 4 question(s) flagged" in out
+    assert (course / "quizzes" / "quiz-review.md").exists()
+
+
+def test_review_quizzes_skips_without_a_critic_model(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("MODEL_NAME", raising=False)
+    course = _write_course(tmp_path)
+    cli._review_quizzes(_review_args(course), _FakeCritic("OUTOFSCOPE"))
+    out = capsys.readouterr().out
+    assert "skipping quiz review" in out
+    assert not (course / "quizzes" / "quiz-review.md").exists()   # nothing written, generate unharmed

@@ -29,7 +29,7 @@ uv sync --group dev     # also installs the `coursekit` command (editable)
 Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint — see [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest           # 541 tests, all offline — no model needed (names each, not just dots)
+uv run pytest           # 553 tests, all offline — no model needed (names each, not just dots)
 ```
 
 ## Quick start
@@ -72,6 +72,7 @@ The CLI is three verbs, in the order work flows through them:
 | `coursekit generate PATH --pages --detail full` | Page depth: `brief` / `medium` / `full` (overrides `page.yaml`). | ✓        |
 | `coursekit generate PATH --output-root DIR`     | Write elsewhere instead of with the course.                      | ✓        |
 | `coursekit generate PATH --max-iters N`         | Cap model turns per week (default 80).                           | ✓        |
+| `coursekit generate PATH --no-review`           | Skip the cold-read quiz review a `generate` runs by default.     | ✓        |
 
 | Emit Commands                      | What it does                      | Uses LLM |
 | ---------------------------------- | --------------------------------- | -------- |
