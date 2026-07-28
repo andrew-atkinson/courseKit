@@ -85,9 +85,10 @@ The CLI is three verbs, in the order work flows through them:
 | ----------------------------- | ------------------------------------------------------------------ | -------- |
 | `coursekit evaluate PATH`     | Cold-read review of generated quizzes → `quiz-review.md` of flagged questions. | ✓ |
 
-| Test Command       | What it does        | Uses LLM |
-| ------------------ | ------------------- | -------- |
-| `uv run pytest`    | Run the test suite. | x        |
+| Test Command         | What it does                                                    | Uses LLM |
+| -------------------- | --------------------------------------------------------------- | -------- |
+| `uv run pytest`      | The offline unit suite. Deterministic, no model.                | x        |
+| `uv run pytest evals/` | Model-in-the-loop evals (critic judgment). Skips without a model. | ✓ |
 
 Exit codes: `0` success · `1` a unit failed to finalize · `2` the model could not be loaded.
 
