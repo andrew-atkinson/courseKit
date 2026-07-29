@@ -76,3 +76,37 @@ def render_concepts(pc: PageConcepts) -> str:
         shown = "?" if c.score < 0 else str(c.score)
         lines.append(f"- **{c.concept}** {shown}/3 — {c.note}")
     return "\n".join(lines) + "\n"
+
+
+def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None):
+    """Score concept delivery for every generated page in a course and write one page-concepts.md.
+    Returns (per-page results, out_path_or_None) — for reviewing already-generated pages."""
+    from pathlib import Path
+
+    from coursekit.discover import find_units
+    from coursekit.generate.page.page import Page
+    from coursekit.pipeline import _week_matches
+
+    units = find_units(path, subdir="pages")
+    if weeks:
+        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
+
+    results = []
+    for u in units:
+        pj = Path(u.output_dir) / "page.json"
+        if not pj.exists():
+            continue
+        page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
+        material = Path(u.transcript_path).read_text(encoding="utf-8")
+        pc = evaluate_page_concepts(page, material, provider, model, project_root=u.course_root)
+        pc.page_id = u.week_slug         # label by week for the course report
+        results.append(pc)
+
+    if not results:
+        return [], None
+    if out_path is None:
+        out_path = Path(units[0].output_dir).parent / "page-concepts.md"
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("\n".join(render_concepts(r) for r in results), encoding="utf-8")
+    return results, out_path

@@ -300,6 +300,7 @@ def _print_findings(kind: str, noun: str, findings, review) -> bool:
 def _cmd_evaluate(args) -> int:
     """Review ALREADY-generated content in place — quizzes and/or pages, plus an optional page pedagogy
     rubric — without regenerating. Reads bank.json / page.json off disk."""
+    from coursekit.generate.page import concept_delivery as cd
     from coursekit.generate.page import evaluate as pev
     from coursekit.generate.page import pedagogy as ped
     from coursekit.generate.quiz import evaluate as ev
@@ -326,7 +327,8 @@ def _cmd_evaluate(args) -> int:
             did_something = True
             flagged_any |= _print_findings("Pages", "section", findings, review)
 
-    if args.pedagogy and do_page:
+    # --all adds the deeper page-quality rubrics (form + concept delivery) on top of facticity.
+    if args.all and do_page:
         rubrics, out = ped.evaluate_course_pedagogy(args.path, weeks=weeks, provider=provider, model=model)
         if rubrics:
             did_something = True
@@ -334,6 +336,14 @@ def _cmd_evaluate(args) -> int:
             for r in rubrics:
                 print(f"  {r.page_id}: {r.total}/{3 * len(ped.CRITERIA)}")
             print(f"  -> {out}")
+
+        concepts, cout = cd.evaluate_course_concepts(args.path, weeks=weeks, provider=provider, model=model)
+        if concepts:
+            did_something = True
+            print(f"Concept delivery: scored {len(concepts)} page(s).")
+            for c in concepts:
+                print(f"  {c.page_id}: avg {c.average:.1f}/3 over {len(c.concepts)} concept(s)")
+            print(f"  -> {cout}")
 
     if not did_something:
         print("Nothing found to evaluate (need generated bank.json / page.json under the course).")
@@ -408,8 +418,9 @@ def build_parser() -> argparse.ArgumentParser:
     pvw = pv.add_mutually_exclusive_group()
     pvw.add_argument("--quizzes", action="store_true", help="only the quizzes (default: quizzes and pages)")
     pvw.add_argument("--pages", action="store_true", help="only the pages (default: quizzes and pages)")
-    pv.add_argument("--pedagogy", action="store_true",
-                    help="also score each page on the pedagogy rubric -> page-pedagogy.md")
+    pv.add_argument("--all", action="store_true",
+                    help="run every evaluation, not just facticity: the page pedagogy (form) and "
+                         "concept-delivery rubrics too -> page-pedagogy.md, page-concepts.md")
     pv.add_argument("--week", action="append", metavar="N", help="a week to review, repeatable")
     pv.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
     pv.add_argument("--reads", type=int, metavar="N",

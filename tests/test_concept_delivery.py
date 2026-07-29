@@ -60,3 +60,17 @@ def test_fixtures_differ_in_the_intended_way():
 def test_render_concepts_is_readable():
     out = cd.render_concepts(cd.evaluate_page_concepts(good_page(), "m", _FakeConceptCritic(), "x"))
     assert "Concept delivery" in out and "avg 2.0/3" in out and "**the for loop repeats a block** 3/3" in out
+
+
+def test_evaluate_course_concepts_writes_a_report(tmp_path):
+    course = tmp_path / "course"
+    (course / "output").mkdir(parents=True)
+    (course / "output" / "week-3.md").write_text("loops material", encoding="utf-8")
+    pd = course / "pages" / "week-3"
+    pd.mkdir(parents=True)
+    (pd / "page.json").write_text(good_page().model_dump_json(), encoding="utf-8")
+
+    results, out = cd.evaluate_course_concepts(course, provider=_FakeConceptCritic(), model="m")
+    assert len(results) == 1 and out is not None and out.exists()
+    assert results[0].page_id == "week-3"          # labelled by week
+    assert "Concept delivery" in out.read_text()

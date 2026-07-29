@@ -65,9 +65,10 @@ def test_evaluate_defaults_to_both_quizzes_and_pages():
     assert args.quizzes is False and args.pages is False   # neither flag => both facticity passes
 
 
-def test_evaluate_pages_and_pedagogy_flags():
-    args = _parse("evaluate", "/course", "--pages", "--pedagogy")
-    assert args.pages and args.pedagogy
+def test_evaluate_all_is_the_umbrella_flag():
+    args = _parse("evaluate", "/course", "--pages", "--all")
+    assert args.pages and args.all
+    assert _parse("evaluate", "/course").all is False   # default: facticity only, no deeper rubrics
 
 
 def test_evaluate_quizzes_and_pages_are_mutually_exclusive():
