@@ -114,12 +114,12 @@ def _union(reads: list[tuple[str, str, str]]) -> tuple[str, str, str, int]:
     return "ERROR", "every read failed", "", 0
 
 
-def _critic_body(category: str, project_root) -> str:
-    """The critic's system prompt, with the course's domain profile prepended (review-framed) so it
-    knows the domain's framework/globals and does not false-flag valid domain code. Domain is '' when
-    the course declares none, or when there is no course (synthetic banks)."""
+def _critic_body(category: str, project_root, name: str = "critic") -> str:
+    """A review prompt (`name`, default 'critic'), with the course's domain profile prepended
+    (review-framed) so the reviewer knows the domain's framework/globals and does not false-flag valid
+    domain code. Domain is '' when the course declares none, or when there is no course (synthetic)."""
     from coursekit import courseconfig
-    body = prompts.load(category, "critic", project_root=project_root).body
+    body = prompts.load(category, name, project_root=project_root).body
     domain = courseconfig.load(project_root).domain if project_root else ""
     return courseconfig.critic_domain_preface(domain) + body
 

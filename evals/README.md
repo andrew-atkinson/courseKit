@@ -71,3 +71,13 @@ dimension.
 ```bash
 uv run python evals/pedagogy_scorecard.py
 ```
+
+The **concept-delivery** rubric (a third page-evaluator mode — does the page actually *deliver* the
+week's core concepts, scored 0–3 per concept: clear explanation / worked example / right level) has its
+own calibration too: `evals/concept_scorecard.py` scores one well-delivered coding page plus deficient
+variants (`concept_fixtures.py`: concepts merely named / explained-but-no-example / jargon-above-level)
+and checks the good page's average scores above each variant.
+
+```bash
+uv run python evals/concept_scorecard.py
+```
