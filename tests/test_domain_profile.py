@@ -3,7 +3,11 @@ right domain and correct a drifting source."""
 
 from coursekit import courseconfig as cc
 from coursekit.discover import find_units
+from coursekit.generate.page import evaluate as pev
+from coursekit.generate.page import page as pagemod
 from coursekit.generate.page.generator import PageGenerator
+from coursekit.generate.quiz import bank as bankmod
+from coursekit.generate.quiz import evaluate as ev
 from coursekit.generate.quiz.generator import QuizGenerator
 
 
@@ -85,3 +89,56 @@ def test_non_coding_domain_reaches_the_page_prompt(tmp_path):
     sys = PageGenerator().build_messages(unit, "TRANSCRIPT", unit.config)[0]["content"]
     assert "COURSE DOMAIN" in sys
     assert "no programming in this course" in sys
+
+
+# ---- the domain profile now reaches the CRITICS too (facticity), not just the generators ----
+
+class _RecordingCritic:
+    """Records the system message it is handed, then PASSes — to inspect what the critic sees."""
+    def __init__(self):
+        self.system = ""
+
+    def chat(self, *, model, messages, temperature=None, max_tokens=None, seed=None):
+        self.system = messages[0]["content"]
+        return "VERDICT: PASS\nCONCERN:\nFIX:"
+
+
+def _one_group_bank():
+    bankmod.reset()
+    bankmod.init("run", None)
+    bankmod.create_group("c1", "Loops", "multiple_choice")
+    bankmod.put_variant(bankmod.MCVariant(
+        group_id="c1", label="A", variant_summary="angle", question_text="What does the loop do here?",
+        options=["a", "b", "c", "d"], correct_index=0))
+    return bankmod.get()
+
+
+def test_critic_domain_preface_is_review_framed():
+    assert cc.critic_domain_preface("") == ""
+    p = cc.critic_domain_preface("This is a p5.js course.")
+    assert "COURSE DOMAIN" in p and "p5.js" in p
+    assert "do NOT flag" in p and "correct it silently" not in p   # review-framed, not generation
+
+
+def test_domain_reaches_the_quiz_critic(tmp_path):
+    unit = _course(tmp_path, domain="This course teaches p5.js; `width` and `height` are globals.")
+    rec = _RecordingCritic()
+    ev.evaluate_bank(_one_group_bank(), "transcript", rec, "m", project_root=unit.course_root)
+    assert "COURSE DOMAIN" in rec.system and "p5.js" in rec.system
+
+
+def test_domain_reaches_the_page_critic(tmp_path):
+    unit = _course(tmp_path, domain="This course teaches p5.js; `width` is a global.")
+    pagemod.reset()
+    pagemod.init("p1", None)
+    pagemod.put_block(pagemod.build_block("paragraph", block_id="b1", text="A loop repeats a block."))
+    rec = _RecordingCritic()
+    pev.evaluate_page(pagemod.get(), "transcript", rec, "m", project_root=unit.course_root)
+    assert "COURSE DOMAIN" in rec.system and "p5.js" in rec.system
+
+
+def test_no_domain_means_no_domain_block_in_the_critic(tmp_path):
+    unit = _course(tmp_path)   # no domain.md
+    rec = _RecordingCritic()
+    ev.evaluate_bank(_one_group_bank(), "t", rec, "m", project_root=unit.course_root)
+    assert "COURSE DOMAIN" not in rec.system

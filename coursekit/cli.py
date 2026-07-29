@@ -286,25 +286,59 @@ def _cmd_emit_course(args) -> int:
     return 0
 
 
+def _print_findings(kind: str, noun: str, findings, review) -> bool:
+    """Print one facticity review block; return whether anything was flagged."""
+    flagged = [f for f in findings if f.flagged]
+    print(f"{kind}: reviewed {len(findings)} {noun}(s); {len(flagged)} flagged.")
+    for f in flagged:
+        print(f"  [{f.verdict}] {f.week} {f.group_id}/{f.label}: {f.concern}")
+    if review:
+        print(f"  -> {review}")
+    return bool(flagged)
+
+
 def _cmd_evaluate(args) -> int:
+    """Review ALREADY-generated content in place — quizzes and/or pages, plus an optional page pedagogy
+    rubric — without regenerating. Reads bank.json / page.json off disk."""
+    from coursekit.generate.page import evaluate as pev
+    from coursekit.generate.page import pedagogy as ped
     from coursekit.generate.quiz import evaluate as ev
     provider = _build_provider()
     model, reads = _critic_model_and_reads(args.path, args.reads)
     if not model:
         print("No critic model configured (set MODEL_NAME or evaluate.yaml `model:`).")
+        return 2
+    weeks = _parse_weeks(args)
+    do_quiz, do_page = not args.pages, not args.quizzes    # default: both facticity passes
+    did_something = flagged_any = False
+
+    if do_quiz:
+        findings, review = ev.evaluate_course(args.path, weeks=weeks, provider=provider,
+                                              model=model, reads=reads)
+        if findings:
+            did_something = True
+            flagged_any |= _print_findings("Quizzes", "question", findings, review)
+
+    if do_page:
+        findings, review = pev.evaluate_course_pages(args.path, weeks=weeks, provider=provider,
+                                                     model=model, reads=reads)
+        if findings:
+            did_something = True
+            flagged_any |= _print_findings("Pages", "section", findings, review)
+
+    if args.pedagogy and do_page:
+        rubrics, out = ped.evaluate_course_pedagogy(args.path, weeks=weeks, provider=provider, model=model)
+        if rubrics:
+            did_something = True
+            print(f"Pedagogy: scored {len(rubrics)} page(s).")
+            for r in rubrics:
+                print(f"  {r.page_id}: {r.total}/{3 * len(ped.CRITERIA)}")
+            print(f"  -> {out}")
+
+    if not did_something:
+        print("Nothing found to evaluate (need generated bank.json / page.json under the course).")
         return 1
-    findings, review = ev.evaluate_course(
-        args.path, weeks=_parse_weeks(args), provider=provider, model=model, reads=reads)
-    if not findings:
-        print("No quizzes found to evaluate (need a generated bank.json under the course).")
-        return 1
-    flagged = [f for f in findings if f.flagged]
-    print(f"Reviewed {len(findings)} question(s); {len(flagged)} flagged.")
-    for f in flagged:
-        print(f"  [{f.verdict}] {f.week} {f.group_id}/{f.label}: {f.concern}")
-    if review:
-        print(f"\n-> {review}")
-    return 0 if not flagged else 1
+    return 1 if flagged_any else 0
 
 
 # ---------------------------------------------------------------- parser
@@ -367,13 +401,19 @@ def build_parser() -> argparse.ArgumentParser:
     eco.add_argument("path", help="the course root (its pages/ and quizzes/ trees)")
     eco.set_defaults(func=_cmd_emit_course)
 
-    # evaluate — cold-read quality review of generated quizzes (uses the model)
-    pv = sub.add_parser("evaluate", help="cold-read review of generated quizzes; flags weak questions")
-    pv.add_argument("path", help="the course (its quizzes/ tree + transcripts)")
+    # evaluate — cold-read quality review of ALREADY-generated quizzes and pages (uses the model)
+    pv = sub.add_parser("evaluate",
+                        help="cold-read review of already-generated quizzes and pages; flags weak items")
+    pv.add_argument("path", help="the course (its quizzes/ and pages/ trees + transcripts)")
+    pvw = pv.add_mutually_exclusive_group()
+    pvw.add_argument("--quizzes", action="store_true", help="only the quizzes (default: quizzes and pages)")
+    pvw.add_argument("--pages", action="store_true", help="only the pages (default: quizzes and pages)")
+    pv.add_argument("--pedagogy", action="store_true",
+                    help="also score each page on the pedagogy rubric -> page-pedagogy.md")
     pv.add_argument("--week", action="append", metavar="N", help="a week to review, repeatable")
     pv.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
     pv.add_argument("--reads", type=int, metavar="N",
-                    help="cold reads per question, unioned (default 3; more = better recall, more calls)")
+                    help="cold reads per question/section, unioned (default 1; more = more calls)")
     pv.set_defaults(func=_cmd_evaluate)
 
     return parser

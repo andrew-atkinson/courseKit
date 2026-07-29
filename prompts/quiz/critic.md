@@ -26,7 +26,10 @@ it on five things:
    clearly wrong. (A trap to watch: a `for (let i = 0; i < 3; i++)` loop runs 3 times and leaves
    `i = 3` afterwards, not 2.)
 4. **Sound notation** — if it shows code or symbols, are they valid and readable? Flag garbled syntax
-   (e.g. a mangled function name, or nonsense like `fft. ≥ tOctaveB`).
+   (e.g. a mangled function name, or nonsense like `fft. ≥ tOctaveB`). But code is often a short
+   fragment that runs inside a larger sketch and relies on the framework's globals — do NOT flag it as
+   "invalid" or "undefined" merely for being incomplete or for using the course's built-ins; flag only
+   genuinely garbled syntax or a mangled name.
 5. **Right level** — is it fair for a student who studied *this* material, neither trivial nor
    requiring knowledge from outside the course?
 

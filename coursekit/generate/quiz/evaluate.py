@@ -114,6 +114,16 @@ def _union(reads: list[tuple[str, str, str]]) -> tuple[str, str, str, int]:
     return "ERROR", "every read failed", "", 0
 
 
+def _critic_body(category: str, project_root) -> str:
+    """The critic's system prompt, with the course's domain profile prepended (review-framed) so it
+    knows the domain's framework/globals and does not false-flag valid domain code. Domain is '' when
+    the course declares none, or when there is no course (synthetic banks)."""
+    from coursekit import courseconfig
+    body = prompts.load(category, "critic", project_root=project_root).body
+    domain = courseconfig.load(project_root).domain if project_root else ""
+    return courseconfig.critic_domain_preface(domain) + body
+
+
 def _reads_for(critic, transcript, v, provider, model, reads, seed_base=None):
     """The per-read outcomes for one variant: `reads` independent cold reads, each seeded distinctly
     when `seed_base` is given. Returns [(verdict, concern, fix), ...]. The single gather that both the
@@ -128,7 +138,7 @@ def evaluate_bank(bank, transcript: str, provider, model: str, *, week: str = ""
     """Cold-read every variant `reads` times and union the verdicts — several independent fresh reads,
     flag if any flags. That is what turns a noisy local critic ('a different 3 of 4 each run') into a
     dependable one."""
-    critic = prompts.load(EVALUATE_CATEGORY, "critic", project_root=project_root).body
+    critic = _critic_body(EVALUATE_CATEGORY, project_root)
     findings = []
     for g in bank.groups.values():
         for v in g.variants.values():
@@ -145,7 +155,7 @@ def read_verdicts(bank, transcript: str, provider, model: str, *, reads: int = D
     harness needs to see what each cold read caught and what the union adds. Returns
     (group_id, label, stem, [verdict per read]). When `seed_base` is set, read i uses seed
     `seed_base + i`, so the reads are distinct samples rather than the same one repeated."""
-    critic = prompts.load(EVALUATE_CATEGORY, "critic", project_root=project_root).body
+    critic = _critic_body(EVALUATE_CATEGORY, project_root)
     out = []
     for g in bank.groups.values():
         for v in g.variants.values():

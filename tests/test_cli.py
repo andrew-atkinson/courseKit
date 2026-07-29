@@ -60,6 +60,21 @@ def test_evaluate_routes_with_week_filter():
     assert args.func is cli._cmd_evaluate and args.path == "/course" and args.week == ["3"]
 
 
+def test_evaluate_defaults_to_both_quizzes_and_pages():
+    args = _parse("evaluate", "/course")
+    assert args.quizzes is False and args.pages is False   # neither flag => both facticity passes
+
+
+def test_evaluate_pages_and_pedagogy_flags():
+    args = _parse("evaluate", "/course", "--pages", "--pedagogy")
+    assert args.pages and args.pedagogy
+
+
+def test_evaluate_quizzes_and_pages_are_mutually_exclusive():
+    with pytest.raises(SystemExit):
+        _parse("evaluate", "/course", "--quizzes", "--pages")
+
+
 def test_ingest_routes_with_raw():
     args = _parse("ingest", "/docs", "--raw")
     assert args.func is cli._cmd_ingest and args.path == "/docs" and args.raw

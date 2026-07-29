@@ -125,6 +125,26 @@ def domain_preface(domain: str) -> str:
     return _DOMAIN_PREFACE.format(domain=domain) if domain else ""
 
 
+# The critic gets the domain too, but framed for REVIEW, not generation: it needs the domain's
+# knowledge (its framework, globals, conventions) so it does not false-flag valid domain code — but it
+# must NOT be told to "correct silently," and the domain must not widen what the material may teach.
+_CRITIC_DOMAIN_PREFACE = (
+    "COURSE DOMAIN — the subject and toolset this course teaches:\n"
+    "{domain}\n\n"
+    "Use this only to recognise the domain's standard framework, its globals, and its conventions, so "
+    "you do NOT flag valid domain code or notation as wrong: a snippet that relies on the framework's "
+    "built-ins (for example p5.js provides `width`, `height`, `mouseX`) or that is an intentional "
+    "fragment is not 'invalid' or 'undefined' on those grounds. This does NOT widen what may be taught "
+    "— judge scope and correctness against the MATERIAL below, exactly as instructed.\n\n"
+)
+
+
+def critic_domain_preface(domain: str) -> str:
+    """The domain block to prepend to a CRITIC's system prompt (review-framed), or '' when no domain."""
+    domain = (domain or "").strip()
+    return _CRITIC_DOMAIN_PREFACE.format(domain=domain) if domain else ""
+
+
 def find_root(start: Path) -> Path | None:
     """The nearest ancestor (inclusive) containing a `.vtconfig/` marker, like git finds `.git`."""
     d = Path(start).resolve()

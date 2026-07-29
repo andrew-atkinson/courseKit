@@ -29,7 +29,7 @@ uv sync --group dev     # also installs the `coursekit` command (editable)
 Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint — see [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest           # 565 tests, all offline — no model needed (names each, not just dots)
+uv run pytest           # 579 tests, all offline — no model needed (names each, not just dots)
 ```
 
 ## Quick start
@@ -82,9 +82,11 @@ The CLI is three verbs, in the order work flows through them:
 | `coursekit emit cc PATH`           | One Canvas `.imscc` of all pages. | x        |
 | `coursekit emit course PATH`       | One Canvas `.imscc` of the whole course — pages **and** quizzes, in week modules. | x |
 
-| Review Command                | What it does                                                        | Uses LLM |
-| ----------------------------- | ------------------------------------------------------------------ | -------- |
-| `coursekit evaluate PATH`     | Cold-read review of generated quizzes → `quiz-review.md` of flagged questions. | ✓ |
+| Review Command                     | What it does                                                        | Uses LLM |
+| ---------------------------------- | ------------------------------------------------------------------ | -------- |
+| `coursekit evaluate PATH`          | Cold-read review of already-generated quizzes **and** pages → `quiz-review.md`, `page-review.md`. | ✓ |
+| `coursekit evaluate PATH --pages`  | Only the pages (`--quizzes` for only quizzes).                     | ✓ |
+| `coursekit evaluate PATH --pedagogy` | Also score each page on the pedagogy rubric → `page-pedagogy.md`. | ✓ |
 
 | Test Command         | What it does                                                    | Uses LLM |
 | -------------------- | --------------------------------------------------------------- | -------- |

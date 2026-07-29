@@ -118,7 +118,7 @@ def test_page_generator_uses_the_shipped_page_prompts(tmp_path):
 
     assert "THE ONLY WAY TO ADD CONTENT IS A TOOL CALL" in msgs[0]["content"]
     assert "TRANSCRIPT-MARKER" in msgs[0]["content"]
-    assert "Start now with the first heading." in msgs[1]["content"]
+    assert "Organise this week into a single course page" in msgs[1]["content"]
 
 
 def test_page_run_writes_html_and_merges_supplements(tmp_path):

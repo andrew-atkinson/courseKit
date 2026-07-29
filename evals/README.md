@@ -58,5 +58,16 @@ page sections (`coursekit/generate/page/synthesize.py` — sound facts plus plan
 
 ```bash
 uv run python evals/page_scorecard.py                        # 1 read/section, all domains
+uv run python evals/page_scorecard.py --hard                  # subtle near-miss / beyond-material flaws
 uv run python evals/page_scorecard.py --model qwen/qwen3.6-27b
+```
+
+The **page pedagogy rubric** (a second page-evaluator mode — how a page *reads and teaches*, scored 0–3
+on scannability / signaling / engagement / worked-examples / retrieval, not FLAG/PASS) has its own
+calibration: `evals/pedagogy_scorecard.py` scores one well-built coding page plus deficient variants
+(each missing one dimension's blocks) and checks the rubric scores each variant lower on its dropped
+dimension.
+
+```bash
+uv run python evals/pedagogy_scorecard.py
 ```

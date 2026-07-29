@@ -40,6 +40,12 @@ job, so choose by function, not decoration:
 Do not decorate. A device that does not do one of these jobs is noise — plain headings, bullets, and
 paragraphs are the right default, and most of the page should be them.
 
+But every page still needs its **pedagogical spine**, and these are never "decoration" to cut: it
+**opens with a hook** (a reason to care before any definition), **foregrounds the one key idea** the
+week hinges on, and **closes by consolidating** — a short summary plus a retrieval prompt the student
+answers from memory. Those do real jobs — engagement, signalling, and retrieval — so build them even
+when the rest of the page is deliberately plain.
+
 To revise a block, call the same tool again with the same block_id — it replaces in place, so you
 never need to restart.
 

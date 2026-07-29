@@ -12,11 +12,11 @@ core is worth extracting once a third consumer appears — not before (same disc
 
 from pathlib import Path
 
-from coursekit import prompts
 from coursekit.generate.quiz.evaluate import (
     DEFAULT_READS,
     READ_TEMPERATURE,
     Finding,
+    _critic_body,
     _parse_verdict,
     _union,
     render_review,
@@ -81,7 +81,7 @@ def _one_read(critic: str, material: str, b, provider, model: str,
 def evaluate_page(page, material: str, provider, model: str, *, week: str = "",
                   project_root=None, reads: int = DEFAULT_READS) -> list[Finding]:
     """Cold-read every content block of a page against the week's material."""
-    critic = prompts.load(PAGE_CATEGORY, "critic", project_root=project_root).body
+    critic = _critic_body(PAGE_CATEGORY, project_root)
     findings = []
     for b in page.blocks.values():
         if b.kind in _SKIP_KINDS:

@@ -17,7 +17,10 @@ judging it on four things:
    For a glossary entry, does the definition match how the material uses the term? For a comparison,
    are the two sides characterised correctly? If something is wrong, say what it should be.
 3. **Sound code / notation** — if it shows code or symbols, are they valid and readable? Flag garbled
-   syntax, a mangled name, or code that would not run as written.
+   syntax or a mangled name. But page code is usually a short fragment that runs inside a larger sketch
+   and relies on the framework's globals — do NOT flag it "invalid" or "undefined" merely for being
+   incomplete or for using the course's built-ins (a snippet using `width`, or an object set up
+   elsewhere, is fine); flag only genuinely garbled syntax or clearly wrong logic.
 4. **Clear** — could a student who studied this material follow the section as written? Flag prose that
    is confusing, empty, or self-contradictory. Do NOT flag a section merely for being brief.
 
