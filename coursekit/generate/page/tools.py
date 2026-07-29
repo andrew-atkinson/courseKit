@@ -45,8 +45,11 @@ def add_bullets(block_id: str, items: list[str]) -> str:
     return page.put_block(page.build_block("bullets", block_id=block_id, items=items))
 
 
-def add_code(block_id: str, code: str, language: str = "") -> str:
-    return page.put_block(page.build_block("code", block_id=block_id, code=code, language=language))
+def add_code(block_id: str, code: str = "", language: str = "", text: str = "") -> str:
+    # `text` is a lenient alias: the model sometimes sends the code under `text` (the arg name it uses
+    # for prose blocks). Silently dropping a rejected code block is how a section ends up all bullets and
+    # no nuts-and-bolts, so accept either.
+    return page.put_block(page.build_block("code", block_id=block_id, code=code or text, language=language))
 
 
 def add_glossary(block_id: str, entries: list[dict]) -> str:
@@ -129,7 +132,8 @@ add_code_json = {
         "block_id": _ID,
         "code": {"type": "string", "description": "the code, exactly as it should appear"},
         "language": {"type": "string", "description": "language hint, e.g. 'js' (optional)"},
-    }, "required": ["block_id", "code"], "additionalProperties": False},
+        "text": {"type": "string", "description": "accepted as an alias for `code`; prefer `code`"},
+    }, "required": ["block_id"], "additionalProperties": False},
 }
 
 add_glossary_json = {
@@ -262,7 +266,8 @@ tools = [{"type": "function", "function": spec} for spec in TOOL_SPECS]
 
 
 def run_tool_calls(tool_calls) -> list[tuple[str, str]]:
-    return dispatch.run_tool_calls(TOOL_REGISTRY, tool_calls, _call_log)
+    return dispatch.run_tool_calls(TOOL_REGISTRY, tool_calls, _call_log,
+                                   terminal_tools={"finalize_page"})
 
 
 def replay(path) -> list[str]:

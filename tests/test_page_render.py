@@ -226,3 +226,14 @@ def test_malformed_iframe_snippet_is_dropped(fresh):
     page = _page_with(dict(kind="heading", block_id="h", text="X"))
     body = render_body(page, {"examples": [{"label": "broken", "iframe": "<iframe no src here>"}]})
     assert "broken" not in body   # nothing usable, so nothing emitted
+
+
+def test_columns_render_multiline_code_as_pre_not_collapsed_li(fresh):
+    # A column carrying multi-line code must keep its line breaks (a bulleted <li> collapses them,
+    # merging `// comment` into the next line and breaking the code).
+    body = render_body(_page_with(dict(kind="columns", block_id="c", columns=[
+        {"title": "Loop", "items": ["// comment\nfor (let i = 0; i < 3; i++) {\n  print(i);\n}"]},
+        {"title": "Notes", "items": ["a short bullet"]},
+    ])))
+    assert "<pre" in body and "<br" in body and "// comment" in body   # code column: pre + preserved breaks
+    assert "<li" in body and "a short bullet" in body                   # text column: still bulleted

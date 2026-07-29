@@ -92,3 +92,39 @@ def test_call_log_records_raw_calls(fresh, tmp_path):
     T.run_tool_calls([_call("add_heading", block_id="h", text="REVIEW")])
     logged = (tmp_path / "calls.jsonl").read_text().strip()
     assert json.loads(logged)["name"] == "add_heading"
+
+
+# ---- stop consuming a batch at the first finalize (the week-7 --detail full runaway) ----
+
+def test_run_tool_calls_ignores_calls_after_a_successful_finalize(fresh):
+    # A gemma --detail full run emitted its whole build AND several rebuilds in one turn, finalizing
+    # 8x and leaving orphaned empty headings. Everything after the first finalize must be ignored.
+    calls = [
+        _call("add_heading", block_id="h1", text="Kept", role="concept"),
+        _call("finalize_page"),
+        _call("add_heading", block_id="h2", text="Runaway heading"),
+        _call("add_paragraph", block_id="p2", text="Runaway content"),
+    ]
+    results = T.run_tool_calls(calls)
+    page = P.get()
+    assert "h1" in page.blocks and P.is_finalized()
+    assert "h2" not in page.blocks and "p2" not in page.blocks   # the rebuild is dropped
+    assert results[-1][1].startswith("(ignored")
+
+
+def test_a_rejected_finalize_does_not_stop_the_batch(fresh):
+    # finalize fails with no heading present; the batch must keep going, not stop on the error.
+    calls = [
+        _call("finalize_page"),
+        _call("add_heading", block_id="h1", text="Added after a failed finalize", role="concept"),
+    ]
+    results = T.run_tool_calls(calls)
+    assert results[0][1].startswith("ERROR") and not P.is_finalized()
+    assert "h1" in P.get().blocks                                # processing continued
+
+
+def test_add_code_accepts_text_as_an_alias_for_code(fresh):
+    # The model sometimes sends code under `text`; accepting it stops a section going all-bullets.
+    T.run_tool_calls([_call("add_code", block_id="c1", text="let x = 1;")])
+    b = P.get().blocks["c1"]
+    assert b.kind == "code" and b.code == "let x = 1;"

@@ -546,12 +546,22 @@ def run_tool_calls(tool_calls) -> list[tuple[str, str]]:
     costs tokens on every subsequent turn and reads worse to a small model.
     """
     results = []
+    finalized = False
     for tc in tool_calls:
+        # Stop at the first successful finalize: the driver only checks after a whole turn's batch,
+        # but a model can emit its whole build (and then rebuild) in one turn. Anything after the
+        # finalize is a runaway; ignore it so the artifact is the one the model first committed to.
+        if finalized:
+            results.append((tc.id, "(ignored: the artifact is already finalized)"))
+            continue
         if _call_log is not None:
             _call_log.parent.mkdir(parents=True, exist_ok=True)
             with open(_call_log, "a", encoding="utf-8") as f:
                 f.write(json.dumps({"name": tc.name, "arguments": tc.arguments}) + "\n")
-        results.append((tc.id, _dispatch_one(tc.name, tc.arguments)))
+        content = _dispatch_one(tc.name, tc.arguments)
+        results.append((tc.id, content))
+        if tc.name == "finalize_bank" and not content.startswith("ERROR"):
+            finalized = True
     return results
 
 

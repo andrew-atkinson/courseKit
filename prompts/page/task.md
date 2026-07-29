@@ -20,7 +20,9 @@ the material — it pulls the student in, foregrounds what matters, and helps th
 3. Add a heading for each key concept the week teaches, with bullets underneath capturing the main
    points (short phrases). Where the material demonstrates something concrete — code, a worked
    example, a technique — put it next to the concept it illustrates (code goes verbatim in a code
-   block).
+   block). Where the material has a common mistake, an off-by-one, or a manual-vs-automated approach,
+   show the two side by side with `add_columns` (wrong vs. right, before vs. after) — the contrast is
+   what makes the idea stick, so reach for it wherever the week offers one.
 4. **Foreground the one key idea.** Decide the single thing this week hinges on — the sentence a
    student should keep even if they forget the details — and set it with `add_pullquote`, once. If you
    cannot name one, the page has no centre; find it before moving on.

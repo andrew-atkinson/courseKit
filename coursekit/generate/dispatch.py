@@ -47,19 +47,33 @@ def dispatch_one(registry: dict[str, Callable[..., str]], name: str, raw_args: s
         return f"ERROR: {name} failed: {type(e).__name__}: {e}"
 
 
-def run_tool_calls(registry, tool_calls, call_log: Path | None = None) -> list[tuple[str, str]]:
+def run_tool_calls(registry, tool_calls, call_log: Path | None = None,
+                   *, terminal_tools=frozenset()) -> list[tuple[str, str]]:
     """Dispatch neutral ToolCalls -> [(tool_call_id, content)], logging raw calls if a path is set.
 
     Pairs, not provider-shaped messages: how a result sits in a conversation is the provider's
     business; what the tool did is ours. Content is a plain string, never json.dumps'd.
+
+    Stops at the first SUCCESSFUL `terminal_tools` call (e.g. finalize_page). The driver only checks
+    "is it finalized?" after a whole turn's batch, but a model can emit the whole build in one turn —
+    one gemma run under `--detail full` emitted 138 calls at once, finalizing 8× and rebuilding the page
+    into an orphaned mess. A well-behaved model finalizes last, so everything after the first finalize is
+    a runaway rebuild: ignore it, and the finished artifact is the one the model first committed to.
     """
     results = []
+    finalized = False
     for tc in tool_calls:
+        if finalized:
+            results.append((tc.id, "(ignored: the artifact is already finalized)"))
+            continue
         if call_log is not None:
             call_log.parent.mkdir(parents=True, exist_ok=True)
             with open(call_log, "a", encoding="utf-8") as f:
                 f.write(json.dumps({"name": tc.name, "arguments": tc.arguments}) + "\n")
-        results.append((tc.id, dispatch_one(registry, tc.name, tc.arguments)))
+        content = dispatch_one(registry, tc.name, tc.arguments)
+        results.append((tc.id, content))
+        if tc.name in terminal_tools and not content.startswith("ERROR"):
+            finalized = True
     return results
 
 

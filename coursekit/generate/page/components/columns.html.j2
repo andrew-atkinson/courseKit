@@ -2,11 +2,19 @@
 {%- for col in b.columns %}
 <div style="flex: 1; min-width: 220px;">
 <div style="font-family: {{ t.type.heading_family }}; font-weight: {{ t.type.heading_weight }}; color: {{ t.color.accent }}; margin-bottom: {{ t.space.unit }}px;">{{ col.title }}</div>
+{%- if '\n' in (col['items'] | join('')) %}
+{#- a column carrying multi-line code: render each item as a <pre> so line breaks survive
+   (a bulleted <li> collapses newlines, turning `// comment` + code into one broken line) #}
+{%- for item in col['items'] %}
+<pre style="background-color: {{ t.color.code_bg }}; color: {{ t.color.code_fg }}; font-family: {{ t.type.mono_family }}; font-size: 13px; line-height: 1.5; padding: {{ t.space.unit }}px {{ t.space.unit + 4 }}px; border-radius: {{ t.shape.radius }}px; overflow-x: auto; margin: 0 0 {{ t.space.unit }}px 0;"><span>{{ item | nl2br }}</span></pre>
+{%- endfor %}
+{%- else %}
 <ul style="font-family: {{ t.type.body_family }}; color: {{ t.color.ink }}; line-height: 1.7; margin: 0; padding-left: 20px;">
 {%- for item in col['items'] %}
 <li style="margin-bottom: {{ t.space.unit // 2 }}px;">{{ item | md_inline }}</li>
 {%- endfor %}
 </ul>
+{%- endif %}
 </div>
 {%- endfor %}
 </div>
