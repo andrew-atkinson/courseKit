@@ -3,8 +3,16 @@ name: task
 category: page
 description: "The brief: organise a week's material into a page"
 ---
-Organise this week into a single course page, working top to bottom. A good page doesn't just present
-the material — it pulls the student in, foregrounds what matters, and helps them consolidate:
+Organise this week into a single course page. A good page doesn't just present the material — it pulls
+the student in, foregrounds what matters, and helps them consolidate.
+
+**Size the page to the material, not to a fixed length.** Let the page's depth follow how much the week
+actually teaches: a week with many distinct concepts earns a fuller page — each concept its own real
+section with an explanation and a worked example — while a week with only one or two ideas stays tight.
+Never pad a thin week with ceremony, and never compress a rich week into a summary. The number of
+concepts the week teaches is what grounds the length.
+
+Build it top to bottom:
 
 1. **Recap (only if the week builds on earlier ones).** Open with a heading with `role: review`
    whose text **names the topic you are recapping** — the prior week's theme, e.g. "Still Life"
@@ -17,12 +25,15 @@ the material — it pulls the student in, foregrounds what matters, and helps th
    scenario, a question worth chewing on, or the problem this week solves ("You can place one shape by
    hand — but what about five hundred?"). One short paragraph, or a callout. Make it real, not a
    throat-clearing sentence — this is the page's first job, to earn attention.
-3. Add a heading for each key concept the week teaches, with bullets underneath capturing the main
-   points (short phrases). Where the material demonstrates something concrete — code, a worked
-   example, a technique — put it next to the concept it illustrates (code goes verbatim in a code
-   block). Where the material has a common mistake, an off-by-one, or a manual-vs-automated approach,
-   show the two side by side with `add_columns` (wrong vs. right, before vs. after) — the contrast is
-   what makes the idea stick, so reach for it wherever the week offers one.
+3. **Teach each concept in its own section — with real content, not just a label.** For every core
+   concept the week teaches, add a heading and then actually teach it: a short explanation of what it
+   is and why it matters (a sentence or two, or substantive bullets — not a bare list of terms), and,
+   wherever the material shows it, a concrete **code example or worked demonstration right beside it**
+   (code goes verbatim in a code block). A heading with three abstract bullets is not teaching the
+   concept — the nuts and bolts are the point, so give every concept its example where one exists.
+   Where the material has a common mistake, an off-by-one, or a manual-vs-automated approach, show the
+   two side by side with `add_columns` (wrong vs. right, before vs. after) — the contrast is what makes
+   the idea stick, so reach for it wherever the week offers one.
 4. **Foreground the one key idea.** Decide the single thing this week hinges on — the sentence a
    student should keep even if they forget the details — and set it with `add_pullquote`, once. If you
    cannot name one, the page has no centre; find it before moving on.

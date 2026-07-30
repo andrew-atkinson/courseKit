@@ -17,7 +17,9 @@ Every decision checks against that line: does it make artifacts more correct, be
 
 ## Current focus
 
-> ✅ **Done** — page-build runaway fixed: `dispatch.run_tool_calls` now stops at the first SUCCESSFUL finalize, so a model that finalizes then rebuilds in one turn has the rebuild ignored (applied to quiz + page dispatch). Replaying week-7's real 138-call runaway through the fix → 28 dispatched, 110 ignored, a coherent 27-block page (headings interleaved with their content, no orphaned empties). 2 regression tests; 587 green. Next focus (parked): (B) the evaluator visual/structural pass.
+> ✅ **Largely done** — content-relative reframe (task.md), measured on week-6 (thin) + week-7 (dense). The thin week is FIXED: concept-delivery **2.2 → 3.0**, all 6 concepts developed with examples — the previously-worst, under-developed page is now fully developed, so length tracks content. Dense week-7 improved structurally but sits at **2.6**: two concepts (`.push()`/`.pop()` — no code example; comparator logic — no explanation) still get skipped, because the model decides on the fly which concepts get full treatment. Those residual per-concept gaps are exactly what a **concept map** (an explicit per-concept checklist it can't skip) would close → the natural next focus, now evidence-justified.
+>
+> _(Prior focus ✅ done: page-build runaway fixed — dispatch stops at the first finalize; plus add_code text-alias + columns-render-code fixes.)_
 
 ## Themes
 
@@ -57,6 +59,7 @@ _(Evaluation exists to improve; the loop-back is its point — so "improve" live
 
 Captured, deliberately not active. Reviewed at each regroup. `[theme]` tags where it belongs.
 
+- **Studio, Bauhaus and Plotter Styles** they add bullet points on line breaks in the comparison columns, but with code that looks wrong. Also no indents preserved. ![unwanted bullets](<screengrabs/Screenshot 2026-07-29 at 3.32.33 PM.png>) Needs a better way of displaying comparisons other than bulletted lines.
 - **Concept-delivery v2** `[evaluate]` — pin concept _extraction_ to the material (counts wobble now); optional course-authored concept list.
 - **Targeted auto-regeneration** `[evaluate]` — feed a specific review flag back to the model to fix that item (vs the systemic prompt fix already proven).
 - **Multi-model reads** `[evaluate]` — for borderline facticity cases the single critic is a coin-flip; a second _model_ (not seed) would let the union help. Seed-diversity is a proven no-op on the local model.
@@ -74,6 +77,7 @@ Captured, deliberately not active. Reviewed at each regroup. `[theme]` tags wher
 - **Images / diagrams on pages** `[generate]` — pages are text + code only; there is no image block in the page IR, so visual concepts (parallax, coordinate transforms) have no visual. Add an image/diagram block — instructor-supplied first (like embeds, via supplements, no invented URLs), generated diagrams a bigger later step. UDL multiple means of representation. Distinct from the quiz visual-question item above.
 - **Composable domain bases** `[profiles]` — ship generic bases (`computer-science`, `digital-art`, …) a course selects one or MORE of and refines; assume multi-domain courses.
 - **Domain-suggester tool** `[profiles]` — scan the transcripts/ingestables → propose a starter `domain.md`.
+- **Concept map as a shared tool contract** `[profiles/arch]` (user, 2026-07-28) — promote "the week's concepts" from something coursekit re-derives inline (inconsistently — the extraction wobble) to a STRUCTURED, persistent artifact in `.vtconfig/` (like `context.yaml` / `domain.md`), authored once and consumed by every generator AND the evaluator. It grounds content-relative length far more robustly than a prompt, stabilises concept-delivery (subsumes "Concept-delivery v2" and the domain-suggester family — all are content-analysis → a `.vtconfig` artifact), and enables course-level sequencing/spacing (cross-week prerequisite links). The two tools already meet ONLY through `.vtconfig/` files, never imports — a concept map fits that boundary exactly. Decisions: (1) the SCHEMA/contract — per-week concepts, each with a one-line definition, level, has-code?, and prerequisite links to earlier weeks; (2) WHO writes it — content analysis is upstream (the transcriber's world), but it's a separate repo. Lean: define the schema first, coursekit ships a v1 extractor (instructor-editable, like the domain-suggester), the transcriber can own it later — same "define the seam, migrate later" discipline that created coursekit. This may become the durable v2 of the current content-relative-length focus.
 - **Pluggable pedagogic strategies** `[profiles]` — per course/professor; anti-staleness (one fixed style goes stale); today's hook/key-idea/consolidation fix is one _default_ strategy, not the only law.
 - **Document the config convention** `[profiles]` — `.yaml` = settings the code reads; `.md` = prose the model reads (`domain.md`, prompt overrides, future pedagogy profile). Put it in `docs/configuration.md`.
 - **Course-level evaluator** `[deliver]` — spacing/spaced-retrieval, pacing, sequencing, cross-week coverage. (Spacing is a schedule property, so it belongs here, not on a single page.)
