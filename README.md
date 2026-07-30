@@ -29,12 +29,12 @@ uv sync --group dev     # also installs the `coursekit` command (editable)
 Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint — see [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest           # 589 tests, all offline — no model needed (names each, not just dots)
+uv run pytest           # 616 tests, all offline — no model needed (names each, not just dots)
 ```
 
 ## Quick start
 
-The CLI has three verbs, one per phase: **`ingest`** (documents → week text), **`generate`** (week text → quizzes/pages, the model), **`emit`** (canonical JSON → Canvas packages, model-free).
+The CLI has four phases: **`ingest`** (documents → week text), **`analyze`** (week text → the per-week concept map that grounds generation), **`generate`** (week text → quizzes/pages, the model), **`emit`** (canonical JSON → Canvas packages, model-free).
 
 ```bash
 # see what it would do — free, no model
@@ -52,9 +52,10 @@ uv run coursekit generate "/path/to/course export" --quizzes --week 3
 
 ## Commands
 
-The CLI is three verbs, in the order work flows through them:
+The CLI is four phases, in the order work flows through them:
 
 - **`ingest`** — turn a week's documents (PDF, slides, `.docx`) into the week text the generators read.
+- **`analyze`** — consolidate a week's concepts into a `.vtconfig/concepts/week-N.yaml` concept map (instructor-editable) that grounds generation and evaluation.
 - **`generate`** — turn that week text into quizzes and pages (the model-driven step).
 - **`emit`** — package the canonical JSON into Canvas files, model-free — up to a whole-course `.imscc`.
 
@@ -62,6 +63,11 @@ The CLI is three verbs, in the order work flows through them:
 | ----------------------------- | ---------------------------------------------------------- | -------- |
 | `coursekit ingest PATH`       | Documents (PDF/docx/odt/pptx/txt/md) → `output/week-N.md`. | ✓        |
 | `coursekit ingest PATH --raw` | Same, extract only, fully offline.                         | x        |
+
+| Analyze Commands                    | What it does                                                        | Uses LLM |
+| ----------------------------------- | ------------------------------------------------------------------ | -------- |
+| `coursekit analyze PATH`            | Build each week's concept map from its `knowledge.json` → `.vtconfig/concepts/week-N.yaml`. | ✓ |
+| `coursekit analyze PATH --dry-run`  | List the weeks and their knowledge-component counts, no model.     | x        |
 
 | Generate Commands                               | What it does                                                     | Uses LLM |
 | ----------------------------------------------- | ---------------------------------------------------------------- | -------- |

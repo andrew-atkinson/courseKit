@@ -51,13 +51,22 @@ def _parse_concepts(reply: str) -> list[tuple[str, int, str]]:
     return out
 
 
-def evaluate_page_concepts(page, material: str, provider, model: str, *, project_root=None) -> PageConcepts:
-    """Identify the week's concepts from the material and score the page's delivery of each. Best-effort:
-    a provider error or an unreadable reply yields no concepts, never an exception."""
+def evaluate_page_concepts(page, material: str, provider, model: str, *, project_root=None,
+                           concepts: list[str] | None = None) -> PageConcepts:
+    """Score the page's delivery of each core concept. When `concepts` is given (from the week's
+    consolidated concept map), score against THAT fixed list — no re-derivation, so the scored set is
+    stable across reads and matches what generation was told to teach; otherwise the critic identifies
+    the concepts from the material itself. Best-effort: a provider error or an unreadable reply yields
+    no concepts, never an exception."""
     critic = _critic_body(CONCEPT_CATEGORY, project_root, name="concept_delivery")
+    if concepts:
+        given = "\n".join(f"- {c}" for c in concepts)
+        task = (f"The week's concepts are already identified — score the page's delivery of each of "
+                f"these, and only these:\n{given}")
+    else:
+        task = "Judge how well the page delivers each core concept."
     user = (f"The week's teaching material:\n<material>\n{material}\n</material>\n\n"
-            f"The full page, in order:\n{_render_page(page)}\n\n"
-            f"Judge how well the page delivers each core concept.")
+            f"The full page, in order:\n{_render_page(page)}\n\n{task}")
     messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]
     try:
         reply = provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE)
@@ -83,7 +92,9 @@ def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None
     Returns (per-page results, out_path_or_None) — for reviewing already-generated pages."""
     from pathlib import Path
 
+    from coursekit import courseconfig
     from coursekit.discover import find_units
+    from coursekit.generate.page.concept_map import concept_map_path, load_concept_map
     from coursekit.generate.page.page import Page
     from coursekit.pipeline import _week_matches
 
@@ -98,7 +109,18 @@ def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None
             continue
         page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
         material = Path(u.transcript_path).read_text(encoding="utf-8")
-        pc = evaluate_page_concepts(page, material, provider, model, project_root=u.course_root)
+        # Score against the week's concept map when one exists — a fixed list, not a re-derivation.
+        names = None
+        key = courseconfig.week_key(u.week_slug) if u.course_root else None
+        if key:
+            try:
+                cmap = load_concept_map(concept_map_path(u.course_root, key))
+            except Exception:
+                cmap = None
+            if cmap and cmap.concepts:
+                names = [c.name for c in cmap.concepts]
+        pc = evaluate_page_concepts(page, material, provider, model, project_root=u.course_root,
+                                    concepts=names)
         pc.page_id = u.week_slug         # label by week for the course report
         results.append(pc)
 

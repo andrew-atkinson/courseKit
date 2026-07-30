@@ -314,6 +314,12 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
         if framed and frame_roles:
             # a role outside the theme's frame list stays flat; role-less headings keep the default
             framed = role is None or role in frame_roles
+        # Dark-surface protection: on a theme whose panels ARE the surface (terminal's petrol),
+        # a heading-less group (the opening hook paragraph, a standalone pullquote) would otherwise
+        # render its light ink straight onto the white gap between panels — illegible. So give every
+        # group its panel; the white gaps stay the margins between them, never a ground for light text.
+        if not framed and panels and surface and surface.lower() not in ("#fff", "#ffffff"):
+            framed = True
         # A glossary under a concept/example/practice/summary heading is specific to that topic, so
         # it FOLDS IN — just the labelled terms, no separate box. A standalone glossary — its own
         # section (a plain or "Key Terms" heading, or no heading) — keeps its full Key Terms frame.

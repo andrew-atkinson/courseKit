@@ -125,6 +125,35 @@ def test_non_allowlisted_embed_degrades_to_link(fresh):
     assert '<a href="https://evil.example.com/x"' in body   # rendered as a plain link instead
 
 
+_DARK_PANEL = {
+    "shape": {"section_frame": "panel", "radius": 6, "border_width": 1},
+    "color": {"surface": "#12333d", "ink": "#e7eef0", "muted": "#93a7ac",
+              "frame_border": "#20505d", "accent": "#5ec8b0",
+              "code_bg": "#0c262e", "code_fg": "#e7eef0"},
+    "type": {"heading_family": "monospace", "body_family": "sans-serif",
+             "mono_family": "monospace", "heading_weight": 600},
+    "space": {"unit": 8, "section_gap": 22},
+}
+
+
+def test_dark_surface_frames_heading_less_blocks(fresh):
+    # A hook paragraph BEFORE any heading, and a standalone pullquote — heading-less groups that used
+    # to render light ink onto the white gap between panels. On a dark surface they must be panelled.
+    page = _page_with(
+        dict(kind="paragraph", block_id="hook", text="You can place one shape by hand."),
+        dict(kind="pullquote", block_id="pq", text="Complexity is managed by structure."),
+        dict(kind="heading", block_id="h", text="Object Literals", level=2),
+        dict(kind="paragraph", block_id="p", text="body"),
+    )
+    body = render_body(page, None, _DARK_PANEL)
+    # the hook sits inside a panel carrying the surface ground, not raw on the page
+    hook_at = body.index("place one shape")
+    assert body.rfind("background-color: #12333d", 0, hook_at) != -1
+    # and so does the standalone pullquote
+    pq_at = body.index("Complexity is managed")
+    assert body.rfind("background-color: #12333d", 0, pq_at) != -1
+
+
 def test_no_supplements_renders_only_blocks(fresh):
     body = render_body(_page_with(dict(kind="heading", block_id="h", text="X")))
     assert "References" not in body and "Examples" not in body

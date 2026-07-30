@@ -172,6 +172,68 @@ def _cmd_ingest(args) -> int:
 
 # ---------------------------------------------------------------- generate
 
+def _cmd_analyze(args) -> int:
+    """The 'analyze' phase, between ingest and generate: build each week's concept map. Reads the
+    transcriber's `knowledge.json` beside every week doc, consolidates it (the model) into the week's
+    teaching concepts + enduring understanding, and writes `.vtconfig/concepts/week-N.yaml` — the
+    content model both generate and evaluate stand on. Instructor-editable after; re-run when the
+    material changes. Weeks with no knowledge.json are skipped (that course's pages fall back to
+    inline derivation until a map is authored)."""
+    if not args.path:
+        raise SystemExit("no PATH given and TRANSCRIPTION is not set")
+    from coursekit.discover import find_units
+    from coursekit.generate.page import concept_map as cmap
+    from coursekit.generate.page import consolidate as con
+
+    weeks = _parse_weeks(args)
+    units = find_units(args.path)
+    if weeks:
+        units = [u for u in units if any(pipeline._week_matches(w, u) for w in weeks)]
+    if not units:
+        print("No week transcripts found.")
+        return 0
+
+    if args.dry_run:
+        print("DRY RUN — weeks that would be analyzed:")
+        for u in units:
+            wk = cmap.read_week_knowledge(u.transcript_path)
+            detail = (f"{len(wk.kcs)} knowledge component(s) from {len(wk.sources)} source(s)"
+                      if wk.kcs else "no knowledge.json beside the transcript — would be SKIPPED")
+            print(f"  [plan] {u.week_label}: {detail}")
+        return 0
+
+    provider = _build_provider()
+    model = os.getenv("MODEL_NAME") or courseconfig.load(
+        args.path, config_name="page.yaml").value("model")
+    if not model:
+        raise SystemExit("no model configured — set MODEL_NAME or page.yaml `model:`")
+
+    wrote = 0
+    for u in units:
+        label = u.week_label or u.week_slug
+        if not u.course_root:
+            print(f"  [skip] {label}: no .vtconfig course root to write the map into")
+            continue
+        key = courseconfig.week_key(u.week_slug)
+        if not key:
+            print(f"  [skip] {label}: could not resolve a week number for the filename")
+            continue
+        wk = cmap.read_week_knowledge(u.transcript_path, week=label)
+        if not wk.kcs:
+            print(f"  [skip] {label}: no knowledge.json beside the transcript")
+            continue
+        cfg = courseconfig.load(u.transcript_path, config_name="page.yaml")
+        cmp = con.consolidate(wk, provider, model, week=label, domain=cfg.domain,
+                              project_root=u.course_root)
+        out = cmap.save_concept_map(cmp, cmap.concept_map_path(u.course_root, key))
+        eu = " + enduring understanding" if cmp.enduring_understanding else ""
+        print(f"  [OK] {label}: {len(cmp.concepts)} concept(s){eu} -> {out}")
+        wrote += 1
+
+    print(f"\n{wrote} concept map(s) written. Edit them, then generate.")
+    return 0
+
+
 def _cmd_generate(args) -> int:
     if not args.path:
         raise SystemExit("no PATH given and TRANSCRIPTION is not set")
@@ -356,7 +418,8 @@ def _cmd_evaluate(args) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="coursekit", description="Generate Canvas artifacts from course material.")
-    sub = parser.add_subparsers(dest="command", required=True, metavar="{ingest,generate,emit}")
+    sub = parser.add_subparsers(dest="command", required=True,
+                                metavar="{ingest,analyze,generate,emit}")
 
     # ingest — documents → week text
     pi = sub.add_parser("ingest", help="documents (PDF/docx/odt/pptx/txt/md) → output/week-N.md")
@@ -364,6 +427,18 @@ def build_parser() -> argparse.ArgumentParser:
     pi.add_argument("--raw", action="store_true",
                     help="extract text only; skip the local-LLM shaping pass (fully offline)")
     pi.set_defaults(func=_cmd_ingest)
+
+    # analyze — week text + knowledge.json → the per-week concept map (uses the model)
+    pa = sub.add_parser("analyze",
+                        help="build each week's concept map (.vtconfig/concepts/week-N.yaml) — the "
+                             "content model generate and evaluate read")
+    pa.add_argument("path", nargs="?", default=os.getenv("TRANSCRIPTION"),
+                    help="transcript file or directory (default: $TRANSCRIPTION)")
+    pa.add_argument("--week", action="append", metavar="N", help="a week to analyze, repeatable")
+    pa.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
+    pa.add_argument("--dry-run", action="store_true",
+                    help="list the weeks and their knowledge-component counts, without the model")
+    pa.set_defaults(func=_cmd_analyze)
 
     # generate — week text → quizzes and/or pages (uses the model)
     pg = sub.add_parser("generate", help="week text → quizzes and/or pages (uses the model)")

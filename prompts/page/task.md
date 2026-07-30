@@ -34,6 +34,9 @@ Build it top to bottom:
    Where the material has a common mistake, an off-by-one, or a manual-vs-automated approach, show the
    two side by side with `add_columns` (wrong vs. right, before vs. after) — the contrast is what makes
    the idea stick, so reach for it wherever the week offers one.
+   **Keep each paragraph to one idea.** When a paragraph would carry both how something works and why
+   it matters — its mechanism and its purpose — or two different concepts, split it into separate
+   paragraphs. A reader should be able to name the single point of each paragraph.
 4. **Foreground the one key idea.** Decide the single thing this week hinges on — the sentence a
    student should keep even if they forget the details — and set it with `add_pullquote`, once. If you
    cannot name one, the page has no centre; find it before moving on.
