@@ -78,6 +78,11 @@ def add_details(block_id: str, summary: str, text: str) -> str:
     return page.put_block(page.build_block("details", block_id=block_id, summary=summary, text=text))
 
 
+def add_image(block_id: str, ref: str, alt: str, caption: str = "") -> str:
+    return page.put_block(page.build_block("image", block_id=block_id, ref=ref, alt=alt,
+                                           caption=caption or None))
+
+
 def get_page_report() -> str:
     return page.report()
 
@@ -213,6 +218,24 @@ add_details_json = {
     }, "required": ["block_id", "summary", "text"], "additionalProperties": False},
 }
 
+add_image_json = {
+    "name": "add_image",
+    "description": ("Place a visual where it teaches — a diagram, an example work, a chart the material "
+                    "shows or describes. You do NOT supply the file: give a short `ref` and real `alt` "
+                    "text, and the instructor adds the actual image under that ref later. Never a URL. "
+                    "Use it only where a visual genuinely helps, not for decoration."),
+    "parameters": {"type": "object", "properties": {
+        "block_id": _ID,
+        "ref": {"type": "string",
+                "description": "a short key for the image, e.g. 'coordinate-system' or 'parallax-demo' "
+                               "— the instructor supplies the file under this ref. Not a URL."},
+        "alt": {"type": "string",
+                "description": "what the image should show, as a full phrase — required for "
+                               "accessibility, and it tells the instructor what to supply"},
+        "caption": {"type": "string", "description": "an optional caption shown under the image"},
+    }, "required": ["block_id", "ref", "alt"], "additionalProperties": False},
+}
+
 get_page_report_json = {
     "name": "get_page_report",
     "description": "List the blocks recorded so far. Call this when you think the page is done.",
@@ -242,6 +265,7 @@ TOOL_REGISTRY = {
     "add_pullquote": add_pullquote,
     "add_card": add_card,
     "add_details": add_details,
+    "add_image": add_image,
     "get_page_report": get_page_report,
     "finalize_page": finalize_page,
 }
@@ -257,6 +281,7 @@ _SCHEMAS = {
     "add_pullquote": add_pullquote_json,
     "add_card": add_card_json,
     "add_details": add_details_json,
+    "add_image": add_image_json,
     "get_page_report": get_page_report_json,
     "finalize_page": finalize_page_json,
 }

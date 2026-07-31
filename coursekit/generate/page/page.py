@@ -170,8 +170,28 @@ class DetailsBlock(_Block):
     _nourl_text = field_validator("text")(staticmethod(_check_no_url))
 
 
+class ImageBlock(_Block):
+    """A visual placed inline where it teaches — a diagram, an example work, a chart. The model places
+    the SLOT (a `ref` + real alt text) but NEVER a URL: an image URL is exactly what a model fabricates,
+    so the instructor supplies the actual file in the supplements and the renderer resolves it by `ref`
+    at render time (the two-author split; the no-fabricated-URLs guardrail made structural). UDL:
+    multiple means of representation. `alt` is required — an image ships accessible or not at all."""
+    kind: Literal["image"] = "image"
+    ref: str = Field(min_length=1)          # the key the instructor's supplements maps to a file
+    alt: str = Field(min_length=1)          # WCAG — what the image shows / what belongs here
+    caption: str | None = None
+
+    _nourl_ref = field_validator("ref")(staticmethod(_check_no_url))
+    _nourl_alt = field_validator("alt")(staticmethod(_check_no_url))
+
+    @field_validator("caption")
+    @classmethod
+    def _cap_ok(cls, v):
+        return _check_no_url(v) if v else v
+
+
 Block = Union[HeadingBlock, ParagraphBlock, BulletsBlock, CodeBlock, GlossaryBlock, CalloutBlock,
-              ColumnsBlock, PullquoteBlock, CardBlock, DetailsBlock]
+              ColumnsBlock, PullquoteBlock, CardBlock, DetailsBlock, ImageBlock]
 
 _KINDS: dict[str, type[_Block]] = {
     "heading": HeadingBlock,
@@ -184,6 +204,7 @@ _KINDS: dict[str, type[_Block]] = {
     "pullquote": PullquoteBlock,
     "card": CardBlock,
     "details": DetailsBlock,
+    "image": ImageBlock,
 }
 
 

@@ -1,0 +1,13 @@
+{%- set src = images.get(b.ref) if (images is defined and images) else none -%}
+{%- set alt = (src.alt if src and src.alt else b.alt) -%}
+{%- set cap = (src.caption if src and src.caption else b.caption) -%}
+{%- if src and src.url %}
+<figure style="margin: 0 0 {{ t.space.unit * 2 }}px 0;">
+<img src="{{ src.url }}" alt="{{ alt }}" style="display: block; max-width: 100%; height: auto; border: 1px solid {{ t.color.frame_border }}; border-radius: {{ t.shape.radius }}px;">
+{%- if cap %}
+<figcaption style="font-family: {{ t.type.body_family }}; color: {{ t.color.muted }}; font-size: 14px; margin-top: {{ t.space.unit }}px;">{{ cap | md_inline }}</figcaption>
+{%- endif %}
+</figure>
+{%- else %}
+<div style="border: 1px dashed {{ t.color.muted }}; border-radius: {{ t.shape.radius }}px; padding: {{ t.space.unit * 2 }}px; margin: 0 0 {{ t.space.unit * 2 }}px 0; font-family: {{ t.type.body_family }}; color: {{ t.color.muted }}; font-size: 14px;">Image to add — <strong style="color: {{ t.color.ink }};">{{ b.alt }}</strong>. Supply the file in the course supplements under images ref <code>{{ b.ref }}</code>.</div>
+{%- endif %}

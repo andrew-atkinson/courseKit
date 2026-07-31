@@ -161,6 +161,43 @@ def test_no_supplements_renders_only_blocks(fresh):
 
 # ------------------------------------------------- supplements loader
 
+def test_image_block_resolves_supplement_ref(fresh):
+    page = _page_with(dict(kind="heading", block_id="h", text="X"),
+                      dict(kind="image", block_id="fig1", ref="coord", alt="the coordinate system"))
+    supp = {"images": [{"ref": "coord", "url": "https://ex.test/coord.png", "caption": "Coordinates"}]}
+    body = render_body(page, supp)
+    assert '<img src="https://ex.test/coord.png"' in body
+    assert 'alt="the coordinate system"' in body
+    assert "Coordinates" in body                       # caption rendered
+
+
+def test_image_block_placeholder_when_unsupplied(fresh):
+    page = _page_with(dict(kind="heading", block_id="h", text="X"),
+                      dict(kind="image", block_id="fig1", ref="coord", alt="the coordinate system"))
+    body = render_body(page)                            # no supplements yet
+    assert "Image to add" in body and "the coordinate system" in body and "coord" in body
+    assert "<img" not in body                           # no broken image, a placeholder instead
+
+
+def test_refd_image_is_inline_only_not_in_the_gallery(fresh):
+    page = _page_with(dict(kind="heading", block_id="h", text="X"),
+                      dict(kind="image", block_id="fig1", ref="coord", alt="a diagram"))
+    supp = {"images": [{"ref": "coord", "url": "https://ex.test/c.png", "alt": "a diagram"},
+                       {"url": "https://ex.test/loose.png", "alt": "a loose figure"}]}
+    body = render_body(page, supp)
+    assert body.count("https://ex.test/c.png") == 1     # inline once, not doubled in the gallery
+    assert "https://ex.test/loose.png" in body          # a ref-less image still lands in the gallery
+
+
+def test_image_block_rejects_url_and_requires_alt(fresh):
+    from coursekit.generate.page import page as P
+    from coursekit.generate.page.page import ValidationError
+    with pytest.raises(ValidationError):
+        P.build_block("image", block_id="i", ref="x", alt="see http://evil.test for more")
+    with pytest.raises(ValidationError):
+        P.build_block("image", block_id="i", ref="x", alt="")   # alt is required (WCAG)
+
+
 def test_load_supplements_reads_the_course_file(tmp_path):
     d = tmp_path / ".vtconfig" / "pages"
     d.mkdir(parents=True)

@@ -46,6 +46,8 @@ def _format_block(b) -> str:
         return f"[details] {b.summary}\n{b.text}"
     if kind == "columns":
         return "[columns]\n" + "\n".join(f"  {c.title}: " + "; ".join(c.items) for c in b.columns)
+    if kind == "image":
+        return f"[image] {b.alt}" + (f" — {b.caption}" if getattr(b, "caption", None) else "")
     # paragraph, pullquote, and any future text block
     return f"[{kind}]\n{getattr(b, 'text', '')}"
 

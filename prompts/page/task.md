@@ -34,6 +34,10 @@ Build it top to bottom:
    Where the material has a common mistake, an off-by-one, or a manual-vs-automated approach, show the
    two side by side with `add_columns` (wrong vs. right, before vs. after) — the contrast is what makes
    the idea stick, so reach for it wherever the week offers one.
+   **Where a concept is inherently visual, place an image.** For a diagram, an example work, a chart, or
+   any visual the material shows or describes, call `add_image` with a short `ref` and real `alt` text.
+   You never supply the file — the instructor adds it under that ref — so never write a URL, and reach
+   for an image only where a visual genuinely teaches, not as decoration.
    **Keep each paragraph to one idea.** When a paragraph would carry both how something works and why
    it matters — its mechanism and its purpose — or two different concepts, split it into separate
    paragraphs. A reader should be able to name the single point of each paragraph.

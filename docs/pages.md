@@ -65,6 +65,16 @@ examples:
     iframe: >
       <iframe src="https://docs.google.com/presentation/d/e/ABC/embed?start=false"
               width="960" height="569" allowfullscreen></iframe>
+
+# Images. The model places an image SLOT inline where a visual teaches (via `add_image`, choosing a
+# `ref` and writing alt text) but never a URL — you supply the file here, keyed by that ref, and it
+# renders in place. An image WITHOUT a `ref` lands in a gallery at the foot of the page instead.
+# Until you supply a ref'd image, the page shows a placeholder naming what to add.
+images:
+  - ref: "coordinate-system"          # matches the model's add_image ref
+    url: "$WIKI_REFERENCE$/files/123/coords.png"
+    caption: "The p5.js coordinate system — y grows downward."
+    # `alt:` optional here; the model already wrote alt text for the slot. Yours wins if given.
 ```
 
 Two ways to give an embed, whichever is handier: the structured `url` + `embed: true` (+ optional

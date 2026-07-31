@@ -169,6 +169,8 @@ def _prep_images(images) -> list[dict]:
     out = []
     for im in images or []:
         im = dict(im)
+        if im.get("ref"):        # a ref'd image is placed inline by its block, not in the gallery
+            continue
         if not im.get("url"):
             continue
         alt = im.get("alt") or im.get("caption")
@@ -189,6 +191,11 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
     from coursekit.generate.page.style import load_style
     supplements = supplements or {}
     t = style or load_style(None)
+    # Instructor-supplied images keyed by ref, for resolving the model's inline `image` slots. An image
+    # WITH a ref is placed inline (consumed by its block); one WITHOUT a ref falls to the trailing
+    # gallery (see _prep_images), so nothing renders twice.
+    img_by_ref = {im["ref"]: im for im in (supplements.get("images") or [])
+                  if isinstance(im, dict) and im.get("ref")}
 
     # Topic grouping: a heading opens a topic that runs until the next heading. The grouping is
     # already implicit in the block sequence, so framing it is purely a theme decision
@@ -329,7 +336,7 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
             _env.get_template(f"{b.kind}.html.j2").render(
                 b=b.model_dump(), t=t, framed=framed, frame_pad=unit * 3,
                 nested=(b.kind == "glossary" and topic_section),
-                concept=concept_name).strip()
+                concept=concept_name, images=img_by_ref).strip()
             for b in group
         ]
         parts.append(_panel("\n".join(rendered)) if framed else "\n".join(rendered))
