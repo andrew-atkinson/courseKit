@@ -94,6 +94,15 @@ Captured, deliberately not active. Reviewed at each regroup. `[theme]` tags wher
 - **Canvas extension / LTI** `[deliver]` — plausibility of surfacing the tool inside Canvas. CLARIFY first: _which_ chatbot — coursekit's own generation surfaced interactively, or a separate project?
 - **One-off:** regenerate the one thin page (a Functions week scored low on delivery — under-generated).
 
+### Carried over from the increment history (reconciled 2026-07-30)
+
+Increments 1–10 are complete in code; these are the live remnants, lifted here so nothing real is lost. The offline plan file is now history.
+
+- **Canvas whole-course `.imscc` import** `[deliver]` — the last real acceptance gate of the file-emitter era; MANUAL, on the user's Canvas (pages + quizzes as week modules). Quiz `.imscc` import was already exercised and bug-fixed; local Canvas Docker lacks the QTI tool ([[local-canvas-qti-gotcha]]), a Canvas-setup issue, not a coursekit bug.
+- **Non-coding readings → page end-to-end** `[generate]` — Increment 8's acceptance gate: a real readings/PDF course (no transcripts) through `ingest → generate --pages`, confirming a sensible non-coding page. A user model run.
+- **Canvas API push** `[deliver]` — Increment 3/6 Phase 3: `POST /api/v1/courses/:id/pages` with the rendered HTML; defaults to dry-run, gated on a running Canvas + token. File emitters stay first-class regardless.
+- **Quiz deterministic verifier** `[evaluate]` — Increment 10 steps 4–5: execute/compute decidable questions (loop trace, arithmetic) in a sandbox instead of trusting the LLM. Deliberately deprioritised — the critic's 100% wrong-answer recall weakened the rationale; revisit only if a decidable-slice failure resurfaces.
+
 ## Note
 
 `agent/todo.md` predates this file; its live items should migrate here (into the parking lot or a theme) so there is one forward view, not two.
