@@ -95,8 +95,18 @@ def test_finalize_requires_a_heading(fresh):
     assert not P.is_finalized()
 
 
-def test_finalize_succeeds_with_a_heading(fresh):
+def test_finalize_requires_a_retrieval_prompt(fresh):
+    # a heading is no longer enough — the page must ask the student to retrieve (a details foldout)
     P.put_block(P.build_block("heading", block_id="h", text="REVIEW"))
+    assert "retrieval prompt" in "; ".join(P.validate_final())
+    assert P.finalize().startswith("ERROR")
+    assert not P.is_finalized()
+
+
+def test_finalize_succeeds_with_a_heading_and_retrieval(fresh):
+    P.put_block(P.build_block("heading", block_id="h", text="REVIEW"))
+    P.put_block(P.build_block("details", block_id="predict",
+                              summary="Predict: how many times does the loop run?", text="Ten."))
     assert P.validate_final() == []
     assert P.finalize().startswith("OK")
     assert P.is_finalized()

@@ -37,7 +37,8 @@ class _Resp:
 PAGE_SCRIPT = [
     [("add_heading", {"block_id": "review", "text": "REVIEW", "level": 4}),
      ("add_bullets", {"block_id": "recap", "items": ["expressions", "conditionals"]}),
-     ("add_code", {"block_id": "loop", "code": "for (let x=0; x<10; x++){}", "language": "js"})],
+     ("add_code", {"block_id": "loop", "code": "for (let x=0; x<10; x++){}", "language": "js"}),
+     ("add_details", {"block_id": "predict", "summary": "Predict the output", "text": "Ten lines."})],
     [("finalize_page", {})],
 ]
 
@@ -69,11 +70,11 @@ def test_page_generator_runs_through_the_unchanged_driver(tmp_path):
     res = run_unit(unit, _client(), "fake-model", PageGenerator())
 
     assert res.finalized
-    assert res.counts == {"blocks": 3}
+    assert res.counts == {"blocks": 4}
     # the generic driver wrote the artifacts…
     assert (unit.output_dir / "reply.txt").exists()
     saved = json.loads((unit.output_dir / "page.json").read_text())
-    assert list(saved["blocks"]) == ["review", "recap", "loop"]
+    assert list(saved["blocks"]) == ["review", "recap", "loop", "predict"]
     assert saved["finalized"] is True
     assert saved["page_type"] == "week_intro"
 

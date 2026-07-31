@@ -54,7 +54,8 @@ def test_bad_args_do_not_lose_state(fresh):
 
 
 def test_empty_args_string_is_treated_as_no_args(fresh):
-    T.run_tool_calls([_call("add_heading", block_id="h", text="REVIEW")])
+    T.run_tool_calls([_call("add_heading", block_id="h", text="REVIEW"),
+                      _call("add_details", block_id="d", summary="Predict?", text="Yes.")])
     out = T.run_tool_calls([SimpleNamespace(id="c", name="finalize_page", arguments="")])
     assert out[0][1].startswith("OK")
 
@@ -78,9 +79,11 @@ def test_build_and_finalize_a_page(fresh):
         _call("add_code", block_id="loop", code="for (let x=0; x<10; x++){}", language="js"),
         _call("add_glossary", block_id="terms",
               entries=[{"term": "for loop", "definition": "repeats a block"}]),
+        _call("add_details", block_id="predict", summary="Predict: how many iterations?",
+              text="Ten."),
     ]
     T.run_tool_calls(calls)
-    assert list(P.get().blocks) == ["review", "recap", "loop", "terms"]
+    assert list(P.get().blocks) == ["review", "recap", "loop", "terms", "predict"]
 
     out = T.run_tool_calls([SimpleNamespace(id="c", name="finalize_page", arguments="{}")])
     assert out[0][1].startswith("OK")
@@ -101,6 +104,7 @@ def test_run_tool_calls_ignores_calls_after_a_successful_finalize(fresh):
     # 8x and leaving orphaned empty headings. Everything after the first finalize must be ignored.
     calls = [
         _call("add_heading", block_id="h1", text="Kept", role="concept"),
+        _call("add_details", block_id="d", summary="Predict?", text="Yes."),
         _call("finalize_page"),
         _call("add_heading", block_id="h2", text="Runaway heading"),
         _call("add_paragraph", block_id="p2", text="Runaway content"),

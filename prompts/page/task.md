@@ -56,7 +56,9 @@ Build it top to bottom:
    the student to retrieve before they leave.
 
 Give each block a short, stable block_id. Do not include any links, URLs, or references — those are
-added separately by the instructor. When the page opens with a hook, foregrounds one key idea, and
-closes with consolidation, call finalize_page.
+added separately by the instructor. When the page opens with a hook, foregrounds one key idea, closes
+with consolidation, and includes at least one retrieval prompt (a predict/recall `add_details` — the
+closing one, or the recap's questions), call finalize_page. A page without a retrieval prompt will not
+finalize.
 
 Start now.
