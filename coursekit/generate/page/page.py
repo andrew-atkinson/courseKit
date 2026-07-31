@@ -298,6 +298,19 @@ def validate_final() -> list[str]:
         problems.append("the page has no blocks")
     if not any(b.kind == "heading" for b in _page.blocks.values()):
         problems.append("the page has no heading block to structure it")
+    # A page must ask the student to RETRIEVE — the testing effect is core pedagogy, and this device
+    # is the first to get dropped as the prompt grows. So gate it structurally (unlike the hook /
+    # pullquote / summary, which stay prompt-guidance): at least one predict/recall `details` foldout —
+    # the recap's recall questions or the closing "Predict: …" prompt both count.
+    # PROVISIONAL (2026-07-31): this is really a stopgap for local-model ATTENTION crowding, not a
+    # universal pedagogical invariant — retrieval isn't right for every page type (a pure reference or
+    # intro page), and forcing it can yield a hollow foldout. A candidate for removal / making it
+    # page-type-aware once composable generation manages attention properly (see roadmap "Composable
+    # generation"). If pages become multi-page or typed, revisit whether every page needs its own.
+    if not any(b.kind == "details" for b in _page.blocks.values()):
+        problems.append("the page has no retrieval prompt — add a predict/recall `details` block "
+                        "(the closing 'Predict: …' or the recap's questions) so students retrieve "
+                        "before they leave")
     return problems
 
 
