@@ -197,6 +197,23 @@ def test_reemit_skips_a_bank_with_an_empty_group(tmp_path):
     assert not (wk / "week-9.zip").exists()   # nothing written for the broken bank
 
 
+def test_reemit_skips_a_bank_whose_quiz_references_a_missing_group(tmp_path):
+    # an interrupted regeneration can leave a one-group bank beside a STALE multi-group quiz.json
+    # (seen 2026-07-31: week-7). emit must skip it with a reason, not KeyError on the whole course.
+    import json
+    b2, quiz2 = _mc_bank(n_groups=2)            # quiz2 references c1 AND c2
+    b1, _ = _mc_bank(run_id="run", n_groups=1)  # a one-group bank (c1 only)
+    wk = tmp_path / "week-7"
+    wk.mkdir()
+    (wk / "bank.json").write_text(b1.model_dump_json(), encoding="utf-8")   # bank: c1 only
+    (wk / "quiz.json").write_text(json.dumps(quiz2), encoding="utf-8")      # quiz: c1 + c2 (stale)
+
+    bank_json, imscc, reason = qti.reemit(tmp_path)[0]
+    assert imscc is None
+    assert "c2" in reason and "out of sync" in reason
+    assert not (wk / "week-7.zip").exists()
+
+
 def test_bundle_skips_the_incomplete_bank_but_keeps_the_rest(tmp_path):
     good, _ = _mc_bank(run_id="good")
     (tmp_path / "week-3").mkdir()

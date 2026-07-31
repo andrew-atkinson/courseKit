@@ -307,6 +307,15 @@ def reset() -> None:
     init("test", None)
 
 
+def load(bank_obj: "Bank", out_dir: Path | None = None) -> None:
+    """Adopt an EXISTING bank as the working singleton — for editing a finished bank in place (the
+    targeted-fix pass reloads a `bank.json`, then a `put_variant` overwrites just the flagged variant
+    and autosaves the whole bank). Distinct from `init`, which starts empty."""
+    global _bank, _out_dir
+    _bank = bank_obj
+    _out_dir = Path(out_dir) if out_dir else None
+
+
 def get() -> Bank:
     return _bank
 
@@ -524,6 +533,6 @@ def build_variant(kind: str, **kwargs) -> Variant:
 __all__ = [
     "Bank", "Group", "Pair", "Variant", "ValidationError",
     "MCVariant", "MAVariant", "TFVariant", "SAVariant", "NumVariant", "MatchVariant",
-    "init", "reset", "get", "is_finalized", "create_group", "put_variant", "report",
+    "init", "load", "reset", "get", "is_finalized", "create_group", "put_variant", "report",
     "validate_final", "pick_quiz", "finalize", "build_variant", "unused_correct_positions",
 ]

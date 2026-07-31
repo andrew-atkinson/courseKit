@@ -46,7 +46,7 @@ uv sync --group dev     # also installs the `coursekit` command (editable)
 Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint — see [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest           # 617 tests, all offline — no model needed (names each, not just dots)
+uv run pytest           # 630 tests, all offline — no model needed (names each, not just dots)
 ```
 
 ## Quick start
@@ -74,6 +74,7 @@ The full command surface — every verb, flag, and what uses the model — is th
 The README is the high-level read; the detail lives in [`docs/`](docs/):
 
 - **[Command reference](docs/commands.md)** — every CLI verb and flag, and which use the model.
+- **[Evaluating and fixing](docs/evaluating.md)** — the audit → repair loop: `analyze` (the concept map), `evaluate` (the cold-read checks), and `fix` (regenerate flagged items in place). The part that makes a local model trustworthy.
 - **[Generating quizzes](docs/quizzes.md)** — the quiz workflow end to end: dry-run, generate, where output lands, and exporting to Canvas as a QTI `.zip`. Plus the six question types and how the hardened loop copes with an unreliable local model.
 - **[Course pages](docs/pages.md)** — generating a week's page, the two-author split (model outline + your supplements), the supplements YAML (references, examples, embeds — including pasted `<iframe>` snippets), and re-rendering model-free.
 - **[The domain profile](docs/domain-profile.md)** — one `.vtconfig/domain.md` per course that pins every generator to the right knowledge domain (p5.js, not Processing) and _corrects a transcript that drifts_. The main defence against plausible-but-wrong output.

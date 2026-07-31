@@ -3,10 +3,13 @@
 Source of truth for the structural diagrams. Kept in `agent/` alongside the other tracked references.
 Presented version: <https://claude.ai/code/artifact/e0d099ed-016c-4911-a75d-7805d5dbffe0>
 
-Verified 27 July 2026 against `main` (through the CLI-subcommands + `emit course` work). The
-videotranscriber (separate repo at `~/video_transcription`) is unchanged since the 19 July pass. The
-test count lives only in `README.md`, where a meta-test (`tests/test_docs_facts.py`) keeps it honest —
-it is deliberately not repeated here, because a number stated in two places rots in one of them.
+Verified 31 July 2026 against `main`. Since the 27 July pass (CLI subcommands + `emit course`) this
+adds the **analyze** phase (a per-week concept map), the **output-worth evaluator** (facticity ·
+pedagogy · concept-delivery cold reads), and the targeted **fix** loop that regenerates flagged items
+in place. The videotranscriber (separate repo at `~/video_transcription`) is unchanged since the 19
+July pass. The test count lives only in `README.md`, where a meta-test (`tests/test_docs_facts.py`)
+keeps it honest — it is deliberately not repeated here, because a number stated in two places rots in
+one of them.
 
 ## Three views
 
@@ -35,12 +38,14 @@ flowchart TB
         ctx["<b>.vtconfig/context.yaml</b><br/>course · weeks · modules"]
         ycfg["<b>.vtconfig/</b> quiz.yaml · page.yaml<br/>style.yaml · supplements<br/><i>(faculty-editable)</i>"]
         wk["week-N.md<br/>the week's text"]
+        cmap["<b>.vtconfig/concepts/</b>week-N.yaml<br/>the concept map · faculty-editable"]
         ir["bank.json · page.json · IR<br/>+ .gift · QTI .zip · .html · .imscc"]
     end
 
     subgraph L3 [" ③ coursekit · a set of programs "]
         direction LR
         ingest["ingest"]
+        analyze["analyze"]
         generate["generate"]
         emit["emit"]
     end
@@ -59,6 +64,11 @@ flowchart TB
     docs --> ingest
     ingest -. "writes" .-> wk
     ingest -. "shape pass" .-> llm
+
+    wk --> analyze
+    analyze <--> llm
+    analyze -. "writes" .-> cmap
+    cmap -. "grounds" .-> generate
 
     wk --> generate
     ctx -. "read" .-> generate
@@ -98,12 +108,15 @@ here (week text, IR, artifacts) and **reads** here (config); the transcriber wri
 disjoint runtimes — the transcriber keeps `mlx-whisper` and its Apple-Silicon stack; coursekit stays
 pydantic + stdlib — and neither imports the other.
 
-**③ coursekit — a set of programs.** Three programs run locally: **ingest** (documents → `week-N.md`),
-**generate** (week text → `bank.json`/`page.json`), **emit** (IR → Canvas files). Generate — and
-ingest's optional shaping pass — **call an LLM, either one you host locally (LM Studio by default) or
-a hosted API.** coursekit holds no model of its own; it drives whichever provider is configured, which
-is what lets the whole thing run offline when the LLM is local. (The transcriber is the *media→text*
-front door; ingest is the *document→text* one — two ways onto the same folder.)
+**③ coursekit — a set of programs.** Four phases run locally: **ingest** (documents → `week-N.md`),
+**analyze** (week text + the transcriber's `knowledge.json` → the per-week concept map), **generate**
+(week text → `bank.json`/`page.json`), **emit** (IR → Canvas files). Two more verbs sit alongside them
+as the *output-worth* layer: **evaluate** (cold-read the committed IR for correctness, form, and
+concept-delivery) and **fix** (regenerate each flagged item in place). All of these except `emit` —
+and ingest's optional shaping pass — **call an LLM, either one you host locally (LM Studio by default)
+or a hosted API.** coursekit holds no model of its own; it drives whichever provider is configured,
+which is what lets the whole thing run offline when the LLM is local. (The transcriber is the
+*media→text* front door; ingest is the *document→text* one — two ways onto the same folder.)
 
 **④ Delivery — Canvas.** The emitted artifacts import into Canvas (a QTI `.zip`, or an `.imscc` course
 package). Canvas is a **sink**. The one loop back is optional and one-time: a *prior* Canvas export can
@@ -160,6 +173,29 @@ gated third delivery path — it will read the same IRs, so it is one more emitt
 knows only `reset · tools · run_tool_calls · is_finalized · nudge · result`, nothing about quizzes or
 pages. That is how the page generator reused the whole driver without touching `run_unit`, and why a
 third generator would too.
+
+### The output-worth layer — analyze, evaluate, fix
+
+Beyond generation, coursekit **understands, measures, and repairs** its own output — the layer the
+incumbents' generators don't have.
+
+- **analyze** (`generate/page/concept_map.py` + `consolidate.py`) builds a per-week **concept map** —
+  the teaching concepts, their nested knowledge components, and the one enduring understanding — from
+  the transcriber's `knowledge.json` when present, or the week text when not (same schema, swappable
+  producer). It lands in `.vtconfig/concepts/week-N.yaml` (faculty-editable) and is read by the page
+  generator (as an un-skippable teaching checklist) and by the evaluator (a fixed list to score
+  against, rather than one re-derived each read).
+- **evaluate** is the *output-worth* gate — three cold reads over the committed IR, in a fresh
+  conversation per item so it is not the generator grading itself: **facticity** (is each item
+  correct?), **pedagogy** (does the page scan / signal / engage?), and **concept-delivery** (does it
+  teach each concept?). Report-only.
+- **fix** closes the loop (`generate/quiz/fix.py`, `generate/page/fix.py`): for each flagged quiz
+  variant or page block it hands the model the material, the flawed item, and the reviewer's concern,
+  and takes a correction committed through the SAME tool with the SAME id — overwriting in place via
+  `bank.load` / `page.load` — then cold-reads the fix to confirm it now passes.
+
+Evaluate and fix read the same IR the emitters do, so the whole flow is **generate → audit → repair →
+emit**, and only `emit` needs no model.
 
 ## Finding the course folder
 
@@ -281,8 +317,14 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
    `.imscc` of week modules via a `CartridgeSource` per content type (extensible to discussions/
    assignments); the CLI became phase subcommands (`ingest` / `generate` / `emit`) under a `coursekit`
    command. Import **confirmed in situ**.
-8. **Migrate the transcriber onto the spine** — providers first, taking the union of capabilities.
-9. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class.
+8. ✅ **The output-worth evaluator** — three cold-read checks (facticity · pedagogy · concept-delivery)
+   over the committed IR, calibrated on synthetic sets and wired into `evaluate` / `evaluate --all`.
+9. ✅ **The analyze phase + concept map** — per-week `.vtconfig/concepts/week-N.yaml`, from the
+   transcriber's `knowledge.json` or the week text, grounding page generation and evaluation.
+10. ✅ **The targeted fix loop** — `fix` regenerates each flagged quiz variant / page block in place and
+    verifies (`bank.load` / `page.load` adopt a finished artifact for in-place edit).
+11. **Migrate the transcriber onto the spine** — providers first, taking the union of capabilities.
+12. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class.
 
 ## Not yet closed
 

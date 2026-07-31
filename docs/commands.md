@@ -46,6 +46,13 @@ The CLI is four phases, in the order work flows through them, plus a review verb
 | `coursekit evaluate PATH --pages`  | Only the pages (`--quizzes` for only quizzes).                     | ✓ |
 | `coursekit evaluate PATH --all`    | Every evaluation: facticity + page **pedagogy** (form) + **concept-delivery** → `page-pedagogy.md`, `page-concepts.md`. | ✓ |
 
+| Fix Command                        | What it does                                                       | Uses LLM |
+| ---------------------------------- | ------------------------------------------------------------------ | -------- |
+| `coursekit fix PATH`               | **Regenerate each item flagged by the last review in place** (quizzes **and** pages), then verify — no re-audit, so a just-flagged item is fixed at once. Updates `bank.json`/GIFT + `page.json`/HTML; re-run `emit` to refresh the Canvas package. | ✓ |
+| `coursekit fix PATH --reaudit`     | Cold-read the whole course afresh instead of acting on the last review. | ✓ |
+| `coursekit fix PATH --pages`       | Only the pages (`--quizzes` for only quizzes). | ✓ |
+| `coursekit fix PATH --week N`      | Only that week (`--weeks A-B` for a range); `--max-turns N` caps model turns per fix. | ✓ |
+
 | Test Command         | What it does                                                    | Uses LLM |
 | -------------------- | --------------------------------------------------------------- | -------- |
 | `uv run pytest`      | The offline unit suite. Deterministic, no model.                | x        |

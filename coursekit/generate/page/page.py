@@ -216,6 +216,15 @@ def reset() -> None:
     init("test", None)
 
 
+def load(page_obj: "Page", out_dir: Path | None = None) -> None:
+    """Adopt an EXISTING page as the working singleton — for editing a finished page in place (the
+    targeted-fix pass reloads a `page.json`, then a `put_block` overwrites just the flagged block and
+    autosaves). Distinct from `init`, which starts empty."""
+    global _page, _out_dir
+    _page = page_obj
+    _out_dir = Path(out_dir) if out_dir else None
+
+
 def get() -> Page:
     return _page
 

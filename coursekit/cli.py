@@ -108,7 +108,8 @@ def _review_quizzes(args, provider) -> None:
     print("\nReviewing the generated quizzes (cold read)…")
     try:
         findings, review = ev.evaluate_course(
-            args.path, weeks=_parse_weeks(args), provider=provider, model=model, reads=reads)
+            args.path, weeks=_parse_weeks(args), provider=provider, model=model, reads=reads,
+            progress=_tick)
     except Exception as e:                       # never let the review abort a finished generate
         print(f"(quiz review skipped: {type(e).__name__}: {e})")
         return
@@ -133,7 +134,8 @@ def _review_pages(args, provider) -> None:
     print("\nReviewing the generated pages (cold read)…")
     try:
         findings, review = pev.evaluate_course_pages(
-            args.path, weeks=_parse_weeks(args), provider=provider, model=model, reads=reads)
+            args.path, weeks=_parse_weeks(args), provider=provider, model=model, reads=reads,
+            progress=_tick)
     except Exception as e:
         print(f"(page review skipped: {type(e).__name__}: {e})")
         return
@@ -384,14 +386,14 @@ def _cmd_evaluate(args) -> int:
 
     if do_quiz:
         findings, review = ev.evaluate_course(args.path, weeks=weeks, provider=provider,
-                                              model=model, reads=reads)
+                                              model=model, reads=reads, progress=_tick)
         if findings:
             did_something = True
             flagged_any |= _print_findings("Quizzes", "question", findings, review)
 
     if do_page:
         findings, review = pev.evaluate_course_pages(args.path, weeks=weeks, provider=provider,
-                                                     model=model, reads=reads)
+                                                     model=model, reads=reads, progress=_tick)
         if findings:
             did_something = True
             flagged_any |= _print_findings("Pages", "section", findings, review)
@@ -421,6 +423,79 @@ def _cmd_evaluate(args) -> int:
 
 
 # ---------------------------------------------------------------- parser
+
+def _tick(msg: str) -> None:
+    """A live heartbeat line for the slow model-driven commands — printed and flushed immediately so
+    the user sees progress instead of a silent terminal."""
+    print(msg, flush=True)
+
+
+def _review_findings(path, *, pages: bool):
+    """The Findings from an existing quiz-review.md / page-review.md, or None if there is no review to
+    act on. Lets `fix` repair exactly what the last review flagged without re-auditing the course."""
+    from pathlib import Path
+    from coursekit.discover import find_units
+    from coursekit.generate.quiz.evaluate import parse_review
+    units = find_units(path, subdir="pages") if pages else find_units(path)
+    if not units:
+        return None
+    rp = Path(units[0].output_dir).parent / ("page-review.md" if pages else "quiz-review.md")
+    return parse_review(rp.read_text(encoding="utf-8")) if rp.exists() else None
+
+
+def _cmd_fix(args) -> int:
+    """REGENERATE each flagged quiz question / page section in place, then verify. By default it acts
+    on the LAST review (quiz-review.md / page-review.md) — no re-audit, so a just-flagged item is fixed
+    at once; `--reaudit` forces a fresh cold read. Updates bank.json/GIFT + page.json/HTML."""
+    if not args.path:
+        raise SystemExit("no PATH given")
+    provider = _build_provider()
+    model, reads = _critic_model_and_reads(args.path, args.reads)
+    if not model:
+        raise SystemExit("no critic model configured — set MODEL_NAME or evaluate.yaml `model:`")
+    weeks = _parse_weeks(args)
+    do_quiz, do_page = not args.pages, not args.quizzes    # default: fix both
+    did = False
+
+    def _run(kind, fix_call, pages):
+        review = None if args.reaudit else _review_findings(args.path, pages=pages)
+        if review is not None:
+            n = sum(1 for f in review if f.flagged)
+            if not n:
+                print(f"Last {kind} review had no flags — nothing to fix "
+                      f"(use --reaudit for a fresh check).")
+                return []
+            print(f"Fixing {n} flagged {kind}(s) from the last review…")
+        else:
+            print(f"No prior {kind} review found — cold-reading the {kind}s (use it, or run "
+                  f"`evaluate` first)…")
+        return fix_call(review)
+
+    if do_quiz:
+        from coursekit.generate.quiz import fix as qfix
+        outs = _run("question", lambda review: qfix.fix_course(
+            args.path, weeks=weeks, provider=provider, model=model, reads=reads,
+            max_turns=args.max_turns, findings=review, progress=_tick), pages=False)
+        if outs:
+            did = True
+            print(qfix.render_outcomes(outs))
+
+    if do_page:
+        from coursekit.generate.page import fix as pfix
+        outs = _run("section", lambda review: pfix.fix_course_pages(
+            args.path, weeks=weeks, provider=provider, model=model, reads=reads,
+            max_turns=args.max_turns, findings=review, progress=_tick), pages=True)
+        if outs:
+            did = True
+            print(pfix.render_outcomes(outs))
+
+    if not did:
+        print("Nothing fixed.")
+        return 0
+    print("Artifacts updated (bank.json/GIFT, page.json/HTML). "
+          "Re-run `coursekit emit qti` / `emit course` to refresh the Canvas package.")
+    return 0
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -508,6 +583,23 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("--reads", type=int, metavar="N",
                     help="cold reads per question/section, unioned (default 1; more = more calls)")
     pv.set_defaults(func=_cmd_evaluate)
+
+    # fix — cold-read the quizzes and regenerate each flagged question in place (uses the model)
+    pf = sub.add_parser("fix",
+                        help="cold-read quizzes and/or pages and REGENERATE each flagged item in place")
+    pf.add_argument("path", help="the course (its quizzes/ and pages/ trees + transcripts)")
+    pfw = pf.add_mutually_exclusive_group()
+    pfw.add_argument("--quizzes", action="store_true", help="only quizzes (default: quizzes and pages)")
+    pfw.add_argument("--pages", action="store_true", help="only pages (default: quizzes and pages)")
+    pf.add_argument("--week", action="append", metavar="N", help="a week to fix, repeatable")
+    pf.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
+    pf.add_argument("--reaudit", action="store_true",
+                    help="cold-read the whole course afresh instead of acting on the last review")
+    pf.add_argument("--reads", type=int, metavar="N",
+                    help="cold reads per question when finding flaws with --reaudit (default 1)")
+    pf.add_argument("--max-turns", type=int, default=4, metavar="N",
+                    help="model turns allowed per fix (default 4)")
+    pf.set_defaults(func=_cmd_fix)
 
     return parser
 

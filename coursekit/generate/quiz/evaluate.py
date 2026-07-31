@@ -134,16 +134,19 @@ def _reads_for(critic, transcript, v, provider, model, reads, seed_base=None):
 
 
 def evaluate_bank(bank, transcript: str, provider, model: str, *, week: str = "",
-                  project_root=None, reads: int = DEFAULT_READS) -> list[Finding]:
+                  project_root=None, reads: int = DEFAULT_READS, progress=None) -> list[Finding]:
     """Cold-read every variant `reads` times and union the verdicts — several independent fresh reads,
     flag if any flags. That is what turns a noisy local critic ('a different 3 of 4 each run') into a
-    dependable one."""
+    dependable one. `progress(msg)`, when given, is called after each question — a live heartbeat for a
+    slow local model."""
     critic = _critic_body(EVALUATE_CATEGORY, project_root)
     findings = []
     for g in bank.groups.values():
         for v in g.variants.values():
             results = _reads_for(critic, transcript, v, provider, model, reads)
             verdict, concern, fix, n_flag = _union(results)
+            if progress:
+                progress(f"  {'⚑' if verdict == 'FLAG' else '·'} {week} {g.group_id}/{v.label} — {verdict}")
             findings.append(Finding(week, g.group_id, v.label, v.question_text.strip(),
                                     verdict, concern, fix, n_flag=n_flag, n_reads=len(results)))
     return findings
@@ -166,9 +169,10 @@ def read_verdicts(bank, transcript: str, provider, model: str, *, reads: int = D
 
 
 def evaluate_course(path, *, weeks=None, provider, model, out_path=None,
-                    reads: int = DEFAULT_READS) -> tuple[list[Finding], Path | None]:
+                    reads: int = DEFAULT_READS, progress=None) -> tuple[list[Finding], Path | None]:
     """Discover a course's weeks, pair each `bank.json` with its transcript, cold-read every
-    question `reads` times, and write one `quiz-review.md`. Returns (findings, review_path_or_None)."""
+    question `reads` times, and write one `quiz-review.md`. Returns (findings, review_path_or_None).
+    `progress(msg)` gives a per-week / per-question heartbeat."""
     from coursekit.discover import find_units
     from coursekit.generate.quiz.bank import Bank
     from coursekit.pipeline import _week_matches
@@ -184,8 +188,11 @@ def evaluate_course(path, *, weeks=None, provider, model, out_path=None,
             continue
         bank = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
         transcript = Path(u.transcript_path).read_text(encoding="utf-8")
-        findings += evaluate_bank(bank, transcript, provider, model,
-                                  week=u.week_slug, project_root=u.course_root, reads=reads)
+        n = sum(len(g.variants) for g in bank.groups.values())
+        if progress:
+            progress(f"cold-reading {u.week_slug} — {n} question(s)…")
+        findings += evaluate_bank(bank, transcript, provider, model, week=u.week_slug,
+                                  project_root=u.course_root, reads=reads, progress=progress)
 
     if not findings:
         return [], None
@@ -217,3 +224,26 @@ def render_review(findings: list[Finding], *, title: str = "Quiz review", noun: 
             lines.append(f"- **Fix:** {f.fix}")
         lines.append("")
     return "\n".join(lines) + "\n"
+
+
+# The inverse of render_review's per-item header, so `fix` can act on an EXISTING review without
+# re-auditing the whole course: `## week-7 · c5/B — FLAG` (the id part splits on the last '/', so a
+# page block_id with hyphens — `realtime-code/code` — parses too).
+_REVIEW_HEADER = re.compile(
+    r"^##\s+(?P<week>\S+)\s+·\s+(?P<ids>\S+/\S+)\s+—\s+(?P<verdict>FLAG|ERROR)", re.MULTILINE)
+_REVIEW_CONCERN = re.compile(r"^-\s+\*\*Concern:\*\*\s+(.*)$", re.MULTILINE)
+
+
+def parse_review(text: str) -> list[Finding]:
+    """Parse a `quiz-review.md` / `page-review.md` back into Findings (the inverse of `render_review`),
+    so `fix` can repair exactly what the last review flagged without re-reading every question. Only
+    the fields `fix` needs are recovered — week, group_id/block_id, label/kind, verdict, concern; the
+    stem is re-fetched from the artifact at fix time."""
+    findings, heads = [], list(_REVIEW_HEADER.finditer(text or ""))
+    for i, m in enumerate(heads):
+        block = text[m.end():(heads[i + 1].start() if i + 1 < len(heads) else len(text))]
+        gid, label = m.group("ids").rsplit("/", 1)
+        c = _REVIEW_CONCERN.search(block)
+        findings.append(Finding(m.group("week"), gid, label, "", m.group("verdict"),
+                                c.group(1).strip() if c else ""))
+    return findings

@@ -63,7 +63,9 @@ class QuizzesSource:
     content_type = "Quizzes::Quiz"
 
     def collect(self, course_path) -> list[CartridgeItem]:
-        entries, _skipped = qti._load_banks(course_path)   # (bank, quiz, bank_json); guards run here
+        entries, skipped = qti._load_banks(course_path)   # (bank, quiz, bank_json); guards run here
+        for bj, reason in skipped:                          # a broken week is warned + omitted, not fatal
+            print(f"  ⚠ skipped quiz {bj.parent.name}: {reason}")
         items = []
         for bank, quiz, bj in entries:
             qid = qti.quiz_ident(bank.run_id)

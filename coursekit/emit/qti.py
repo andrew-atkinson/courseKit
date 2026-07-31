@@ -778,6 +778,19 @@ def _incomplete_reason(bank) -> str | None:
     return None
 
 
+def _quiz_bank_mismatch(bank, quiz: dict) -> str | None:
+    """A stale `quiz.json` can reference groups a (re)generated or interrupted `bank.json` no longer
+    has — emitting it would `KeyError` in `emit_assessment`. Catch it so one out-of-sync week is
+    skipped with a clear reason, not fatal to the whole-course package. (Seen 2026-07-31: an
+    interrupted week-7 quiz left a one-group bank beside a stale five-group quiz.json.)"""
+    referenced = {g["group_id"] for g in quiz.get("groups", [])} | set(quiz.get("picks", {}))
+    missing = sorted(referenced - set(bank.groups))
+    if missing:
+        return (f"quiz.json references group(s) {missing} not in bank.json — the quiz is out of sync "
+                f"with the bank (an interrupted or partial generation); regenerate this week's quiz")
+    return None
+
+
 def _load_banks(path) -> tuple[list[tuple], list[tuple]]:
     """(entries, skipped) for every bank.json under path. entries are (bank, quiz, bank_json)."""
     from coursekit.generate.quiz.bank import Bank
@@ -791,6 +804,10 @@ def _load_banks(path) -> tuple[list[tuple], list[tuple]]:
             skipped.append((bj, reason))
             continue
         quiz = _quiz_for(b, bj.parent / "quiz.json")
+        reason = _quiz_bank_mismatch(b, quiz)
+        if reason:
+            skipped.append((bj, reason))
+            continue
         try:
             _quiz_files(b, quiz)  # surfaces unsupported question types before we commit
         except NotImplementedError as e:
@@ -844,6 +861,10 @@ def reemit(path) -> list[tuple]:
             results.append((bj, None, reason))
             continue
         quiz = _quiz_for(b, bj.parent / "quiz.json")
+        reason = _quiz_bank_mismatch(b, quiz)
+        if reason:
+            results.append((bj, None, reason))
+            continue
         out = bj.parent / f"{bj.parent.name}.zip"
         try:
             results.append((bj, write_imscc(b, quiz, out), None))

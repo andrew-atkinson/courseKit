@@ -79,8 +79,9 @@ def _one_read(critic: str, material: str, b, provider, model: str,
 
 
 def evaluate_page(page, material: str, provider, model: str, *, week: str = "",
-                  project_root=None, reads: int = DEFAULT_READS) -> list[Finding]:
-    """Cold-read every content block of a page against the week's material."""
+                  project_root=None, reads: int = DEFAULT_READS, progress=None) -> list[Finding]:
+    """Cold-read every content block of a page against the week's material. `progress(msg)`, when
+    given, is called after each section — a live heartbeat for a slow local model."""
     critic = _critic_body(PAGE_CATEGORY, project_root)
     findings = []
     for b in page.blocks.values():
@@ -88,15 +89,18 @@ def evaluate_page(page, material: str, provider, model: str, *, week: str = "",
             continue
         results = [_one_read(critic, material, b, provider, model) for _ in range(max(1, reads))]
         verdict, concern, fix, n_flag = _union(results)
+        if progress:
+            progress(f"  {'⚑' if verdict == 'FLAG' else '·'} {week} {b.block_id} ({b.kind}) — {verdict}")
         findings.append(Finding(week, b.block_id, b.kind, _preview(b).strip(),
                                 verdict, concern, fix, n_flag=n_flag, n_reads=len(results)))
     return findings
 
 
 def evaluate_course_pages(path, *, weeks=None, provider, model, out_path=None,
-                          reads: int = DEFAULT_READS) -> tuple[list[Finding], Path | None]:
+                          reads: int = DEFAULT_READS, progress=None) -> tuple[list[Finding], Path | None]:
     """Discover a course's weeks, pair each `page.json` with its transcript, cold-read every section,
-    and write one `page-review.md`. Returns (findings, review_path_or_None)."""
+    and write one `page-review.md`. Returns (findings, review_path_or_None). `progress(msg)` gives a
+    per-week / per-section heartbeat."""
     from coursekit.discover import find_units
     from coursekit.generate.page.page import Page
     from coursekit.pipeline import _week_matches
@@ -112,8 +116,11 @@ def evaluate_course_pages(path, *, weeks=None, provider, model, out_path=None,
             continue
         page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
         material = Path(u.transcript_path).read_text(encoding="utf-8")
-        findings += evaluate_page(page, material, provider, model,
-                                  week=u.week_slug, project_root=u.course_root, reads=reads)
+        n = sum(1 for b in page.blocks.values() if b.kind not in _SKIP_KINDS)
+        if progress:
+            progress(f"cold-reading {u.week_slug} — {n} section(s)…")
+        findings += evaluate_page(page, material, provider, model, week=u.week_slug,
+                                  project_root=u.course_root, reads=reads, progress=progress)
 
     if not findings:
         return [], None
