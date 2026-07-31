@@ -29,7 +29,7 @@ uv sync --group dev     # also installs the `coursekit` command (editable)
 Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint — see [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest           # 616 tests, all offline — no model needed (names each, not just dots)
+uv run pytest           # 617 tests, all offline — no model needed (names each, not just dots)
 ```
 
 ## Quick start
@@ -66,7 +66,7 @@ The CLI is four phases, in the order work flows through them:
 
 | Analyze Commands                    | What it does                                                        | Uses LLM |
 | ----------------------------------- | ------------------------------------------------------------------ | -------- |
-| `coursekit analyze PATH`            | Build each week's concept map from its `knowledge.json` → `.vtconfig/concepts/week-N.yaml`. | ✓ |
+| `coursekit analyze PATH`            | Build each week's concept map (from the transcriber's `knowledge.json`, or the week text when absent) → `.vtconfig/concepts/week-N.yaml`. | ✓ |
 | `coursekit analyze PATH --dry-run`  | List the weeks and their knowledge-component counts, no model.     | x        |
 
 | Generate Commands                               | What it does                                                     | Uses LLM |

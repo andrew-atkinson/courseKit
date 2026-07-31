@@ -61,27 +61,50 @@ def _extract_json(reply: str) -> dict:
     return data
 
 
-def consolidate(wk: WeekKnowledge, provider, model: str, *, week: str = "", domain: str = "",
-                project_root=None) -> ConceptMap:
-    """Roll a raw `WeekKnowledge` bundle up into a `ConceptMap` via the model. The week label is set
-    by us, not the model — one less thing for it to get wrong. A week with no knowledge components
-    short-circuits to an empty map (the caller falls back to inline derivation) without a model call."""
-    week = week or wk.week
-    if not wk.kcs:
-        return ConceptMap(week=week)
-    system = prompts.load(PAGE_CATEGORY, "consolidate", project_root=project_root)
+def _call(prompt_name: str, user_content: str, provider, model: str, *, week: str, domain: str,
+          project_root) -> ConceptMap:
+    """Shared model call: domain-aware system prompt + a user message → a validated `ConceptMap`. The
+    week label is set by us, not the model — one less thing for it to get wrong."""
+    system = prompts.load(PAGE_CATEGORY, prompt_name, project_root=project_root)
     system_message = courseconfig.domain_preface(domain) + system.body
     messages = [{"role": "system", "content": system_message},
-                {"role": "user", "content": _bundle_for_prompt(wk)}]
+                {"role": "user", "content": user_content}]
     reply = provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE)
     data = _extract_json(reply)
     data["week"] = week
     return ConceptMap.model_validate(data)
 
 
+def consolidate(wk: WeekKnowledge, provider, model: str, *, week: str = "", domain: str = "",
+                project_root=None) -> ConceptMap:
+    """Roll a raw `WeekKnowledge` bundle (the transcriber's knowledge.json) up into a `ConceptMap`. A
+    week with no knowledge components short-circuits to an empty map without a model call — the caller
+    falls back to `build_concept_map_from_text` (or inline derivation)."""
+    week = week or wk.week
+    if not wk.kcs:
+        return ConceptMap(week=week)
+    return _call("consolidate", _bundle_for_prompt(wk), provider, model,
+                 week=week, domain=domain, project_root=project_root)
+
+
+def build_concept_map_from_text(text: str, provider, model: str, *, week: str = "", domain: str = "",
+                                project_root=None) -> ConceptMap:
+    """The fallback producer for a course with NO transcriber knowledge.json: read the week's teaching
+    text directly and build the same `ConceptMap` (identify concepts, roll up components, name the
+    enduring understanding). Same schema, same downstream consumers — only the source differs."""
+    user = f"The week's teaching material:\n<material>\n{text}\n</material>"
+    return _call("extract", user, provider, model, week=week, domain=domain, project_root=project_root)
+
+
 def build_concept_map(path, provider, model: str, *, week: str = "", domain: str = "",
                       project_root=None) -> ConceptMap:
     """End-to-end for one week: read the sibling `knowledge.json` files → consolidate → `ConceptMap`.
-    `path` is the week doc or its directory; save it with `concept_map.save_concept_map`."""
+    Falls back to extracting from the week text when there is no knowledge.json. `path` is the week doc
+    or its directory; save the result with `concept_map.save_concept_map`."""
     wk = read_week_knowledge(path, week=week)
-    return consolidate(wk, provider, model, week=week, domain=domain, project_root=project_root)
+    if wk.kcs:
+        return consolidate(wk, provider, model, week=week, domain=domain, project_root=project_root)
+    from pathlib import Path
+    text = Path(path).read_text(encoding="utf-8") if Path(path).is_file() else ""
+    return build_concept_map_from_text(text, provider, model, week=week, domain=domain,
+                                       project_root=project_root)

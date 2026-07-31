@@ -77,12 +77,12 @@ def test_run_writes_concept_map(tmp_path, monkeypatch, capsys):
     assert "1 concept map(s) written" in capsys.readouterr().out
 
 
-def test_run_skips_week_without_knowledge(tmp_path, monkeypatch, capsys):
-    doc = _course(tmp_path, with_knowledge=False)
+def test_run_falls_back_to_text_without_knowledge(tmp_path, monkeypatch, capsys):
+    doc = _course(tmp_path, with_knowledge=False)     # no knowledge.json → extract from week text
     monkeypatch.setattr(cli, "_build_provider", lambda: FakeProvider())
     monkeypatch.setenv("MODEL_NAME", "fake-model")
     args = cli.build_parser().parse_args(["analyze", str(doc)])
     rc = cli._cmd_analyze(args)
     assert rc == 0
-    assert "no knowledge.json" in capsys.readouterr().out
-    assert not cmap.concept_map_path(tmp_path, "3").exists()
+    assert "from the week text" in capsys.readouterr().out
+    assert cmap.concept_map_path(tmp_path, "3").exists()   # fallback still wrote a map

@@ -105,3 +105,16 @@ def test_week_label_overrides():
     fp = FakeProvider(_MAP_JSON)
     m = con.consolidate(_bundle(), fp, "fake-model", week="week 5")
     assert m.week == "week 5"
+
+
+# ------------------------------------------------------------- fallback: text -> ConceptMap
+
+def test_build_from_text_uses_extract_prompt_and_material():
+    fp = FakeProvider(_MAP_JSON)
+    m = con.build_concept_map_from_text("A week about arrays and loops.", fp, "fake-model",
+                                        week="week 3")
+    assert isinstance(m, cm.ConceptMap) and m.week == "week 3"
+    assert [c.name for c in m.concepts] == ["for loop"]
+    system, user = fp.messages
+    assert "directly from" in system["content"]            # the extract prompt, not consolidate
+    assert "A week about arrays and loops." in user["content"]

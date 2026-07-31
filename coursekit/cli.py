@@ -198,7 +198,7 @@ def _cmd_analyze(args) -> int:
         for u in units:
             wk = cmap.read_week_knowledge(u.transcript_path)
             detail = (f"{len(wk.kcs)} knowledge component(s) from {len(wk.sources)} source(s)"
-                      if wk.kcs else "no knowledge.json beside the transcript — would be SKIPPED")
+                      if wk.kcs else "no knowledge.json — would extract from the week text")
             print(f"  [plan] {u.week_label}: {detail}")
         return 0
 
@@ -218,16 +218,23 @@ def _cmd_analyze(args) -> int:
         if not key:
             print(f"  [skip] {label}: could not resolve a week number for the filename")
             continue
-        wk = cmap.read_week_knowledge(u.transcript_path, week=label)
-        if not wk.kcs:
-            print(f"  [skip] {label}: no knowledge.json beside the transcript")
-            continue
         cfg = courseconfig.load(u.transcript_path, config_name="page.yaml")
-        cmp = con.consolidate(wk, provider, model, week=label, domain=cfg.domain,
-                              project_root=u.course_root)
+        wk = cmap.read_week_knowledge(u.transcript_path, week=label)
+        if wk.kcs:
+            cmp = con.consolidate(wk, provider, model, week=label, domain=cfg.domain,
+                                  project_root=u.course_root)
+            via = f"from {len(wk.kcs)} knowledge components"
+        else:
+            # No transcriber knowledge.json — fall back to extracting from the week text itself, so a
+            # PDF/readings course (no transcripts) still gets a map. Same schema, same consumers.
+            from pathlib import Path as _P
+            text = _P(u.transcript_path).read_text(encoding="utf-8")
+            cmp = con.build_concept_map_from_text(text, provider, model, week=label,
+                                                  domain=cfg.domain, project_root=u.course_root)
+            via = "from the week text (no knowledge.json)"
         out = cmap.save_concept_map(cmp, cmap.concept_map_path(u.course_root, key))
         eu = " + enduring understanding" if cmp.enduring_understanding else ""
-        print(f"  [OK] {label}: {len(cmp.concepts)} concept(s){eu} -> {out}")
+        print(f"  [OK] {label}: {len(cmp.concepts)} concept(s){eu} {via} -> {out}")
         wrote += 1
 
     print(f"\n{wrote} concept map(s) written. Edit them, then generate.")
