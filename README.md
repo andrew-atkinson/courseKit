@@ -1,22 +1,39 @@
 # coursekit
 
-Turns a course's lecture transcripts — or its readings and slides — into Canvas-ready artifacts: randomized **quizzes** and course **pages**, using a local, tool-calling LLM. It runs fully offline against a model you host (LM Studio by default).
+**Turn a course's own material into correct, well-taught, Canvas/Moodle-ready content — on a model you run yourself.** Point it at a week's lectures, readings, or slides and it drafts the quizzes and pages, checks them for pedagogical soundness, and packages them for your LMS — without your content ever leaving your machine.
 
-## What it does
+> **Status: working prototype.** Today coursekit is a command-line tool, which means it's a fit for the technically comfortable early adopter. The goal is a friendly app any instructor can use; the interface is where much of the road ahead lies. What's below is real and runs — just from a terminal, for now.
 
-Two generators today, both the same shape: point them at a week's transcript and they drive a local model through **tool calls** into a canonical JSON form, then emit platform files. Prose is never the artifact — the model _commits_ each piece through a tool call, so a revision overwrites rather than piling up (an early free-text version kept losing final questions among the model's own drafts).
+## Who it's for
 
-- **Quizzes** — 5 concepts × 4 variants; each concept becomes a Canvas _question group_ that draws one variant at random, so every student gets a different version. `bank.json` → Canvas QTI `.zip` (+ GIFT). → [Generating quizzes](docs/quizzes.md)
-- **Pages** — the week's narrative page: a teaching outline (headings, concept bullets, code, glossary) the model builds from the transcript, plus instructor-supplied references and embeds. `page.json` → Canvas-safe HTML. → [Course pages](docs/pages.md)
+- **Teaching-focused faculty** who want their courses to be more engaging and better-taught, and who'd rather spend their time on the _subject_ than on tooling.
+- **Adjunct and contingent faculty** who often can't get an LMS admin account or API token — coursekit produces standard import files, so you don't need one.
+- **Instructional designers and centers for teaching & learning** who support many courses and want a repeatable way to draft and audit them.
+- **Institutions** that want to raise engagement and online-course quality while keeping faculty content in faculty hands.
 
-Two supporting phases bracket the generators. **Ingest** turns documents (PDF, slides, `.docx`) into the same week text the generators read, so a course with no video still works. **Emit** packages the canonical JSON into Canvas files, model-free — up to a whole-course `.imscc` that imports pages *and* quizzes as week modules in one go.
+## What you can do
 
-Every input converges on one **canonical form** (`bank.json`, `page.json`) that the emitters read — so adding a platform is one emitter, not a rewrite. That, plus a shared spine (`coursekit/`) both generators sit on, is the whole architecture. See [agent/architecture.md](agent/architecture.md) for the map.
+Each is "you have something → coursekit gives you something."
+
+- **Audit an existing course for pedagogical soundness.** You have a course's material and want to know whether it actually teaches well. coursekit reads each page and quiz and reports back on three axes — is it _correct_ (facticity), does it _scan, signal, and engage_ (form), and does it actually _deliver each concept_ — as coaching, not just a pass/fail.
+- **Turn a week's material into engaging, portable LMS content.** You have a transcript or readings and want quizzes and a teaching page. coursekit drafts randomized quizzes (every student gets a different variant) and a designed course page, then packages them as standard Canvas QTI / Common Cartridge files — portable, reviewable, no API token required.
+
+On the roadmap (not yet): refreshing and updating existing content in place, building a course from just an outline, and reasoning about the spacing and timing of content across a whole term.
+
+## Why it's different
+
+- **Portable, reviewable artifacts.** Everything converges on one neutral form and emits to standard files (Canvas QTI `.zip`, Common Cartridge `.imscc`, Moodle GIFT). You get a reviewable package you can import anywhere — no lock-in to one platform's API, and it works for the many faculty who can't get a token.
+- **Local-first.** It runs against a model _you_ host, so your course material and your intellectual property stay on your machine — no cloud dependency.
+- **Evaluation, not just generation.** Most tools generate; coursekit also _measures_ whether the result is pedagogically sound. (This is the newest angle, and one we're still deepening.)
+
+## How it works
+
+Every input converges on one **canonical form** (`bank.json` for quizzes, `page.json` for pages) that the emitters read — so adding a platform is one emitter, not a rewrite. Two generators sit on a shared spine (`coursekit/`), and the model _commits_ each piece through a tool call rather than free text, so a revision overwrites rather than piling up drafts. See [agent/architecture.md](agent/architecture.md) for the map.
 
 ## Requirements
 
 - **Python 3.12+** and [uv](https://docs.astral.sh/uv/)
-- A **tool-calling model** behind one of the supported providers — by default [LM Studio](https://lmstudio.ai/) running its local server
+- A **tool-calling model** behind one of the supported providers — by default [LM Studio](https://lmstudio.ai/) running its local server. (Setting up a local model is the main friction today; a future packaged app aims to remove it.)
 - macOS for the RAM pre-flight check (it degrades to a no-op elsewhere)
 
 ## Install
@@ -34,84 +51,34 @@ uv run pytest           # 617 tests, all offline — no model needed (names each
 
 ## Quick start
 
-The CLI has four phases: **`ingest`** (documents → week text), **`analyze`** (week text → the per-week concept map that grounds generation), **`generate`** (week text → quizzes/pages, the model), **`emit`** (canonical JSON → Canvas packages, model-free).
+The CLI has four phases: **`ingest`** (documents → week text), **`analyze`** (week text → the concept map that grounds generation), **`generate`** (week text → quizzes/pages, the model), **`emit`** (canonical JSON → LMS packages, model-free).
 
 ```bash
 # see what it would do — free, no model
-uv run coursekit generate "/path/to/course export" --dry-run
+uv run coursekit generate "/path/to/course" --dry-run
 
 # both quizzes AND pages, one week (the default)
-uv run coursekit generate "/path/to/course export" --week 3
+uv run coursekit generate "/path/to/course" --week 3
 
 # narrow to one kind
-uv run coursekit generate "/path/to/course export" --pages --week 3
-uv run coursekit generate "/path/to/course export" --quizzes --week 3
+uv run coursekit generate "/path/to/course" --pages --week 3
+
+# check what you already have for pedagogical soundness
+uv run coursekit evaluate "/path/to/course" --all
 ```
 
-`PATH` is a markdown file or a directory of per-week transcripts (`week-*.md`). A `generate` run produces **both quizzes and pages** by default; `--quizzes` or `--pages` narrows it. Artifacts land beside the course (`quizzes/` and `pages/` trees), never in this repo. (`python app.py <verb> …` is equivalent to `coursekit <verb> …` everywhere below.) The detailed guides cover output, Canvas import, and per-course configuration.
-
-## Commands
-
-The CLI is four phases, in the order work flows through them:
-
-- **`ingest`** — turn a week's documents (PDF, slides, `.docx`) into the week text the generators read.
-- **`analyze`** — consolidate a week's concepts into a `.vtconfig/concepts/week-N.yaml` concept map (instructor-editable) that grounds generation and evaluation.
-- **`generate`** — turn that week text into quizzes and pages (the model-driven step).
-- **`emit`** — package the canonical JSON into Canvas files, model-free — up to a whole-course `.imscc`.
-
-| Ingest Commands               | What it does                                               | Uses LLM |
-| ----------------------------- | ---------------------------------------------------------- | -------- |
-| `coursekit ingest PATH`       | Documents (PDF/docx/odt/pptx/txt/md) → `output/week-N.md`. | ✓        |
-| `coursekit ingest PATH --raw` | Same, extract only, fully offline.                         | x        |
-
-| Analyze Commands                    | What it does                                                        | Uses LLM |
-| ----------------------------------- | ------------------------------------------------------------------ | -------- |
-| `coursekit analyze PATH`            | Build each week's concept map (from the transcriber's `knowledge.json`, or the week text when absent) → `.vtconfig/concepts/week-N.yaml`. | ✓ |
-| `coursekit analyze PATH --dry-run`  | List the weeks and their knowledge-component counts, no model.     | x        |
-
-| Generate Commands                               | What it does                                                     | Uses LLM |
-| ----------------------------------------------- | ---------------------------------------------------------------- | -------- |
-| `coursekit generate PATH`                       | Both quizzes and pages, every week found.                        | ✓        |
-| `coursekit generate PATH --dry-run`             | List the weeks it would process.                                 | x        |
-| `coursekit generate PATH --week 3`              | One week. `--week` is repeatable; `--weeks 3-8` a range.         | ✓        |
-| `coursekit generate PATH --pages`               | Only pages (`--quizzes` for only quizzes).                       | ✓        |
-| `coursekit generate PATH --pages --detail full` | Page depth: `brief` / `medium` / `full` (overrides `page.yaml`). | ✓        |
-| `coursekit generate PATH --output-root DIR`     | Write elsewhere instead of with the course.                      | ✓        |
-| `coursekit generate PATH --max-iters N`         | Cap model turns per week (default 80).                           | ✓        |
-| `coursekit generate PATH --no-review`           | Skip the cold-read quiz review a `generate` runs by default.     | ✓        |
-
-| Emit Commands                      | What it does                      | Uses LLM |
-| ---------------------------------- | --------------------------------- | -------- |
-| `coursekit emit qti PATH`          | One Canvas quiz `.zip` per week.  | x        |
-| `coursekit emit qti PATH --bundle` | One `.zip` for all quizzes.       | x        |
-| `coursekit emit html PATH`         | Re-render pages from `page.json`. | x        |
-| `coursekit emit cc PATH`           | One Canvas `.imscc` of all pages. | x        |
-| `coursekit emit course PATH`       | One Canvas `.imscc` of the whole course — pages **and** quizzes, in week modules. | x |
-
-| Review Command                     | What it does                                                        | Uses LLM |
-| ---------------------------------- | ------------------------------------------------------------------ | -------- |
-| `coursekit evaluate PATH`          | Cold-read review of already-generated quizzes **and** pages → `quiz-review.md`, `page-review.md`. | ✓ |
-| `coursekit evaluate PATH --pages`  | Only the pages (`--quizzes` for only quizzes).                     | ✓ |
-| `coursekit evaluate PATH --all`    | Every evaluation: facticity + page **pedagogy** (form) + **concept-delivery** → `page-pedagogy.md`, `page-concepts.md`. | ✓ |
-
-| Test Command         | What it does                                                    | Uses LLM |
-| -------------------- | --------------------------------------------------------------- | -------- |
-| `uv run pytest`      | The offline unit suite. Deterministic, no model.                | x        |
-| `uv run pytest evals/` | Model-in-the-loop evals (critic judgment). Skips without a model. | ✓ |
-
-Exit codes: `0` success · `1` a unit failed to finalize · `2` the model could not be loaded.
+The full command surface — every verb, flag, and what uses the model — is the **[command reference](docs/commands.md)**.
 
 ## Documentation
 
 The README is the high-level read; the detail lives in [`docs/`](docs/):
 
+- **[Command reference](docs/commands.md)** — every CLI verb and flag, and which use the model.
 - **[Generating quizzes](docs/quizzes.md)** — the quiz workflow end to end: dry-run, generate, where output lands, and exporting to Canvas as a QTI `.zip`. Plus the six question types and how the hardened loop copes with an unreliable local model.
 - **[Course pages](docs/pages.md)** — generating a week's page, the two-author split (model outline + your supplements), the supplements YAML (references, examples, embeds — including pasted `<iframe>` snippets), and re-rendering model-free.
 - **[The domain profile](docs/domain-profile.md)** — one `.vtconfig/domain.md` per course that pins every generator to the right knowledge domain (p5.js, not Processing) and _corrects a transcript that drifts_. The main defence against plausible-but-wrong output.
 - **[Page design](docs/design.md)** — the four visual identities (bauhaus, terminal, plotter, studio), the `style.yaml` a course picks a theme with, section roles (where design meets pedagogy), and the guardrails (Canvas allowlist, WCAG, alt-text) that keep a theme shippable.
 - **[Configuration](docs/configuration.md)** — the `.env` environment, choosing a provider, the RAM pre-flight, and the per-course `.vtconfig/` files (`quiz.yaml` / `page.yaml`, prompt overrides).
-- **[Canvas QTI format](docs/canvasQuizStructure.md)** — the internals behind `qti.py`: the package layout, namespaces, and the "imports empty" trap that cost two rounds to find. Read this before
-  touching the QTI emitter.
+- **[Canvas QTI format](docs/canvasQuizStructure.md)** — the internals behind `qti.py`: the package layout, namespaces, and the "imports empty" trap that cost two rounds to find. Read this before touching the QTI emitter.
 
-For the architecture, the shared-spine design, and the roadmap, see
-[`agent/architecture.md`](agent/architecture.md).
+For the architecture, the shared-spine design, and the roadmap, see [`agent/architecture.md`](agent/architecture.md).
