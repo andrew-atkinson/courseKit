@@ -57,6 +57,14 @@ _MATH_TOKEN = re.compile(r"\\[a-zA-Z]+")
 # $…$ only counts as math when it contains a \command — so prose like "$5 and $10" is left alone.
 _DOLLAR_MATH = re.compile(r"\$([^$]*\\[a-zA-Z][^$]*)\$")
 _PAREN_MATH = re.compile(r"\\\((.+?)\\\)")   # \(…\): an explicit LaTeX inline-math delimiter
+# A bare $…$ span the model delimited around an *equation* — e.g. "$5 - 10 = -5$" — is math, not two
+# prices; Canvas ships bare $…$ literally, so drop the delimiters and render the expression plainly.
+# Gated on a relation (=, <, >) inside an arithmetic/algebra-only body, so genuine prose dollars
+# ("$5 and $10", a "$5 - $10" range) — which never enclose a relation — stay untouched. Runs AFTER
+# the LaTeX passes: the body excludes "\", so an unresolved `$…\cmd…$` span can't match here and is
+# still preserved for a later MathJax pass. (Escaping precedes this, so `<`/`>` arrive as &lt;/&gt;.)
+_MB = r"[0-9A-Za-z\s+\-*/^().,=_&;]"
+_DOLLAR_EQUATION = re.compile(rf"\$({_MB}*(?:=|&lt;|&gt;){_MB}*)\$")
 
 
 def _render_math(s: str) -> str:
@@ -74,7 +82,8 @@ def _render_math(s: str) -> str:
         converted, done = _resolve(m.group(1))
         return converted if done else m.group(0)
 
-    return _PAREN_MATH.sub(_span, _DOLLAR_MATH.sub(_span, s))
+    s = _PAREN_MATH.sub(_span, _DOLLAR_MATH.sub(_span, s))
+    return _DOLLAR_EQUATION.sub(lambda m: m.group(1), s)   # bare "$…=…$" → the expression, no $
 
 
 # The inline-code chip style, set per render from the active theme (render_body). A self-contained

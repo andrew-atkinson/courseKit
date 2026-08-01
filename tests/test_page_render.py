@@ -67,6 +67,21 @@ def test_bare_dollar_amounts_are_not_treated_as_math(fresh):
     assert "$5 and $10" in body
 
 
+def test_bare_equation_sheds_its_dollar_delimiters(fresh):
+    # the real regression: the model wrote "$5 - 10 = -5$" (an equation it delimited), and with no
+    # LaTeX command inside, the old passes left it literal — dollar signs and all — in the output.
+    body = render_body(_page_with(
+        dict(kind="paragraph", block_id="p", text="the balance is $5 - 10 = -5$ after the debit")))
+    assert "5 - 10 = -5" in body and "$5" not in body and "-5$" not in body
+
+
+def test_a_dollar_range_without_a_relation_stays_prose(fresh):
+    # "$5 - $10" is a price range, not an equation — no relation between the dollars, leave it be.
+    body = render_body(_page_with(
+        dict(kind="paragraph", block_id="p", text="the fee ranges $5 - $10 per seat")))
+    assert "$5 - $10" in body
+
+
 def test_unresolved_latex_is_left_intact_for_mathjax_later(fresh):
     # a command we don't map (\frac) is preserved as a delimited span — the seam a future
     # MathJax strategy targets; nothing is silently mangled or dropped.
