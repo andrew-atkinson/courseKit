@@ -383,6 +383,7 @@ def _cmd_evaluate(args) -> int:
     weeks = _parse_weeks(args)
     do_quiz, do_page = not args.pages, not args.quizzes    # default: both facticity passes
     did_something = flagged_any = False
+    reviews, metrics = [], {}                              # for the versioned run-store
 
     if do_quiz:
         findings, review = ev.evaluate_course(args.path, weeks=weeks, provider=provider,
@@ -390,6 +391,9 @@ def _cmd_evaluate(args) -> int:
         if findings:
             did_something = True
             flagged_any |= _print_findings("Quizzes", "question", findings, review)
+            reviews.append(review)
+            metrics["quiz"] = {"reviewed": len(findings),
+                               "flagged": sum(1 for f in findings if f.flagged)}
 
     if do_page:
         findings, review = pev.evaluate_course_pages(args.path, weeks=weeks, provider=provider,
@@ -397,6 +401,9 @@ def _cmd_evaluate(args) -> int:
         if findings:
             did_something = True
             flagged_any |= _print_findings("Pages", "section", findings, review)
+            reviews.append(review)
+            metrics["page"] = {"reviewed": len(findings),
+                               "flagged": sum(1 for f in findings if f.flagged)}
 
     # --all adds the deeper page-quality rubrics (form + concept delivery) on top of facticity.
     if args.all and do_page:
@@ -407,6 +414,9 @@ def _cmd_evaluate(args) -> int:
             for r in rubrics:
                 print(f"  {r.page_id}: {r.total}/{3 * len(ped.CRITERIA)}")
             print(f"  -> {out}")
+            reviews.append(out)
+            metrics["pedagogy"] = {"pages": len(rubrics),
+                                   "avg_total": round(sum(r.total for r in rubrics) / len(rubrics), 1)}
 
         concepts, cout = cd.evaluate_course_concepts(args.path, weeks=weeks, provider=provider, model=model)
         if concepts:
@@ -415,10 +425,22 @@ def _cmd_evaluate(args) -> int:
             for c in concepts:
                 print(f"  {c.page_id}: avg {c.average:.1f}/3 over {len(c.concepts)} concept(s)")
             print(f"  -> {cout}")
+            reviews.append(cout)
+            metrics["concepts"] = {"pages": len(concepts),
+                                   "avg": round(sum(c.average for c in concepts) / len(concepts), 1)}
 
     if not did_something:
         print("Nothing found to evaluate (need generated bank.json / page.json under the course).")
         return 1
+
+    # Snapshot this run so the results are never overwritten — a versioned trend, not a single file.
+    from coursekit.discover import find_units
+    from coursekit.evalstore import archive_evaluation
+    units = find_units(args.path)
+    run_dir = archive_evaluation(units[0].course_root if units else None,
+                                 model=model, reviews=reviews, metrics=metrics)
+    if run_dir:
+        print(f"\nArchived this run → {run_dir}")
     return 1 if flagged_any else 0
 
 

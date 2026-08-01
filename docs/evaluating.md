@@ -32,6 +32,8 @@ uv run coursekit evaluate "/path/to/course" --all    # + pedagogy (form) + conce
 
 It writes `quiz-review.md`, `page-review.md`, and (with `--all`) `page-pedagogy.md` / `page-concepts.md` beside the course. Nothing is changed — a human stays in the loop.
 
+**Every run is archived, never overwritten.** Alongside those "latest" files, each `evaluate` snapshots the run to `<course>/evals/<timestamp>/` (its review files + a `summary.json` recording the date, the coursekit commit, the model, and the counts) and appends one row to `<course>/evals/log.jsonl`. So quality is a **trend you can read over time** — did a change help, did a regression creep in — not a single file you keep overwriting.
+
 A realistic result on a full course: a small local model marks a wrong answer or writes a buggy code block a few percent of the time, and the cold read catches them — the errors that would otherwise ship to students silently.
 
 ## `fix` — repair in place
