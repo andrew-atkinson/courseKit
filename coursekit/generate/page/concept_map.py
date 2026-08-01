@@ -76,6 +76,11 @@ class ConceptMap(BaseModel):
     week: str = Field(min_length=1)
     enduring_understanding: str = ""
     concepts: list[Concept] = Field(default_factory=list)
+    # Optional per-week override for the QUIZ's group count — the instructor sets it in this week's
+    # `.vtconfig/concepts/week-N.yaml` to fix how many questions THIS week gets, regardless of the
+    # concept count. Wins over the course-level `quiz.yaml` `questions:`. Quiz-only; page generation
+    # ignores it.
+    questions: int | None = Field(default=None, ge=1)
 
 
 # ------------------------------- the raw, pre-consolidation bundle (what consolidation reads) ------
@@ -200,3 +205,19 @@ def save_concept_map(cm: ConceptMap, path) -> Path:
                             default_flow_style=False, allow_unicode=True)
     p.write_text(dumped)
     return p
+
+
+def load_for_unit(unit) -> ConceptMap | None:
+    """The concept map for a discovered week `unit`, or None. Best-effort — the map is enrichment, so
+    no course root, no map file, or an unreadable map all fall back to None (the generator then works
+    without it). Shared by the page and quiz generators (the analyze artifact isn't page-specific)."""
+    if not getattr(unit, "course_root", None):
+        return None
+    from coursekit import courseconfig
+    key = courseconfig.week_key(unit.week_slug)
+    if not key:
+        return None
+    try:
+        return load_concept_map(concept_map_path(unit.course_root, key))
+    except Exception:
+        return None

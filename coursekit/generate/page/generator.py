@@ -14,20 +14,9 @@ from coursekit.generate.page.context import build_messages
 
 
 def _load_week_concept_map(unit: Unit):
-    """The consolidated concept map for this week, or None. Best-effort: no course root, no map file,
-    or an unreadable map all fall back to inline derivation rather than failing the page build — the
-    map is enrichment, exactly like the domain profile and supplements."""
-    if not unit.course_root:
-        return None
-    from coursekit import courseconfig
-    from coursekit.generate.page.concept_map import concept_map_path, load_concept_map
-    key = courseconfig.week_key(unit.week_slug)
-    if not key:
-        return None
-    try:
-        return load_concept_map(concept_map_path(unit.course_root, key))
-    except Exception:
-        return None
+    """The consolidated concept map for this week, or None (falls back to inline derivation)."""
+    from coursekit.generate.page.concept_map import load_for_unit
+    return load_for_unit(unit)
 
 
 class PageGenerator:

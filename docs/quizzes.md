@@ -1,6 +1,8 @@
 # Generating quizzes
 
-A quiz is **5 concepts × 4 variants**. Each concept becomes a Canvas _question group_ that draws one variant at random, so every student gets a different version of the same quiz. The model commits each question through a tool call — prose is scratch, so a revision overwrites rather than piling up.
+A quiz is **one question group per concept, × 4 variants** — the number of concepts follows the week's concept map (plus a group for its enduring understanding), rather than a fixed five. Each concept becomes a Canvas _question group_ that draws one variant at random, so every student gets a different version of the same quiz.
+
+You can override the count at two levels: a `questions:` value in a week's `.vtconfig/concepts/week-N.yaml` fixes the number for **that week**, and `questions:` in the course's `.vtconfig/quiz.yaml` fixes it for **every** week — the per-week value wins. With neither set, the model chooses, guided by the concept map. The model commits each question through a tool call — prose is scratch, so a revision overwrites rather than piling up.
 
 The canonical artifact is `bank.json`; the emitters (GIFT, QTI) read only it. Adding a platform is one emitter, not a rewrite.
 
@@ -62,7 +64,7 @@ Then in Canvas: **Import Content → Content Type: "QTI .zip file"** → upload 
 > course-package one brings the quiz in **empty**. (The full story is in
 > [canvasQuizStructure.md](canvasQuizStructure.md).)
 
-Each quiz arrives with 5 question groups, each drawing 1 of 4 variants, plus a description and grading criteria. Both the per-week `.zip` and the `--bundle` package have been imported into a live Canvas course and confirmed working, with the groups randomizing as intended.
+Each quiz arrives with one question group per concept (the count set by the week's concept map, or `quiz.yaml`), each drawing 1 of 4 variants, plus a description and grading criteria. Both the per-week `.zip` and the `--bundle` package have been imported into a live Canvas course and confirmed working, with the groups randomizing as intended.
 
 ## Good to know
 

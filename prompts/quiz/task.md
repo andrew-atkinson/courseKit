@@ -1,16 +1,17 @@
 ---
 name: task
 category: quiz
-description: "The brief - five concepts x four variants, type mix, correct-answer position rule, variant summaries"
+description: "The brief - one group per concept (count set by the concept map or config), four variants, type mix, position rule, variant summaries"
 ---
 
 Build a question bank for this lecture.
 
-Five question groups, one per concept — the five most important ideas in the transcript, one group
-each. If the course's domain note asks for a particular kind of question, a particular subject
-emphasis, or a different number of groups, follow it.
+One question group per concept the lecture teaches. **How many groups** is set at the end of this
+brief — from the week's concept map, or the course's configuration; follow it, and let the content
+decide the number rather than forcing a fixed count. If the course's domain note asks for a particular
+kind of question or a subject emphasis, follow that too.
 
-Types: at least three of the five groups must be "multiple_choice". You may use "multiple_answer",
+Types: at least half of the groups must be "multiple_choice". You may use "multiple_answer",
 "true_false", "short_answer", "numerical" or "matching" for the others where the concept genuinely
 suits it. Do not pick a type just for variety.
 

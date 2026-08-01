@@ -34,13 +34,21 @@ class QuizGenerator:
 
     def build_messages(self, unit: Unit, transcript: str, cfg) -> list[dict]:
         # A course selects its prompts by name (system_prompt/task_prompt in quiz.yaml) and by
-        # file (a .vtconfig/prompts/quiz/ override, reached via project_root).
+        # file (a .vtconfig/prompts/quiz/ override, reached via project_root). The number of question
+        # groups is content-relative: the week's concept map suggests it (one per concept + the
+        # enduring understanding), and quiz.yaml's `questions:` overrides that with a fixed count.
+        from coursekit.generate.page.concept_map import load_for_unit
+        cm = load_for_unit(unit)
+        # Per-week wins over per-course: a `questions` on THIS week's concept map beats quiz.yaml's.
+        q = (cm.questions if cm is not None and cm.questions else cfg.value("questions"))
         return build_messages(
             transcript, course_title=unit.course_title, week_label=unit.week_label,
             module=unit.module, project_root=unit.course_root,
             system_prompt=cfg.prompt_name("system_prompt", default="system"),
             task_prompt=cfg.prompt_name("task_prompt", default="task"),
             domain=cfg.domain,
+            concept_map=cm,
+            questions=int(q) if q else None,
         )
 
     def is_finalized(self) -> bool:
