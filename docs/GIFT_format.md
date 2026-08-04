@@ -5,9 +5,12 @@
 - In the simple form, the question comes first, then the answers are set in between brackets, with an equal sign indicating the correct answer(s) and tilde the wrong answers. A Number sign will insert a response. Questions can be weighted by placing percentage signs around the weight. Comments are preceded by double slashes and are not imported.
 
 ## Useful GIFT Examples
-Here are some useful GIFT examples that can be imported or used as rough templates. Many of these examples use questions from files as starting points.
+Here are some useful GIFT examples that can be imported or used as rough templates.
+Many of these examples use questions from files as starting points.
 
-**TIP:** Any GIFT file must be correctly encoded in UTF8. Beware of some Microsoft "fake" Unicode implementations which may cause strange characters to appear in your quizzes. When in doubt, save as a simple MS-DOS text file.
+**TIP:** Any GIFT file must be correctly encoded in UTF8.
+Beware of some Microsoft "fake" Unicode implementations which may cause strange characters to appear in your quizzes.
+When in doubt, save as a simple MS-DOS text file.
 
 ## Format Symbols
 | Symbol | Use |
@@ -67,13 +70,4 @@ double slash comments can be added for explanations or context.
 defaults include using titles like `::Grant's tomb::` for organization.
 ```
 ### True-False:
-e.g.,
-to ask if Grant was buried in NYC:
-gift format:
-declare true/false statement:
-simple true-false example:
-documentation on how to write questions with T/F options.
-details about default behaviors regarding navigation and feedback messages within Moodle lessons.
-defining feedback options including custom messages or hiding messages using non-breaking spaces (`&nbsp;`).
-defining escape sequences for special characters (`{`, `}`, `=`, `#`, `~`) when used within questions such as TeX expressions or math formulas.
-e.g., replacing `(T)` with `(=True)` and so forth after exporting from Word macros or spreadsheets tools like Excel or Open Office templates.`
+e.g., to ask if Grant was buried in NYC: gift format: declare true/false statement: simple true-false example: documentation on how to write questions with T/F options. details about default behaviors regarding navigation and feedback messages within Moodle lessons. defining feedback options including custom messages or hiding messages using non-breaking spaces (`&nbsp;`). defining escape sequences for special characters (`{`, `}`, `=`, `#`, `~`) when used within questions such as TeX expressions or math formulas. e.g., replacing `(T)` with `(=True)` and so forth after exporting from Word macros or spreadsheets tools like Excel or Open Office templates.`

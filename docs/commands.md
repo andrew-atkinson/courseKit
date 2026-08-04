@@ -1,6 +1,7 @@
 # Command reference
 
-The full CLI surface. For the high-level "what it's for and who it's for," see the [README](../README.md).
+The full CLI surface.
+For the high-level "what it's for and who it's for," see the [README](../README.md).
 
 The CLI is four phases, in the order work flows through them, plus a review verb and the tests:
 
@@ -9,7 +10,9 @@ The CLI is four phases, in the order work flows through them, plus a review verb
 - **`generate`** — turn that week text into quizzes and pages (the model-driven step).
 - **`emit`** — package the canonical JSON into Canvas files, model-free — up to a whole-course `.imscc`.
 
-`PATH` is a markdown file or a directory of per-week transcripts (`week-*.md`). Artifacts land beside the course (`quizzes/` and `pages/` trees), never in this repo. `python app.py <verb> …` is equivalent to `coursekit <verb> …` everywhere below.
+`PATH` is a markdown file or a directory of per-week transcripts (`week-*.md`).
+Artifacts land beside the course (`quizzes/` and `pages/` trees), never in this repo.
+`python app.py <verb> …` is equivalent to `coursekit <verb> …` everywhere below.
 
 | Ingest Commands               | What it does                                               | Uses LLM |
 | ----------------------------- | ---------------------------------------------------------- | -------- |

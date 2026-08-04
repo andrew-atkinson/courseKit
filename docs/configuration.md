@@ -1,6 +1,7 @@
 # Configuration
 
-Two layers: **environment** (`.env`, per machine) and **per-course** (`.vtconfig/`, versioned with the course). Both are optional beyond a model name; everything falls back to a sensible default.
+Two layers: **environment** (`.env`, per machine) and **per-course** (`.vtconfig/`, versioned with the course).
+Both are optional beyond a model name; everything falls back to a sensible default.
 
 ## Environment — `.env`
 
@@ -28,7 +29,8 @@ Model access goes through `coursekit.providers`, so the endpoint is configuratio
 | `ollama`                | `http://localhost:11434/v1/` | local                                         |
 | `openai`                | OpenAI                       | needs `OPENAI_API_KEY`                        |
 
-`LOCAL_HOST_URL` overrides the endpoint for whichever provider is selected. Only providers speaking the OpenAI tool-calling format are implemented today; Anthropic uses a different `tool_use` shape and would need its own implementation behind the same interface.
+`LOCAL_HOST_URL` overrides the endpoint for whichever provider is selected.
+Only providers speaking the OpenAI tool-calling format are implemented today; Anthropic uses a different `tool_use` shape and would need its own implementation behind the same interface.
 
 **Model choice is a RAM question.** On a 32 GB machine a ~15 GB model is the practical ceiling. coursekit warns before a run if the configured model won't fit, and turns LM Studio's opaque load failure into a readable message.
 
@@ -49,7 +51,8 @@ A course carries its own settings in a `.vtconfig/` folder at its root — the s
 
 ### Generator settings — `quiz.yaml` / `page.yaml`
 
-Each generator reads its own file. Every key is optional.
+Each generator reads its own file.
+Every key is optional.
 
 ```yaml
 # <course root>/.vtconfig/quiz.yaml   (page.yaml is identical in shape)
@@ -58,11 +61,13 @@ system_prompt: system # which prompts/<gen>/<name>.md to use for the rules…
 task_prompt: exam # …and for the brief (default: system / task)
 ```
 
-`task_prompt: exam` tells the generator to load `exam.md` instead of `task.md` — resolved the same way as any prompt (the course's own override first, then the shipped file). `MODEL_NAME` in the environment still wins over `model` here; the file is the per-course default, not an override.
+`task_prompt: exam` tells the generator to load `exam.md` instead of `task.md` — resolved the same way as any prompt (the course's own override first, then the shipped file).
+`MODEL_NAME` in the environment still wins over `model` here; the file is the per-course default, not an override.
 
 ### Prompt overrides
 
-The prompts are files, not strings in code — `prompts/quiz/system.md` (the rules) and `prompts/quiz/task.md` (the brief), and likewise under `prompts/page/`. Edit them in place to change behaviour everywhere.
+The prompts are files, not strings in code — `prompts/quiz/system.md` (the rules) and `prompts/quiz/task.md` (the brief), and likewise under `prompts/page/`.
+Edit them in place to change behaviour everywhere.
 
 To change them for **one course only**, drop a replacement next to that course's content and coursekit prefers it, falling back to the shipped file for anything you don't override:
 
@@ -75,8 +80,12 @@ Naming a _variant_ (`task_prompt: exam` above) and supplying its file (`prompts/
 
 ### Voice profile — `voice.md`
 
-A `.vtconfig/voice.md` characterizes the instructor's spoken voice — register, stance, hedging, rhythm, and a few signature moves — so generated prose sounds like them instead of a textbook. It's the companion to [`domain.md`](domain-profile.md): domain fixes _what_ the course is about, voice shapes _how_ it reads.
+A `.vtconfig/voice.md` characterizes the instructor's spoken voice — register, stance, hedging, rhythm, and a few signature moves — so generated prose sounds like them instead of a textbook.
+It's the companion to [`domain.md`](domain-profile.md): domain fixes _what_ the course is about, voice shapes _how_ it reads.
 
-It is produced on the transcriber side (the `voice` step reads the raw transcripts, before cleanup flattens the spoken register, and writes this file); coursekit only reads it. Like `domain.md`, it's plain Markdown you can edit freely — the generator takes it as-is.
+It is produced on the transcriber side (the `voice` step reads the raw transcripts, before cleanup flattens the spoken register, and writes this file); coursekit only reads it.
+Like `domain.md`, it's plain Markdown you can edit freely — the generator takes it as-is.
 
-When present, it's prepended to the **prose generators** and their fix loops as a tone directive that is explicitly _subordinate_ to correctness, structure, and domain — it governs phrasing, never what's taught. **Pages** get the full voice. **Quizzes** get a narrower version: because a quiz is a precision instrument, the voice colours the _feedback and explanations only_, while question stems and answer options stay literal and unambiguous (a hedged register in a stem produces vague or mis-formed questions). It is deliberately **not** given to the evaluators — voice is a matter of tone, not correctness, so the critics never judge against it. Absent the file, nothing changes.
+When present, it's prepended to the **prose generators** and their fix loops as a tone directive that is explicitly _subordinate_ to correctness, structure, and domain — it governs phrasing, never what's taught. **Pages** get the full voice. **Quizzes** get a narrower version: because a quiz is a precision instrument, the voice colours the _feedback and explanations only_, while question stems and answer options stay literal and unambiguous (a hedged register in a stem produces vague or mis-formed questions).
+It is deliberately **not** given to the evaluators — voice is a matter of tone, not correctness, so the critics never judge against it.
+Absent the file, nothing changes.

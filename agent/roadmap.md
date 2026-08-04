@@ -1,12 +1,15 @@
 # coursekit roadmap
 
-The forward-looking view. For the detailed record — measurements, dated decisions, per-course results — see the working log (kept offline). This file is the map; the log is the diary.
+The forward-looking view.
+For the detailed record — measurements, dated decisions, per-course results — see the working log (kept offline).
+This file is the map; the log is the diary.
 
 ## Vision
 
 > coursekit turns a course's own material into Canvas-ready artifacts that are **correct, well-taught, and reviewable** — locally, and measurably.
 
-Every decision checks against that line: does it make artifacts more correct, better-taught, more reviewable, or the tool more usable to a real instructor? If not, it goes to the parking lot.
+Every decision checks against that line: does it make artifacts more correct, better-taught, more reviewable, or the tool more usable to a real instructor?
+If not, it goes to the parking lot.
 
 ## How we work (the cadence)
 
@@ -55,7 +58,9 @@ _(Evaluation exists to improve; the loop-back is its point — so "improve" live
 
 ## Parking lot
 
-Captured, deliberately not active. Reviewed at each regroup. `[theme]` tags where it belongs.
+Captured, deliberately not active.
+Reviewed at each regroup.
+`[theme]` tags where it belongs.
 
 - **assignments and discussions** need to be added.
 - **Quiz introduction** needs reworking. Very generic and factual but doesn't give a good reason for taking the quiz (other than it being mandatory). Need to explore more engaging quiz forms within the remit of canvas.
@@ -98,7 +103,9 @@ Increments 1–10 are complete in code; these are the live remnants, so nothing 
 
 ## Shipped
 
-A running changelog — one line per completed feature, newest first, with its commit(s). The sections above stay forward-looking; deep detail lives in the offline log + git. (Increments 1–9 — GIFT/QTI/CC emitters, `courseconfig`, the quizbot→coursekit rename, the design system, document ingest — predate this changelog; see `architecture.md`'s "Order of operations" and git history.)
+A running changelog — one line per completed feature, newest first, with its commit(s).
+The sections above stay forward-looking; deep detail lives in the offline log + git.
+(Increments 1–9 — GIFT/QTI/CC emitters, `courseconfig`, the quizbot→coursekit rename, the design system, document ingest — predate this changelog; see `architecture.md`'s "Order of operations" and git history.)
 
 - 2026-08-02 · **Voice on quizzes scoped to feedback only** — after voice went live, a full-course run showed quiz flags rise (~2% → ~6%) while pages improved: a hedged register bleeds into stems/options ("asks why, but the options are syntax"). So the quiz generator + quiz fixer now use a narrower `quiz_voice_preface` (voice in feedback/explanations only; stems and options stay literal); pages keep the full voice. _(pending commit)_
 - 2026-08-02 · **Generate's auto-review archives to the run-store** — the cold read after `generate` now snapshots to `<course>/evals/<timestamp>/` + `log.jsonl`, same as `evaluate`; `_review_quizzes`/`_review_pages` return `(review, metrics)`. `b298def`

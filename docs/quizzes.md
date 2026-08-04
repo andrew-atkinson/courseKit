@@ -1,10 +1,14 @@
 # Generating quizzes
 
-A quiz is **one question group per concept, × 4 variants** — the number of concepts follows the week's concept map (plus a group for its enduring understanding), rather than a fixed five. Each concept becomes a Canvas _question group_ that draws one variant at random, so every student gets a different version of the same quiz.
+A quiz is **one question group per concept, × 4 variants** — the number of concepts follows the week's concept map (plus a group for its enduring understanding), rather than a fixed five.
+Each concept becomes a Canvas _question group_ that draws one variant at random, so every student gets a different version of the same quiz.
 
-You can override the count at two levels: a `questions:` value in a week's `.vtconfig/concepts/week-N.yaml` fixes the number for **that week**, and `questions:` in the course's `.vtconfig/quiz.yaml` fixes it for **every** week — the per-week value wins. With neither set, the model chooses, guided by the concept map. The model commits each question through a tool call — prose is scratch, so a revision overwrites rather than piling up.
+You can override the count at two levels: a `questions:` value in a week's `.vtconfig/concepts/week-N.yaml` fixes the number for **that week**, and `questions:` in the course's `.vtconfig/quiz.yaml` fixes it for **every** week — the per-week value wins.
+With neither set, the model chooses, guided by the concept map.
+The model commits each question through a tool call — prose is scratch, so a revision overwrites rather than piling up.
 
-The canonical artifact is `bank.json`; the emitters (GIFT, QTI) read only it. Adding a platform is one emitter, not a rewrite.
+The canonical artifact is `bank.json`; the emitters (GIFT, QTI) read only it.
+Adding a platform is one emitter, not a rewrite.
 
 ## See what it would do (free, no model)
 
@@ -22,15 +26,17 @@ uv run coursekit generate "/path/to/course export" --weeks 3-8   # an inclusive 
 uv run coursekit generate "/path/to/course export"               # every week found
 ```
 
-`PATH` is a markdown file **or** a directory. Given a directory it picks up per-week transcripts
-(`week-*.md`). Expect a few minutes per week on a local model.
+`PATH` is a markdown file **or** a directory.
+Given a directory it picks up per-week transcripts (`week-*.md`).
+Expect a few minutes per week on a local model.
 
-**Input is decoupled** — any markdown works. If the path happens to sit under a videotranscriber project (marked by a `.vtconfig/` folder), coursekit reads its `context.yaml` to enrich the prompt with week titles and module names. It never requires it.
+**Input is decoupled** — any markdown works.
+If the path happens to sit under a videotranscriber project (marked by a `.vtconfig/` folder), coursekit reads its `context.yaml` to enrich the prompt with week titles and module names.
+It never requires it.
 
 ## Where output goes
 
-**With the course, never in this repo.** Artifacts land in a `quizzes/` tree beside the course's own
-files:
+**With the course, never in this repo.** Artifacts land in a `quizzes/` tree beside the course's own files:
 
 ```
 <course root>/quizzes/week-3/
@@ -64,7 +70,8 @@ Then in Canvas: **Import Content → Content Type: "QTI .zip file"** → upload 
 > course-package one brings the quiz in **empty**. (The full story is in
 > [canvasQuizStructure.md](canvasQuizStructure.md).)
 
-Each quiz arrives with one question group per concept (the count set by the week's concept map, or `quiz.yaml`), each drawing 1 of 4 variants, plus a description and grading criteria. Both the per-week `.zip` and the `--bundle` package have been imported into a live Canvas course and confirmed working, with the groups randomizing as intended.
+Each quiz arrives with one question group per concept (the count set by the week's concept map, or `quiz.yaml`), each drawing 1 of 4 variants, plus a description and grading criteria.
+Both the per-week `.zip` and the `--bundle` package have been imported into a live Canvas course and confirmed working, with the groups randomizing as intended.
 
 ## Good to know
 
@@ -72,5 +79,4 @@ Each quiz arrives with one question group per concept (the count set by the week
 - **Guardrails are steering, not just validation.** When the model reuses a correct-answer position, the rejection tells it which positions are still free — errors are written for the model to act on.
 - **Module placement isn't supported** yet: quizzes import into the Quizzes list, not into weekly modules. **GIFT output is unverified** against a live Moodle — it's there as readable plain text; Canvas QTI is the tested path.
 
-See also: [Configuration](configuration.md) (providers, per-course `quiz.yaml`, prompt overrides) and
-[the domain profile](domain-profile.md) (keeping the model in the right knowledge domain).
+See also: [Configuration](configuration.md) (providers, per-course `quiz.yaml`, prompt overrides) and [the domain profile](domain-profile.md) (keeping the model in the right knowledge domain).

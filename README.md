@@ -28,7 +28,9 @@ On the roadmap (not yet): refreshing and updating existing content in place, bui
 
 ## How it works
 
-Every input converges on one **canonical form** (`bank.json` for quizzes, `page.json` for pages) that the emitters read — so adding a platform is one emitter, not a rewrite. Two generators sit on a shared spine (`coursekit/`), and the model _commits_ each piece through a tool call rather than free text, so a revision overwrites rather than piling up drafts. See [agent/architecture.md](agent/architecture.md) for the map.
+Every input converges on one **canonical form** (`bank.json` for quizzes, `page.json` for pages) that the emitters read — so adding a platform is one emitter, not a rewrite.
+Two generators sit on a shared spine (`coursekit/`), and the model _commits_ each piece through a tool call rather than free text, so a revision overwrites rather than piling up drafts.
+See [agent/architecture.md](agent/architecture.md) for the map.
 
 ## Requirements
 
@@ -43,7 +45,8 @@ git clone https://github.com/andrew-atkinson/quizbot.git && cd coursekit
 uv sync --group dev     # also installs the `coursekit` command (editable)
 ```
 
-Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint — see [Configuration](docs/configuration.md) for the full set. Then verify:
+Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint — see [Configuration](docs/configuration.md) for the full set.
+Then verify:
 
 ```bash
 uv run pytest           # 661 tests, all offline — no model needed (names each, not just dots)
