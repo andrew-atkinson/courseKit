@@ -97,3 +97,14 @@ strong as the archive is deep, so it sharpens as more runs accumulate.
 ```bash
 uv run python evals/errpos.py "/path/to/course export"
 ```
+
+## Token-accounting probe (`tokacct.py`)
+
+The companion to `errpos.py` for the crowding question: errpos tests output scope (burden #2), this tests instruction load (burden #1).
+It builds the real quiz + page prompts a course's weeks would send (no model) and decomposes each into transcript · shipped instructions · concept-map directive · domain · voice, as a share of the whole.
+If the transcript dwarfs the instructions, trimming rules buys little and the lever is decomposing the output; if instructions are a large share, routing/trimming them matters.
+Sizes are characters (~tokens ≈ /4); the ratios are the point.
+
+```bash
+uv run python evals/tokacct.py "/path/to/course export"
+```
