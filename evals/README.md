@@ -81,3 +81,19 @@ and checks the good page's average scores above each variant.
 ```bash
 uv run python evals/concept_scorecard.py
 ```
+
+## Error-position probe (`errpos.py`)
+
+Not a scorecard — a probe for the instruction-crowding question (see `agent/roadmap.md`, "Composable
+generation"). It reads a real course's archived evaluation runs (`evals/<timestamp>/quiz-review.md` plus
+the latest `quizzes/quiz-review.md`) and its `bank.json` files, and reports the quiz-flag rate by a
+question's POSITION in the generation: variant letter (A→D, within-group emission order), group-position
+third (early/mid/late), and a last-group confound check (the last group is usually the abstract
+"enduring understanding", which flags more for content reasons). A late/deep elevation that survives the
+confound check points at output-scope crowding — i.e. decompose the generation, don't just trim
+instructions. No model; numerator and denominator are aligned to the same reviewed weeks. It is only as
+strong as the archive is deep, so it sharpens as more runs accumulate.
+
+```bash
+uv run python evals/errpos.py "/path/to/course export"
+```

@@ -39,6 +39,10 @@ it fits — the student reads code with a gap and picks the code that belongs (q
 "multiple_choice", text_format "markdown"). Let the material decide; never force one onto a subject
 that has no code.
 
+**Match the options to what the stem asks.** A stem that asks for a reason, a benefit, a definition, or a concept — "why…", "what is the benefit of…", "how does X improve Y" — must be answered by four *statements* of that kind; a code snippet is not an answer to "why".
+Reach for code as the options only when the stem itself is about code: what it outputs, which version is correct, or the gap to fill.
+A conceptual question paired with code-snippet options is a mismatch — either rewrite the stem to ask about the code, or rewrite the options as competing concepts.
+
 For true_false groups: at least one variant must be true and at least one must be false.
 
 Start by calling create_checklist.
