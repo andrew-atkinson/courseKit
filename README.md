@@ -46,7 +46,7 @@ uv sync --group dev     # also installs the `coursekit` command (editable)
 Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint — see [Configuration](docs/configuration.md) for the full set. Then verify:
 
 ```bash
-uv run pytest           # 659 tests, all offline — no model needed (names each, not just dots)
+uv run pytest           # 661 tests, all offline — no model needed (names each, not just dots)
 ```
 
 ## Quick start

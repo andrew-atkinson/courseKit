@@ -165,6 +165,26 @@ def voice_preface(voice: str) -> str:
     return _VOICE_PREFACE.format(voice=voice) if voice else ""
 
 
+# The QUIZ generator gets a NARROWER voice directive than pages. A quiz is a precision instrument, and a
+# hedged/warm register bleeding into a stem or an option produces vague or mis-formed questions (the
+# "asks why, but the options are syntax" failure) — measured after voice went on: quiz flags rose while
+# pages improved. So here the voice colours only FEEDBACK/explanations; stems and options stay literal.
+_QUIZ_VOICE_PREFACE = (
+    "INSTRUCTOR VOICE — for quiz FEEDBACK only.\n"
+    "{voice}\n\n"
+    "Apply this voice ONLY to feedback and explanations. Question stems and answer options must stay "
+    "literal, precise, and unambiguous — no hedges (no 'kind of', 'roughly', 'basically'), no "
+    "conversational vagueness, no idioms in the assessed text. A quiz question is a measurement, not "
+    "prose: let the voice show where you explain, never where you test.\n\n"
+)
+
+
+def quiz_voice_preface(voice: str) -> str:
+    """The voice block for the QUIZ generator — voice in feedback only, stems/options stay literal."""
+    voice = (voice or "").strip()
+    return _QUIZ_VOICE_PREFACE.format(voice=voice) if voice else ""
+
+
 # The critic gets the domain too, but framed for REVIEW, not generation: it needs the domain's
 # knowledge (its framework, globals, conventions) so it does not false-flag valid domain code — but it
 # must NOT be told to "correct silently," and the domain must not widen what the material may teach.

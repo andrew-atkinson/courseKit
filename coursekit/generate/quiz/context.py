@@ -95,7 +95,7 @@ def build_messages(transcript: str, *, course_title: str | None = None,
         transcript=transcript,
     )
     system_message = ("\n" + courseconfig.domain_preface(domain)
-                      + courseconfig.voice_preface(voice) + body + "\n")
+                      + courseconfig.quiz_voice_preface(voice) + body + "\n")
     task_body = task.body + _shape_directive(concept_map, questions)
     return [{"role": "system", "content": system_message},
             {"role": "user", "content": "\n" + task_body + "\n"}]

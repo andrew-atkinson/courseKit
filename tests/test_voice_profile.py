@@ -47,6 +47,13 @@ def test_preface_governs_tone_and_guards_precision():
     assert "quiz question stem" in p           # explicit precision guard for assessed content
 
 
+def test_quiz_voice_preface_is_feedback_scoped():
+    assert cc.quiz_voice_preface("") == ""
+    p = cc.quiz_voice_preface(VOICE)
+    assert "FEEDBACK only" in p and "no hedges" in p    # scoped to feedback; assessed text stays literal
+    assert "Keep the hedges" in p                        # the voice profile itself is still carried
+
+
 # ------------------------------- injected into BOTH generators' prompts
 
 def test_voice_reaches_the_page_prompt(tmp_path):
@@ -55,10 +62,21 @@ def test_voice_reaches_the_page_prompt(tmp_path):
     assert "INSTRUCTOR VOICE" in sys and "Keep the hedges" in sys
 
 
-def test_voice_reaches_the_quiz_prompt(tmp_path):
+def test_voice_reaches_the_quiz_prompt_scoped_to_feedback(tmp_path):
+    # a quiz is a precision instrument, so voice is scoped to feedback — stems/options stay literal
     unit = _course(tmp_path, voice=VOICE)
     sys = QuizGenerator().build_messages(unit, "TRANSCRIPT", unit.config)[0]["content"]
-    assert "INSTRUCTOR VOICE" in sys and "Keep the hedges" in sys
+    assert "Keep the hedges" in sys                    # the voice profile is present …
+    assert "for quiz FEEDBACK only" in sys             # … but scoped
+    assert "literal, precise" in sys                   # stems and options stay exact
+
+
+def test_quiz_voice_is_narrower_than_page_voice(tmp_path):
+    unit = _course(tmp_path, voice=VOICE)
+    quiz_sys = QuizGenerator().build_messages(unit, "T", unit.config)[0]["content"]
+    page_sys = PageGenerator().build_messages(unit, "T", unit.config)[0]["content"]
+    assert "FEEDBACK only" in quiz_sys                  # quizzes: voice in feedback only
+    assert "FEEDBACK only" not in page_sys              # pages: the full voice
 
 
 def test_no_voice_no_preface_in_prompt(tmp_path):

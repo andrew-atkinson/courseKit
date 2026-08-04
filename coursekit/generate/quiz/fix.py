@@ -43,7 +43,7 @@ def _fixer_body(project_root) -> str:
     voice, exactly like the generator)."""
     cfg = courseconfig.load(project_root) if project_root else None
     domain, voice = (cfg.domain, cfg.voice) if cfg else ("", "")
-    return (courseconfig.domain_preface(domain) + courseconfig.voice_preface(voice)
+    return (courseconfig.domain_preface(domain) + courseconfig.quiz_voice_preface(voice)
             + prompts.load(FIX_CATEGORY, "fix", project_root=project_root).body)
 
 
