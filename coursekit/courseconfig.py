@@ -104,6 +104,26 @@ class CourseConfig:
         except Exception:
             return ""
 
+    @property
+    def voice(self) -> str:
+        """The instructor's voice/tone profile (`.vtconfig/voice.md`), or ''.
+
+        A prose style layer produced on the transcriber side from the RAW transcripts (register,
+        stance, hedging, rhythm, signature moves — before cleanup sands the spoken voice). Prepended
+        to the PROSE generators so output sounds like the instructor, not a textbook. It governs tone
+        only — never correctness, structure, or domain (see `voice_preface`) — and is NOT given to the
+        critics, since voice is not a correctness axis. Never raises.
+        """
+        if self.root is None:
+            return ""
+        path = self.root / VTCONFIG_DIR_NAME / "voice.md"
+        if not path.is_file():
+            return ""
+        try:
+            return path.read_text(encoding="utf-8").strip()
+        except Exception:
+            return ""
+
 
 # Prepended to a generator's system prompt when the course declares a domain. Framed as authoritative
 # and broad: it fixes the knowledge domain, says what the course's artifacts should center on (so the
@@ -123,6 +143,26 @@ def domain_preface(domain: str) -> str:
     """The domain block to prepend to a system prompt, or '' when the course declares no domain."""
     domain = (domain or "").strip()
     return _DOMAIN_PREFACE.format(domain=domain) if domain else ""
+
+
+# Prepended to a PROSE generator's system prompt when the course declares a voice profile. Framed to
+# govern HOW the output sounds, never WHAT it says: tone/phrasing/rhythm only, subordinate to
+# correctness, the required structure, and the domain — with an explicit guard so the conversational
+# register never blurs a definition, a quiz stem, or an answer. Not given to the critics.
+_VOICE_PREFACE = (
+    "INSTRUCTOR VOICE — write in this voice.\n"
+    "{voice}\n\n"
+    "This governs TONE, PHRASING, and RHYTHM only. It never overrides correctness, the required "
+    "structure, or the course domain, and it never changes WHAT is taught — only how it sounds. Where "
+    "precision matters — a definition, a quiz question stem, an answer, a code comment — stay exact and "
+    "unambiguous; do not let the conversational register make assessed or factual content vague.\n\n"
+)
+
+
+def voice_preface(voice: str) -> str:
+    """The voice block to prepend to a PROSE generator's system prompt, or '' when no voice profile."""
+    voice = (voice or "").strip()
+    return _VOICE_PREFACE.format(voice=voice) if voice else ""
 
 
 # The critic gets the domain too, but framed for REVIEW, not generation: it needs the domain's

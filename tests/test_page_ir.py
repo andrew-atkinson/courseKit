@@ -116,6 +116,25 @@ def test_empty_page_is_not_finalizable(fresh):
     assert "no blocks" in "; ".join(P.validate_final())
 
 
+def test_finalize_rejects_a_heading_with_no_content_under_it(fresh):
+    # the crowding failure: content first, then a section heading appended last → an empty section
+    P.put_block(P.build_block("heading", block_id="h", text="Loops"))
+    P.put_block(P.build_block("details", block_id="d", summary="Predict?", text="Ten."))
+    P.put_block(P.build_block("heading", block_id="trailing", text="Nested Loops"))  # nothing after it
+    msg = "; ".join(P.validate_final())
+    assert "no content under them" in msg and "Nested Loops" in msg
+    assert P.finalize().startswith("ERROR")
+    assert not P.is_finalized()
+
+
+def test_finalize_accepts_a_heading_followed_by_its_content(fresh):
+    P.put_block(P.build_block("heading", block_id="h1", text="Loops"))
+    P.put_block(P.build_block("paragraph", block_id="p1", text="Loops repeat a block."))
+    P.put_block(P.build_block("heading", block_id="h2", text="Nested"))
+    P.put_block(P.build_block("details", block_id="d", summary="Predict?", text="Ten."))
+    assert P.validate_final() == []
+
+
 # ------------------------------- pedagogy devices (columns/pullquote/card/details)
 
 def test_columns_needs_two_or_three(fresh):

@@ -77,7 +77,7 @@ def _context_line(course_title, week_label, module) -> str:
 def build_messages(transcript: str, *, course_title: str | None = None,
                    week_label: str | None = None, module: str | None = None,
                    project_root=None, system_prompt: str = "system",
-                   task_prompt: str = "task", domain: str = "",
+                   task_prompt: str = "task", domain: str = "", voice: str = "",
                    concept_map=None, questions: int | None = None) -> list[dict]:
     """The chat messages for one lecture. Metadata is woven in only when supplied.
 
@@ -94,7 +94,8 @@ def build_messages(transcript: str, *, course_title: str | None = None,
         context_line=_context_line(course_title, week_label, module),
         transcript=transcript,
     )
-    system_message = "\n" + courseconfig.domain_preface(domain) + body + "\n"
+    system_message = ("\n" + courseconfig.domain_preface(domain)
+                      + courseconfig.voice_preface(voice) + body + "\n")
     task_body = task.body + _shape_directive(concept_map, questions)
     return [{"role": "system", "content": system_message},
             {"role": "user", "content": "\n" + task_body + "\n"}]

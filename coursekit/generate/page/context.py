@@ -70,8 +70,8 @@ def _context_line(course_title, week_label, module) -> str:
 def build_messages(transcript: str, *, course_title: str | None = None,
                    week_label: str | None = None, module: str | None = None,
                    project_root=None, system_prompt: str = "system",
-                   task_prompt: str = "task", domain: str = "", detail: str = "medium",
-                   concept_map=None) -> list[dict]:
+                   task_prompt: str = "task", domain: str = "", voice: str = "",
+                   detail: str = "medium", concept_map=None) -> list[dict]:
     """The chat messages for one page. A course overrides either prompt from its own
     .vtconfig/prompts/page/, its domain profile is prepended when present, and `detail`
     (brief|medium|full) tunes how much of the week the page covers. When a consolidated
@@ -84,7 +84,8 @@ def build_messages(transcript: str, *, course_title: str | None = None,
         context_line=_context_line(course_title, week_label, module),
         transcript=transcript,
     )
-    system_message = "\n" + courseconfig.domain_preface(domain) + body + "\n"
+    system_message = ("\n" + courseconfig.domain_preface(domain)
+                      + courseconfig.voice_preface(voice) + body + "\n")
     # The detail directive rides at the end of the brief, where a small model attends most.
     task_body = task.body
     directive = _DETAIL_DIRECTIVES.get(detail, "")

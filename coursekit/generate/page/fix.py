@@ -27,9 +27,10 @@ FIX_TOOL_SPECS = [s for s in tools.TOOL_SPECS if s["name"].startswith("add_")]
 
 
 def _fixer_body(project_root) -> str:
-    domain = courseconfig.load(project_root).domain if project_root else ""
-    return courseconfig.domain_preface(domain) + prompts.load(FIX_CATEGORY, "fix",
-                                                             project_root=project_root).body
+    cfg = courseconfig.load(project_root) if project_root else None
+    domain, voice = (cfg.domain, cfg.voice) if cfg else ("", "")
+    return (courseconfig.domain_preface(domain) + courseconfig.voice_preface(voice)
+            + prompts.load(FIX_CATEGORY, "fix", project_root=project_root).body)
 
 
 def fix_one_block(finding, material: str, provider, model: str, *, critic: str,

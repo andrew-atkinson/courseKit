@@ -311,6 +311,20 @@ def validate_final() -> list[str]:
         problems.append("the page has no retrieval prompt — add a predict/recall `details` block "
                         "(the closing 'Predict: …' or the recap's questions) so students retrieve "
                         "before they leave")
+    # A heading introduces the blocks beneath it, and the renderer runs a section from one heading to
+    # the next — so a heading with no content before the next heading (or the page end) renders as an
+    # empty titled panel while its content piles into the previous section. This happens when the model
+    # writes all the prose first and appends the section headings last (a crowding failure). It is
+    # unambiguously broken structure, so refuse to finalize it — deterministically, because the critics
+    # read block text and never SEE the page.
+    ordered = list(_page.blocks.values())
+    empty = [b for i, b in enumerate(ordered) if b.kind == "heading"
+             and (i + 1 == len(ordered) or ordered[i + 1].kind == "heading")]
+    if empty:
+        problems.append(
+            f"{len(empty)} heading(s) have no content under them ({', '.join(b.text for b in empty)}) — "
+            "every heading must be immediately followed by the blocks it introduces, before the next "
+            "heading; place each section heading directly above its own content, not all at the end")
     return problems
 
 

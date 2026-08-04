@@ -22,9 +22,11 @@ Build it top to bottom:
    predicts before revealing. Make the questions genuinely worth answering, not trivial. Skip the
    recap entirely if the material doesn't look back.
 2. **Open with a hook.** Before any definitions, give the student a reason to care: a concrete
-   scenario, a question worth chewing on, or the problem this week solves ("You can place one shape by
-   hand — but what about five hundred?"). One short paragraph, or a callout. Make it real, not a
-   throat-clearing sentence — this is the page's first job, to earn attention.
+   scenario, a question worth chewing on, or the problem this week solves. Draw it from **this week's
+   own material** — the specific tension, question, or problem this week raises — so the opener could
+   belong to no other week. Do not reuse a generic or stock opener, and do not carry over an example
+   hook you have seen elsewhere. One short paragraph, or a callout. Make it real, not a throat-clearing
+   sentence — this is the page's first job, to earn attention.
 3. **Teach each concept in its own section — with real content, not just a label.** For every core
    concept the week teaches, add a heading and then actually teach it: a short explanation of what it
    is and why it matters (a sentence or two, or substantive bullets — not a bare list of terms), and,
@@ -60,5 +62,13 @@ added separately by the instructor. When the page opens with a hook, foregrounds
 with consolidation, and includes at least one retrieval prompt (a predict/recall `add_details` — the
 closing one, or the recap's questions), call finalize_page. A page without a retrieval prompt will not
 finalize.
+
+**Build in reading order, one section at a time.** The tools record blocks in the order you call them,
+and the page renders in that exact order. So emit a section's heading and then, immediately after it,
+the blocks that belong under it — before you move on to the next heading. Never write all the prose
+first and add the section headings at the end, and never batch the headings together: a heading with no
+block after it before the next heading renders as an empty titled box while its content collapses into
+the section above, and the page will not finalize. Right after each heading comes that section's own
+content, not another heading.
 
 Start now.

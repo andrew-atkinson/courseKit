@@ -45,7 +45,7 @@ class PageGenerator:
             module=unit.module, project_root=unit.course_root,
             system_prompt=cfg.prompt_name("system_prompt", default="system"),
             task_prompt=cfg.prompt_name("task_prompt", default="task"),
-            domain=cfg.domain, detail=cfg.value("detail", "medium"),
+            domain=cfg.domain, voice=cfg.voice, detail=cfg.value("detail", "medium"),
             concept_map=_load_week_concept_map(unit),
         )
 

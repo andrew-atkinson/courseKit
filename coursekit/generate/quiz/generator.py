@@ -46,7 +46,7 @@ class QuizGenerator:
             module=unit.module, project_root=unit.course_root,
             system_prompt=cfg.prompt_name("system_prompt", default="system"),
             task_prompt=cfg.prompt_name("task_prompt", default="task"),
-            domain=cfg.domain,
+            domain=cfg.domain, voice=cfg.voice,
             concept_map=cm,
             questions=int(q) if q else None,
         )

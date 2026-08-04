@@ -42,6 +42,7 @@ A course carries its own settings in a `.vtconfig/` folder at its root — the s
 | `quiz.yaml`         | quizzes | the quiz generator's settings                                          |
 | `page.yaml`         | pages   | the page generator's settings                                          |
 | `domain.md`         | shared  | the [domain profile](domain-profile.md) — applies to every generator   |
+| `voice.md`          | shared  | the instructor [voice profile](#voice-profile--voicemd) — prose generators write in this voice |
 | `style.yaml`        | pages   | the page [theme](design.md) — visual identity + accent + density       |
 | `prompts/<gen>/…md` | shared  | per-course prompt overrides                                            |
 | `pages/<week>.yaml` | pages   | a page's [supplements](pages.md) — references, examples, embeds        |
@@ -71,3 +72,11 @@ To change them for **one course only**, drop a replacement next to that course's
 ```
 
 Naming a _variant_ (`task_prompt: exam` above) and supplying its file (`prompts/quiz/exam.md`) is how a course keeps several briefs and picks between them.
+
+### Voice profile — `voice.md`
+
+A `.vtconfig/voice.md` characterizes the instructor's spoken voice — register, stance, hedging, rhythm, and a few signature moves — so generated prose sounds like them instead of a textbook. It's the companion to [`domain.md`](domain-profile.md): domain fixes _what_ the course is about, voice shapes _how_ it reads.
+
+It is produced on the transcriber side (the `voice` step reads the raw transcripts, before cleanup flattens the spoken register, and writes this file); coursekit only reads it. Like `domain.md`, it's plain Markdown you can edit freely — the generator takes it as-is.
+
+When present, it's prepended to the **prose generators** — the page and quiz generators and their fix loops — as a tone directive that is explicitly _subordinate_ to correctness, structure, and domain: it governs phrasing, never what's taught, and a precision guard keeps quiz stems, answers, and definitions exact even in a conversational register. It is deliberately **not** given to the evaluators — voice is a matter of tone, not correctness, so the critics never judge against it. Absent the file, nothing changes.

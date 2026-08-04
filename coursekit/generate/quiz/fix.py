@@ -38,11 +38,13 @@ class FixOutcome:
 
 
 def _fixer_body(project_root) -> str:
-    """The fix prompt, with the course's domain profile prepended (generation-framed — the fixer is
-    authoring a corrected question, so it should know the domain and correct silently to match it)."""
-    domain = courseconfig.load(project_root).domain if project_root else ""
-    return courseconfig.domain_preface(domain) + prompts.load(FIX_CATEGORY, "fix",
-                                                              project_root=project_root).body
+    """The fix prompt, with the course's domain profile and voice prepended (generation-framed — the
+    fixer is authoring a corrected question, so it knows the domain and writes in the instructor's
+    voice, exactly like the generator)."""
+    cfg = courseconfig.load(project_root) if project_root else None
+    domain, voice = (cfg.domain, cfg.voice) if cfg else ("", "")
+    return (courseconfig.domain_preface(domain) + courseconfig.voice_preface(voice)
+            + prompts.load(FIX_CATEGORY, "fix", project_root=project_root).body)
 
 
 def fix_one(finding, transcript: str, provider, model: str, *, critic: str,
