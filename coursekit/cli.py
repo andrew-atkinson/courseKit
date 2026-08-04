@@ -96,15 +96,16 @@ def _critic_model_and_reads(path, reads_override=None):
     return model, reads
 
 
-def _review_quizzes(args, provider) -> None:
+def _review_quizzes(args, provider) -> tuple[str | None, dict | None]:
     """Cold-read the just-generated quizzes and surface flags (report-only). Best-effort by design: a
     missing or unreachable critic model prints a note and returns — a review problem must never sink an
-    otherwise-good generate. Scopes to the same weeks the run produced."""
+    otherwise-good generate. Scopes to the same weeks the run produced. Returns `(review_path, metrics)`
+    so the caller can archive the run into the run-store; `(None, None)` when there was nothing to review."""
     from coursekit.generate.quiz import evaluate as ev
     model, reads = _critic_model_and_reads(args.path)
     if not model:
         print("\n(skipping quiz review: no critic model — set MODEL_NAME or evaluate.yaml `model:`)")
-        return
+        return None, None
     print("\nReviewing the generated quizzes (cold read)…")
     try:
         findings, review = ev.evaluate_course(
@@ -112,25 +113,27 @@ def _review_quizzes(args, provider) -> None:
             progress=_tick)
     except Exception as e:                       # never let the review abort a finished generate
         print(f"(quiz review skipped: {type(e).__name__}: {e})")
-        return
+        return None, None
     if not findings:
-        return
+        return None, None
     flagged = [f for f in findings if f.flagged]
     print(f"Quiz review: {len(flagged)} of {len(findings)} question(s) flagged.")
     for f in flagged:
         print(f"  [{f.verdict}] {f.week} {f.group_id}/{f.label}: {f.concern}")
     if review:
         print(f"-> {review}")
+    return (review or None), {"reviewed": len(findings), "flagged": len(flagged)}
 
 
-def _review_pages(args, provider) -> None:
+def _review_pages(args, provider) -> tuple[str | None, dict | None]:
     """The page equivalent of _review_quizzes — cold-read each generated page section against the
-    week's material (report-only). Same best-effort contract: never fails the generate."""
+    week's material (report-only). Same best-effort contract: never fails the generate. Returns
+    `(review_path, metrics)` for the run-store; `(None, None)` when there was nothing to review."""
     from coursekit.generate.page import evaluate as pev
     model, reads = _critic_model_and_reads(args.path)
     if not model:
         print("\n(skipping page review: no critic model — set MODEL_NAME or evaluate.yaml `model:`)")
-        return
+        return None, None
     print("\nReviewing the generated pages (cold read)…")
     try:
         findings, review = pev.evaluate_course_pages(
@@ -138,15 +141,16 @@ def _review_pages(args, provider) -> None:
             progress=_tick)
     except Exception as e:
         print(f"(page review skipped: {type(e).__name__}: {e})")
-        return
+        return None, None
     if not findings:
-        return
+        return None, None
     flagged = [f for f in findings if f.flagged]
     print(f"Page review: {len(flagged)} of {len(findings)} section(s) flagged.")
     for f in flagged:
         print(f"  [{f.verdict}] {f.week} {f.group_id}/{f.label}: {f.concern}")
     if review:
         print(f"-> {review}")
+    return (review or None), {"reviewed": len(findings), "flagged": len(flagged)}
 
 
 # ---------------------------------------------------------------- ingest
@@ -278,12 +282,32 @@ def _cmd_generate(args) -> int:
         _print_summary(results, dry_run=args.dry_run)
         incomplete = incomplete or (not args.dry_run and any(not r.finalized for r in results))
 
-    # Report-only quality gate: cold-read the new artifacts right after generating them (default on).
+    # Report-only quality gate: cold-read the new artifacts right after generating them (default on),
+    # and snapshot the review into the run-store — the same archive the `evaluate` command writes, so a
+    # generate-time review is a versioned trend too, not just an overwritten quiz-review.md.
     if not args.dry_run and args.review:
+        reviews, metrics = [], {}
         if any(g.category == "quiz" for g in generators):
-            _review_quizzes(args, provider)
+            r, m = _review_quizzes(args, provider)
+            if r:
+                reviews.append(r)
+            if m:
+                metrics["quiz"] = m
         if any(g.category == "page" for g in generators):
-            _review_pages(args, provider)
+            r, m = _review_pages(args, provider)
+            if r:
+                reviews.append(r)
+            if m:
+                metrics["page"] = m
+        if reviews:
+            from coursekit.discover import find_units
+            from coursekit.evalstore import archive_evaluation
+            crit_model, _ = _critic_model_and_reads(args.path)
+            units = find_units(args.path)
+            run_dir = archive_evaluation(units[0].course_root if units else None,
+                                         model=crit_model, reviews=reviews, metrics=metrics)
+            if run_dir:
+                print(f"\nArchived this run → {run_dir}")
 
     return 1 if incomplete else 0
 

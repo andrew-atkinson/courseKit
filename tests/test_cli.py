@@ -149,19 +149,22 @@ def _review_args(course):
 def test_review_quizzes_flags_and_writes_a_review(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("MODEL_NAME", "m")
     course = _write_course(tmp_path)
-    cli._review_quizzes(_review_args(course), _FakeCritic("OUTOFSCOPE"))
+    review, metrics = cli._review_quizzes(_review_args(course), _FakeCritic("OUTOFSCOPE"))
     out = capsys.readouterr().out
     assert "1 of 4 question(s) flagged" in out
     assert (course / "quizzes" / "quiz-review.md").exists()
+    assert review is not None                              # returned for the run-store archive
+    assert metrics == {"reviewed": 4, "flagged": 1}
 
 
 def test_review_quizzes_skips_without_a_critic_model(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("MODEL_NAME", raising=False)
     course = _write_course(tmp_path)
-    cli._review_quizzes(_review_args(course), _FakeCritic("OUTOFSCOPE"))
+    result = cli._review_quizzes(_review_args(course), _FakeCritic("OUTOFSCOPE"))
     out = capsys.readouterr().out
     assert "skipping quiz review" in out
     assert not (course / "quizzes" / "quiz-review.md").exists()   # nothing written, generate unharmed
+    assert result == (None, None)                                 # nothing to archive
 
 
 def _write_page_course(tmp_path):
