@@ -239,6 +239,20 @@ def _cmd_analyze(args) -> int:
                                                   domain=cfg.domain, project_root=u.course_root)
             via = "from the week text (no knowledge.json)"
         out = cmap.save_concept_map(cmp, cmap.concept_map_path(u.course_root, key))
+        # Boundary-correct per-concept material for the decomposed generator: partition the week text
+        # into one contiguous span per concept and store it beside the map. Best-effort — its absence
+        # (or a segmentation hiccup) just falls back to the keyword slicer at generation time.
+        try:
+            from pathlib import Path as _P
+
+            from coursekit.generate.page import segment as seg
+            week_text = _P(u.transcript_path).read_text(encoding="utf-8")
+            mats = seg.segment_week(week_text, cmp, provider, model, project_root=u.course_root)
+            if mats:
+                seg.save_materials(mats, seg.materials_path(u.course_root, key))
+                via += f"; {len(mats)}/{len(cmp.concepts)} material span(s)"
+        except Exception as e:
+            print(f"  (segmentation skipped for {label}: {type(e).__name__}: {e})")
         eu = " + enduring understanding" if cmp.enduring_understanding else ""
         print(f"  [OK] {label}: {len(cmp.concepts)} concept(s){eu} {via} -> {out}")
         wrote += 1
