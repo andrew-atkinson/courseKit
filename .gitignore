@@ -33,3 +33,6 @@ examples/**/quiz-review.md
 examples/synthetic/generated/
 # saved scorecard runs (model-dependent run artifacts, not source)
 evals/results/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+graft/
