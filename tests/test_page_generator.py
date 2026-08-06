@@ -159,54 +159,12 @@ def test_pages_write_to_a_pages_tree_not_quizzes(tmp_path):
     assert (results[0].output_dir / "page.json").exists()
 
 
-def test_detail_directive_rides_the_brief():
-    # brief/full append a steering line to the task brief; medium (the default) adds nothing.
+def test_build_messages_grounds_length_in_the_concept_map_not_a_detail_dial(tmp_path):
+    # The removed `--detail` dial left no steering lines; page length is grounded by the concept
+    # map's one-section-per-concept checklist instead.
     from coursekit.generate.page.context import build_messages
-    brief = build_messages("T", detail="brief")[1]["content"]
-    medium = build_messages("T", detail="medium")[1]["content"]
-    full = build_messages("T", detail="full")[1]["content"]
-    assert "Keep this page BRIEF" in brief
-    assert "Make this page THOROUGH" in full
-    assert "BRIEF" not in medium and "THOROUGH" not in medium          # the untouched brief
-    assert medium == build_messages("T")[1]["content"]                 # medium is the default
-    assert build_messages("T", detail="bogus")[1]["content"] == medium  # unknown -> medium
-
-
-def test_page_yaml_detail_flows_into_the_brief(tmp_path):
-    from coursekit import courseconfig
-    root = tmp_path / "course"
-    (root / ".vtconfig").mkdir(parents=True)
-    (root / ".vtconfig" / "page.yaml").write_text("detail: full\n", encoding="utf-8")
-    f = root / "output" / "week-3.md"
-    f.parent.mkdir(parents=True)
-    f.write_text("body", encoding="utf-8")
-    unit = find_units(f)[0]
-
-    cfg = courseconfig.load(f, config_name="page.yaml")
-    msgs = PageGenerator().build_messages(unit, "T", cfg)
-    assert "Make this page THOROUGH" in msgs[1]["content"]             # page.yaml detail: full applied
-
-
-def test_cli_detail_override_wins_over_page_yaml(tmp_path):
-    # --detail brief (a config override) must beat page.yaml's detail: full.
-    root = tmp_path / "course"
-    (root / ".vtconfig").mkdir(parents=True)
-    (root / ".vtconfig" / "page.yaml").write_text("detail: full\n", encoding="utf-8")
-    f = root / "output" / "week-3.md"
-    f.parent.mkdir(parents=True)
-    f.write_text("body", encoding="utf-8")
-    unit = find_units(f)[0]
-
-    raw = _ScriptedRaw(PAGE_SCRIPT)
-    captured = {}
-    _create = raw.create
-    raw.create = lambda **kw: (captured.setdefault("messages", kw["messages"]), _create(**kw))[1]
-    provider = OpenAICompatProvider(client=raw, name="fake")
-
-    run_unit(unit, provider, "m", PageGenerator(), config_overrides={"detail": "brief"})
-
-    brief_msg = captured["messages"][1]["content"]
-    assert "Keep this page BRIEF" in brief_msg and "THOROUGH" not in brief_msg
+    body = build_messages("T")[1]["content"]
+    assert "BRIEF" not in body and "THOROUGH" not in body     # no detail directive survives
 
 
 def test_page_slug_comes_from_the_week_title(tmp_path):

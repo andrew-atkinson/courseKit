@@ -84,5 +84,6 @@ class QuizzesSource:
                     f"non_cc_assessments/{qid}.xml.qti": qti.emit_assessment(bank, quiz),
                 },
                 rank=1,   # quizzes after pages in a week's module
+                source=bj,
             ))
         return items

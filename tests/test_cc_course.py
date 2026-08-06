@@ -122,6 +122,20 @@ def test_empty_course_returns_none(tmp_path):
     assert cartridge.write_course_imscc(tmp_path) is None
 
 
+def test_duplicate_slug_raises_a_collision_that_names_both_sources(course):
+    """Two page.json with the same slug (e.g. a decomposed AND a monolithic page for one week) both
+    map to wiki_content/<slug>.html — that must be a clear, sourced error, not a bare traceback."""
+    # a second week-3 page, same slug, in a parallel tree — exactly the leftover-copy case
+    _write_page(course / "pages-decomposed", "week-3", "Week 3: Repetition", "week-3-repetition")
+    with pytest.raises(cartridge.CartridgeCollision) as ei:
+        cartridge.write_course_imscc(course, out_path=course / "dup.imscc")
+    msg = str(ei.value)
+    assert "week-3-repetition.html" in msg                  # the colliding file
+    assert str((course / "pages" / "week-3" / "page.json")) in msg          # source A named
+    assert "pages-decomposed" in msg                        # source B named
+    assert not (course / "dup.imscc").exists()              # nothing written on the error path
+
+
 # ---------------------------------------------------- the extensibility seam
 
 def test_a_new_content_type_is_one_source(course):

@@ -39,5 +39,6 @@ class PagesSource:
                 resource_xml=cc.page_resource(page),
                 files={f"wiki_content/{page.slug}.html": cc.render_page(page, supp, style)},
                 rank=0,   # pages come before quizzes in a week's module
+                source=pj,
             ))
         return items

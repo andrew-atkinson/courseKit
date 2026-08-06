@@ -30,7 +30,8 @@ Artifacts land beside the course (`quizzes/` and `pages/` trees), never in this 
 | `coursekit generate PATH --dry-run`             | List the weeks it would process.                                 | x        |
 | `coursekit generate PATH --week 3`              | One week. `--week` is repeatable; `--weeks 3-8` a range.         | ✓        |
 | `coursekit generate PATH --pages`               | Only pages (`--quizzes` for only quizzes).                       | ✓        |
-| `coursekit generate PATH --pages --detail full` | Page depth: `brief` / `medium` / `full` (overrides `page.yaml`). | ✓        |
+| `coursekit generate PATH --pages --function glossary` | Page function: `teaching` (default) / `glossary` / `overview`. | ✓  |
+| `coursekit generate PATH --pages --generator decompose` | Force the teaching generator (default `auto` — picks by length). | ✓ |
 | `coursekit generate PATH --output-root DIR`     | Write elsewhere instead of with the course.                      | ✓        |
 | `coursekit generate PATH --max-iters N`         | Cap model turns per week (default 80).                           | ✓        |
 | `coursekit generate PATH --no-review`           | Skip the cold-read quiz review a `generate` runs by default.     | ✓        |

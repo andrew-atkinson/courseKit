@@ -122,23 +122,23 @@ A strong week page tends to run:
 Your references and examples render **below** all of that, as their own sections.
 So the shape a student sees is: the model's outline, then your curated links and embeds.
 
-### Page length — the `detail` knob
+### Page function — what the page is *for*
 
-How much of the week a page covers is a setting, not a prompt edit.
-Three levels:
+Length is a function of what the page is *for*, not a dial you turn.
+Pick the function with `--function` (pages only):
 
-- **`brief`** — one tight paragraph or a short list of only the essential concepts.
-- **`medium`** — the default: today's teaching outline.
-- **`full`** — near-complete: every concept expanded, with a worked example next to each the material supports.
+- **`teaching`** (the default) — the full taught week page. How much of the week it covers is grounded by the concept map (one section per concept).
+- **`glossary`** — a short "terms beside the video" review companion: the week's key terms + one-line definitions.
+- **`overview`** — a week "Start Here": orientation + the big idea + what you'll cover, assembled from the course data.
 
-Set a course's default in `<course root>/.vtconfig/page.yaml`:
+The functions are separate artifacts (they land beside each other in `pages/`), so a week can have all three.
+
+For a **teaching** page, *which* generator runs — a single monolithic pass or the decomposed per-concept passes — is the program's call, made by measured length (`--generator auto`, the default). Force one with `--generator monolithic|decompose`. Tune the thresholds a course routes on in `<course root>/.vtconfig/page.yaml`:
 
 ```yaml
-detail: full
+mono_char_budget: 24000     # a week longer than this decomposes
+mono_concept_budget: 7      # …or one with more concepts than this
 ```
-
-…or override it for a single run with `--detail brief|medium|full` (quizzes ignore it).
-The flag wins over the file.
 
 ### Steering the model per course
 

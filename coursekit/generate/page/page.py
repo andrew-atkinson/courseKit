@@ -291,6 +291,11 @@ def report() -> str:
     return "\n".join(lines)
 
 
+# Page FUNCTIONS whose job is reference/orientation, not a teaching arc — they carry no retrieval
+# foldout (see the retrieval check below). The teaching page (`week_intro`) is deliberately absent.
+_REFERENCE_PAGE_TYPES = {"glossary", "week_overview", "module_overview", "reference"}
+
+
 def validate_final() -> list[str]:
     """Reasons the page is not ready. Empty list means finalizable."""
     problems = []
@@ -306,8 +311,11 @@ def validate_final() -> list[str]:
     # universal pedagogical invariant — retrieval isn't right for every page type (a pure reference or
     # intro page), and forcing it can yield a hollow foldout. A candidate for removal / making it
     # page-type-aware once composable generation manages attention properly (see roadmap "Composable
-    # generation"). If pages become multi-page or typed, revisit whether every page needs its own.
-    if not any(b.kind == "details" for b in _page.blocks.values()):
+    # generation"). NOW page-type-aware (2026-08-06): a page whose FUNCTION is reference/orientation
+    # (a glossary companion, a week/module overview) has no teaching arc to retrieve from, so the
+    # foldout is skipped for those types; a teaching page still requires it.
+    if _page.page_type not in _REFERENCE_PAGE_TYPES and \
+            not any(b.kind == "details" for b in _page.blocks.values()):
         problems.append("the page has no retrieval prompt — add a predict/recall `details` block "
                         "(the closing 'Predict: …' or the recap's questions) so students retrieve "
                         "before they leave")

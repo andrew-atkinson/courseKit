@@ -41,6 +41,7 @@ class CartridgeItem:
     resource_xml: str          # one or more <resource>…</resource> blocks
     files: dict                # arcname → content
     rank: int = 0              # order within a module (pages before quizzes, etc.)
+    source: Path | None = None  # the file this item came from — named in a collision error
 
 
 @runtime_checkable
@@ -165,15 +166,38 @@ def _manifest(items: list[CartridgeItem], modules, course_title: str) -> str:
 
 # ------------------------------------------------------------- assembly
 
+class CartridgeCollision(ValueError):
+    """Two items map to the same file inside the cartridge — a duplicate or ambiguous source in the
+    course tree, not a bug. Carries the arcname and both offending items so the CLI can name them."""
+
+    def __init__(self, arc: str, first: CartridgeItem, second: CartridgeItem):
+        self.arc, self.first, self.second = arc, first, second
+        super().__init__(str(self))
+
+    def __str__(self) -> str:
+        return (
+            f"two items map to the same cartridge file: {self.arc}\n"
+            f"  - {self.first.title}  <-  {self.first.source or '?'}\n"
+            f"  - {self.second.title}  <-  {self.second.source or '?'}\n"
+            f"A course can hold only one item per file; remove or rename one of the two. "
+            f"(emit scans every page.json / bank.json under the course tree, so a leftover or "
+            f"duplicate copy — e.g. a decomposed and a monolithic page for the same week — is the "
+            f"usual cause.)"
+        )
+
+
 def package_files(items: list[CartridgeItem], course_title: str) -> dict:
     """The arcname→content map for the whole course cartridge. A file collision is an error, not a
-    silent overwrite."""
+    silent overwrite — it names both sources so the duplicate is findable."""
     files: dict = {}
+    owners: dict[str, CartridgeItem] = {}
     for it in items:
         for arc, data in it.files.items():
-            if arc in files:
-                raise ValueError(f"two items produced the same file: {arc}")
+            prev = owners.get(arc)
+            if prev is not None:
+                raise CartridgeCollision(arc, prev, it)
             files[arc] = data
+            owners[arc] = it
     files["course_settings/canvas_export.txt"] = cc.CANVAS_EXPORT_MARKER
     return files
 

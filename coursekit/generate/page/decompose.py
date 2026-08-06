@@ -12,10 +12,11 @@ write into the shared page IR in order:
 Because the passes run in concept-map order and each emits its heading THEN its content, the assembler
 is implicit and the heading-order failure (all headings dumped at the end) is structurally impossible.
 
-Writes to a separate `<course>/pages-decomposed/<week>/` tree so it sits beside the monolithic page for
-an A/B, scored by the same evaluators. EXPERIMENTAL — not wired into the CLI.
+This is the **`teaching`** page function — the full, taught week page. It writes to the canonical
+`<course>/pages/<week>/` tree (so evaluate/fix/emit see it). The shorter functions are separate,
+smaller artifacts: the `glossary` companion (glossary.py) and the week/module `overview` (overview.py).
 
-    uv run python -m coursekit.generate.page.decompose "/path/to/course" --week 7 [--review]
+    uv run python -m coursekit.generate.page.decompose "/path/to/course" --week 7 [--review] [--fix]
 """
 
 import argparse
@@ -43,6 +44,12 @@ DEFAULT_PASS_CHARS = 20000
 # calling tools), not a real "nothing to say" — so give it fresh attempts before giving up. This is the
 # automated backbone of the human "re-run this block" affordance (the vetting UI is parked).
 RETRY_EMPTY = 2
+# NOTE (2026-08-06): the old per-concept `--detail` knob was REMOVED. It injected a "be brief / be
+# thorough" directive into each concept pass — but a pass sees only ONE concept's sliced material, so
+# it cannot know the week's extent, and brevity is a WHOLE-page judgment. Length now lives at the
+# FUNCTION level instead: a glossary companion (short by job) and a week overview are separate, shorter
+# artifacts; a genuinely-shorter TEACHING page needs a whole-week planner that allocates per-concept
+# depth (roadmap: "Composable generation / the depth planner"). This module is the `teaching` function.
 _STOP = {"a", "an", "the", "and", "or", "of", "to", "in", "is", "it", "for", "with", "that",
          "this", "as", "on", "by", "be", "are", "we", "you", "your", "how", "what", "why", "its"}
 
@@ -107,18 +114,19 @@ def _material_chunks(material: str, budget: int) -> list[str]:
 
 
 def _run_pass(provider, model, system: str, user: str, *, max_turns: int = 8,
-              max_nudges: int = 3, stats: dict | None = None) -> int:
+              max_nudges: int = 3, stats: dict | None = None, specs: list | None = None) -> int:
     """Drive one bounded tool-call pass that writes blocks into the shared page IR. Returns the number
     of blocks it added. The model calls `add_*` tools; when it replies in PROSE without having produced
     anything, nudge it back to tool calls (the small model narrates instead of calling tools) — the same
     remedy the monolithic loop and the fix loop use. A prose reply AFTER blocks exist means the section
-    is simply done."""
+    is simply done. `specs` restricts the offered tools (default: every `add_*`)."""
+    specs = specs or _ADD_SPECS
     before = len(pageir.get().blocks)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     nudges = 0
     for _ in range(max_turns):
         try:
-            reply = provider.chat_with_tools(model=model, messages=messages, tools=_ADD_SPECS)
+            reply = provider.chat_with_tools(model=model, messages=messages, tools=specs)
         except Exception as e:
             print(f"    (pass error: {type(e).__name__}: {e})")   # surface it, don't swallow silently
             if stats is not None:                                  # …and tally it (timeout tracking)
@@ -294,11 +302,14 @@ def main() -> int:
 
     from coursekit.cli import _build_provider
     provider = _build_provider()
-    model = os.getenv("MODEL_NAME") or courseconfig.load(
-        args.course, config_name="page.yaml").value("model")
+    cfg = courseconfig.load(args.course, config_name="page.yaml")
+    model = os.getenv("MODEL_NAME") or cfg.value("model")
 
-    out_dir = Path(unit.course_root) / "pages-decomposed" / unit.week_slug
-    print(f"Decomposed generation → {out_dir}")
+    # The `teaching` function writes only to the canonical pages/<week>/ tree — no parallel
+    # pages-decomposed/ side tree (a second tree collided on emit; length now lives at the function
+    # level, so there is nothing to A/B here).
+    out_dir = Path(unit.course_root) / "pages" / unit.week_slug
+    print(f"Teaching page (decomposed) → {out_dir}")
     pg, problems = generate_page_decomposed(unit, provider, model, out_dir,
                                             neighbours=not args.no_neighbours)
     headings = sum(1 for b in pg.blocks.values() if b.kind == "heading")

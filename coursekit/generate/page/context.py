@@ -9,23 +9,10 @@ from coursekit import courseconfig, prompts
 
 PAGE_CATEGORY = "page"
 
-# How much of the week a page covers. Each level appends a steering line to the task brief. A course
-# sets it in page.yaml (`detail: full`) or a run overrides it (`--detail brief`); an unknown value
-# falls back to medium. Kept here, not in a prompt file, because it is generation logic — the task
-# brief itself stays discipline-neutral.
-DETAIL_LEVELS = ("brief", "medium", "full")
-_DETAIL_DIRECTIVES = {
-    "brief": ("Keep this page BRIEF. One tight paragraph, or a short bulleted list of only the most "
-              "essential concepts — favour the few key ideas over completeness. Still include the "
-              "recap and glossary if the material calls for them, but keep every section short."),
-    # `medium` is a real, named level — the calibrated middle — that deliberately adds NO directive:
-    # the shipped task brief already IS the medium page, so its depth is the brief's own. This empty
-    # string is the level's definition, not a missing entry; changing the brief redefines `medium`.
-    "medium": "",
-    "full": ("Make this page THOROUGH. Cover every concept the material teaches, with fuller bullets "
-             "and a worked example next to each concept the material supports. Aim for near-complete "
-             "coverage rather than a summary."),
-}
+# NOTE (2026-08-06): the page `--detail brief|medium|full` knob was REMOVED. Length is a FUNCTION,
+# not a dial (overview/glossary are the short artifacts; a shorter teaching page is the depth-planner),
+# and the choice of monolithic vs decompose is now the program's (see generate/page/route.py). The
+# page's length is grounded by the concept map's one-section-per-concept checklist below.
 
 
 def _concept_directive(concept_map) -> str:
@@ -71,12 +58,11 @@ def build_messages(transcript: str, *, course_title: str | None = None,
                    week_label: str | None = None, module: str | None = None,
                    project_root=None, system_prompt: str = "system",
                    task_prompt: str = "task", domain: str = "", voice: str = "",
-                   detail: str = "medium", concept_map=None) -> list[dict]:
+                   concept_map=None) -> list[dict]:
     """The chat messages for one page. A course overrides either prompt from its own
-    .vtconfig/prompts/page/, its domain profile is prepended when present, and `detail`
-    (brief|medium|full) tunes how much of the week the page covers. When a consolidated
+    .vtconfig/prompts/page/, and its domain profile is prepended when present. When a consolidated
     `concept_map` is present, its concepts become an explicit teaching checklist that grounds the
-    page's length and sections — overriding the vaguer `detail` heuristic."""
+    page's length and sections (one section per concept)."""
     system = prompts.load(PAGE_CATEGORY, system_prompt, project_root=project_root)
     task = prompts.load(PAGE_CATEGORY, task_prompt, project_root=project_root)
 
@@ -86,11 +72,6 @@ def build_messages(transcript: str, *, course_title: str | None = None,
     )
     system_message = ("\n" + courseconfig.domain_preface(domain)
                       + courseconfig.voice_preface(voice) + body + "\n")
-    # The detail directive rides at the end of the brief, where a small model attends most.
-    task_body = task.body
-    directive = _DETAIL_DIRECTIVES.get(detail, "")
-    if directive:
-        task_body = task_body + "\n\n" + directive
-    task_body = task_body + _concept_directive(concept_map)
+    task_body = task.body + _concept_directive(concept_map)
     return [{"role": "system", "content": system_message},
             {"role": "user", "content": "\n" + task_body + "\n"}]

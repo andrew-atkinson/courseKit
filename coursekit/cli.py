@@ -7,8 +7,8 @@ surface is self-describing and the couplings are structural rather than a footgu
 
     coursekit ingest   PATH [--raw]
     coursekit generate PATH [--quizzes | --pages] [--week N ...] [--weeks A-B]
-                            [--detail brief|medium|full] [--dry-run] [--max-iters N]
-                            [--output-root DIR] [--no-review]
+                            [--function teaching|glossary|overview] [--generator auto|monolithic|decompose]
+                            [--dry-run] [--max-iters N] [--output-root DIR] [--no-review]
     coursekit emit qti  PATH [--bundle]
     coursekit emit html PATH
     coursekit emit cc   PATH
@@ -280,12 +280,22 @@ def _cmd_generate(args) -> int:
             if verdict is False:
                 print(f"Warning ({gen.category}): {msg}\n")
 
+        # Pages are driven by FUNCTION (teaching/glossary/overview), with the teaching generator
+        # (monolithic vs decompose) chosen by the program — a per-unit dispatcher, not the one-
+        # conversation seam. Quizzes keep the default seam path.
+        unit_runner = None
+        if gen.category == "page" and not args.dry_run:
+            from coursekit.generate.page import build as pagebuild
+
+            def unit_runner(u, _m=model):
+                return pagebuild.build_page_unit(u, provider, _m, function=args.function,
+                                                 generator=args.generator, max_iters=args.max_iters)
+
         try:
             results = pipeline.run_course(
                 args.path, weeks=weeks, output_root=args.output_root,
                 provider=provider, model=model, dry_run=args.dry_run, max_iters=args.max_iters,
-                generator=gen,
-                config_overrides={"detail": args.detail} if args.detail else None,
+                generator=gen, unit_runner=unit_runner,
             )
         except pipeline.ModelLoadError as e:
             print(str(e))
@@ -387,7 +397,11 @@ def _cmd_emit_cc(args) -> int:
 
 def _cmd_emit_course(args) -> int:
     from coursekit.emit import cartridge
-    out = cartridge.write_course_imscc(args.path)
+    try:
+        out = cartridge.write_course_imscc(args.path)
+    except cartridge.CartridgeCollision as e:
+        print(f"Course cartridge not written — {e}")
+        return 1
     if out is None:
         print(f"No pages or quizzes found under {args.path}")
         return 1
@@ -592,9 +606,12 @@ def build_parser() -> argparse.ArgumentParser:
     pg.add_argument("--week", action="append", metavar="N",
                     help="a week to include, repeatable, e.g. --week 3 --week 5")
     pg.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
-    pg.add_argument("--detail", choices=("brief", "medium", "full"),
-                    help="how much of the week a PAGE covers (overrides page.yaml `detail`); "
-                         "medium is the default. No effect on quizzes.")
+    pg.add_argument("--function", choices=("teaching", "glossary", "overview"), default="teaching",
+                    help="what a PAGE is FOR (pages only): teaching (default) | glossary (a terms "
+                         "companion) | overview (a week 'Start Here'). No effect on quizzes.")
+    pg.add_argument("--generator", choices=("auto", "monolithic", "decompose"), default="auto",
+                    help="which generator drives a TEACHING page (pages only): auto (default — the "
+                         "program picks by measured length) | monolithic | decompose.")
     pg.add_argument("--dry-run", action="store_true",
                     help="list the units that would be processed, without calling the model")
     pg.add_argument("--max-iters", type=int, default=pipeline.DEFAULT_MAX_ITERS,

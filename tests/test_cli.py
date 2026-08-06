@@ -35,9 +35,21 @@ def _parse(*argv):
 
 
 def test_generate_routes_with_only_generation_flags():
-    args = _parse("generate", "/course", "--pages", "--detail", "full")
+    args = _parse("generate", "/course", "--pages", "--function", "glossary", "--generator", "decompose")
     assert args.func is cli._cmd_generate
-    assert args.path == "/course" and args.pages and args.detail == "full"
+    assert args.path == "/course" and args.pages
+    assert args.function == "glossary" and args.generator == "decompose"
+
+
+def test_generate_page_axis_defaults():
+    args = _parse("generate", "/course", "--pages")
+    assert args.function == "teaching" and args.generator == "auto"   # sensible defaults
+
+
+def test_generate_rejects_the_removed_detail_flag():
+    import pytest
+    with pytest.raises(SystemExit):
+        _parse("generate", "/course", "--pages", "--detail", "full")
 
 
 def test_emit_qti_routes_and_carries_bundle():
