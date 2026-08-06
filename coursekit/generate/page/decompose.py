@@ -31,6 +31,18 @@ from coursekit.generate.page.concept_map import load_for_unit
 from coursekit.providers.base import Reply
 
 _ADD_SPECS = [s for s in tools.TOOL_SPECS if s["name"].startswith("add_")]
+# A concept whose material exceeds one pass's budget is SUB-SPLIT into bounded passes under its single
+# heading — nothing dropped, each pass sees a COMPLETE chunk (unlike a truncating cap, which silently
+# loses the tail and can hand the model a broken fragment). The budget is the load-bearing number and
+# should be a MEASURED property of the model's usable context/attention, not an assumption: set
+# `max_pass_chars` in page.yaml to the model's tuned limit. The default is deliberately conservative —
+# this session, a focused pass handled ~30K chars but produced nothing at 56K on this model, and it is
+# task-dependent (the monolithic prompt held 118K), so the right value is measured per model, not here.
+DEFAULT_PASS_CHARS = 20000
+# A section that comes back EMPTY is almost always a flaky pass (the small model narrated instead of
+# calling tools), not a real "nothing to say" — so give it fresh attempts before giving up. This is the
+# automated backbone of the human "re-run this block" affordance (the vetting UI is parked).
+RETRY_EMPTY = 2
 _STOP = {"a", "an", "the", "and", "or", "of", "to", "in", "is", "it", "for", "with", "that",
          "this", "as", "on", "by", "be", "are", "we", "you", "your", "how", "what", "why", "its"}
 
@@ -73,8 +85,29 @@ def slice_material(transcript: str, concept, *, max_chars: int = 2500) -> str:
 
 
 # --------------------------------------------------------------------- the passes (model-driven)
+def _material_chunks(material: str, budget: int) -> list[str]:
+    """Split an oversized concept span into ≤ budget-char chunks on blank-line boundaries (never a
+    mid-paragraph cut), so each pass sees a COMPLETE chunk and no content is dropped. Returns the
+    material unchanged, as a single chunk, when it already fits."""
+    if len(material) <= budget:
+        return [material]
+    chunks, buf = [], ""
+    for p in re.split(r"\n\s*\n", material):
+        p = p.strip()
+        if not p:
+            continue
+        if buf and len(buf) + len(p) + 2 > budget:
+            chunks.append(buf)
+            buf = p
+        else:
+            buf = f"{buf}\n\n{p}" if buf else p
+    if buf:
+        chunks.append(buf)
+    return chunks
+
+
 def _run_pass(provider, model, system: str, user: str, *, max_turns: int = 8,
-              max_nudges: int = 3) -> int:
+              max_nudges: int = 3, stats: dict | None = None) -> int:
     """Drive one bounded tool-call pass that writes blocks into the shared page IR. Returns the number
     of blocks it added. The model calls `add_*` tools; when it replies in PROSE without having produced
     anything, nudge it back to tool calls (the small model narrates instead of calling tools) — the same
@@ -86,7 +119,11 @@ def _run_pass(provider, model, system: str, user: str, *, max_turns: int = 8,
     for _ in range(max_turns):
         try:
             reply = provider.chat_with_tools(model=model, messages=messages, tools=_ADD_SPECS)
-        except Exception:
+        except Exception as e:
+            print(f"    (pass error: {type(e).__name__}: {e})")   # surface it, don't swallow silently
+            if stats is not None:                                  # …and tally it (timeout tracking)
+                stats["errors"] = stats.get("errors", 0) + 1
+                stats.setdefault("error_types", []).append(type(e).__name__)
             break
         if reply.wants_tools:
             provider.append_assistant(messages, reply)
@@ -153,16 +190,19 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
 
     names = ", ".join(c.name for c in cm.concepts)
     eu = cm.enduring_understanding or "(none stated)"
+    stats: dict = {}                                   # tallies pass errors (candidate timeouts) across the run
+    empties: list[str] = []
 
     n = _run_pass(provider, model, sysmsg("frame"),
                   f"Topic: {unit.week_label or unit.week_slug}\nEnduring understanding: {eu}\n"
-                  f"Concepts this week: {names}")
+                  f"Concepts this week: {names}", stats=stats)
     print(f"  frame: +{n} block(s)")
 
     # Boundary-correct per-concept material from `analyze` (one contiguous verbatim span per concept, so
     # the example travels with its definition); fall back to the keyword slicer per concept when absent.
     from coursekit.generate.page import segment as seg
     materials = seg.load_materials_for_unit(unit) or {}
+    budget = int(cfg.value("max_pass_chars", DEFAULT_PASS_CHARS))   # measured per model, not assumed
 
     full = len(transcript)
     for i, c in enumerate(cm.concepts):
@@ -171,19 +211,45 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
         pageir.put_block(pageir.build_block("heading", block_id=f"sec-{i}", text=c.name, role="concept"))
         material = materials.get(c.name) or slice_material(transcript, c)
         src = "map" if materials.get(c.name) else "slice"
-        window = ("\n\n" + _neighbour_context(cm.concepts, i)) if neighbours else ""
-        n = _run_pass(provider, model, sysmsg("concept_section"),
-                      f"{_brief(c)}{window}\n\nThe material for this concept:\n"
-                      f"<material>\n{material}\n</material>")
-        print(f"  {c.name[:34]:34s} [{src}]: {len(material):5d}/{full} chars → +{n} content block(s)")
+        chunks = _material_chunks(material, budget)   # oversized span → bounded sub-passes, nothing dropped
+
+        def _fill_concept():
+            got = 0
+            for k, chunk in enumerate(chunks):
+                # neighbour window only on the first sub-pass; later sub-passes are pure continuation
+                window = ("\n\n" + _neighbour_context(cm.concepts, i)) if (neighbours and k == 0) else ""
+                cont = ("" if len(chunks) == 1 else
+                        f"\n\nThis is part {k + 1} of {len(chunks)} of this concept's material — CONTINUE "
+                        f"the same section: do not add a heading and do not re-introduce the concept.")
+                got += _run_pass(provider, model, sysmsg("concept_section"),
+                                 f"{_brief(c)}{window}{cont}\n\nThe material for this part:\n"
+                                 f"<material>\n{chunk}\n</material>", stats=stats)
+            return got
+
+        added = _fill_concept()
+        retries = 0
+        while added == 0 and retries < RETRY_EMPTY:   # an empty section is a flaky pass — try again fresh
+            retries += 1
+            added = _fill_concept()
+        if added == 0:
+            empties.append(c.name)
+        tag = src + (f",{len(chunks)}×" if len(chunks) > 1 else "") + (f",retry{retries}" if retries else "")
+        print(f"  {c.name[:24]:24s} [{tag}]: {len(material):6d}/{full} chars → +{added} content block(s)")
 
     # Same deterministic-heading treatment as the concepts — place the summary heading first so the
     # close pass can only add content beneath it (last run it emitted the heading last → empty section).
     pageir.put_block(pageir.build_block("heading", block_id="sec-summary", text="Wrapping Up",
                                         role="summary"))
     n = _run_pass(provider, model, sysmsg("close"),
-                  f"Concepts this week: {names}\nEnduring understanding: {eu}")
+                  f"Concepts this week: {names}\nEnduring understanding: {eu}", stats=stats)
     print(f"  close: +{n} content block(s)")
+
+    if stats.get("errors"):                            # the timeout/overheating signal, aggregated
+        from collections import Counter
+        kinds = ", ".join(f"{k}×{v}" for k, v in Counter(stats["error_types"]).items())
+        print(f"  ⚠ {stats['errors']} pass error(s) — candidate timeouts/overheating: {kinds}")
+    if empties:
+        print(f"  ⚠ {len(empties)} section(s) still empty after {RETRY_EMPTY} retries: {', '.join(empties)}")
 
     problems = pageir.validate_final()
     if not problems:
@@ -212,6 +278,9 @@ def main() -> int:
     ap.add_argument("--week", required=True, help="week number (e.g. 7) or label")
     ap.add_argument("--review", action="store_true",
                     help="also cold-read the result and print the flag count (extra model calls)")
+    ap.add_argument("--fix", action="store_true",
+                    help="after the review, run the fix loop on each flagged block, then re-render "
+                         "(implies --review; the fixer sees the FULL week transcript)")
     ap.add_argument("--no-neighbours", action="store_true",
                     help="drop the prev/next coherence window (A/B: does the window help?)")
     args = ap.parse_args()
@@ -236,7 +305,8 @@ def main() -> int:
     print(f"\n{len(pg.blocks)} block(s), {headings} section heading(s), "
           f"{'finalized' if not problems else 'NOT finalized'}")
 
-    if args.review:
+    flagged = []
+    if args.review or args.fix:
         from coursekit.generate.page import evaluate as pev
         material = Path(unit.transcript_path).read_text(encoding="utf-8", errors="replace")
         findings = pev.evaluate_page(pg, material, provider, model, week=unit.week_slug,
@@ -245,6 +315,22 @@ def main() -> int:
         print(f"\ncold read: {len(flagged)}/{len(findings)} section(s) flagged")
         for f in flagged:
             print(f"  [{f.verdict}] {f.group_id}: {f.concern}")
+
+    if args.fix and flagged:
+        # The page is still loaded in the IR; repair each flagged block in place against the FULL week
+        # transcript (so a correction that lives outside a concept's own segment is reachable), then
+        # re-verify and re-render — the same fix loop the production pages use.
+        from coursekit.generate.page import evaluate as pev
+        from coursekit.generate.page import fix as pfix
+        from coursekit.generate.quiz.evaluate import _critic_body
+        from coursekit.generate.quiz.fix import _outcome_word
+        critic = _critic_body(pev.PAGE_CATEGORY, unit.course_root)
+        print("\nfix loop:")
+        for f in flagged:
+            o = pfix.fix_one_block(f, material, provider, model, critic=critic,
+                                   project_root=unit.course_root)
+            print(f"  {f.group_id} ({f.label}): {_outcome_word(o)}")
+        _render(unit, out_dir, unit.course_root)
     return 0
 
 

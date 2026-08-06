@@ -19,6 +19,10 @@ Rules:
   put calls in the right lifecycle place (e.g. `preload` vs `setup`). Fix the specific bug the
   reviewer named.
 - If it is prose, a glossary, or bullets, correct the claim or definition so it matches the material.
+- When the material shows an idea EVOLVE — a version shown, then changed, corrected, or refined later —
+  use the FINAL, latest form, not an earlier one. A lecture often demonstrates a naive or buggy first
+  attempt before the working conclusion; the corrected section should show the conclusion, reaching
+  forward to the settled version rather than back to an earlier one that merely also runs.
 - Do NOT add links or URLs — those come from the course's supplements, never from you.
 - Change only what the flaw requires; keep everything already sound.
 

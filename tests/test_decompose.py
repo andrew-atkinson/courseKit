@@ -47,6 +47,41 @@ def test_module_imports_and_selects_add_tools_only():
     assert decompose._ADD_SPECS and all(s["name"].startswith("add_") for s in decompose._ADD_SPECS)
 
 
+# ------------------------------------------------ sub-splitting an oversized span (no truncation)
+
+def test_material_chunks_single_when_under_budget():
+    assert decompose._material_chunks("short text", 1000) == ["short text"]
+
+
+def test_material_chunks_splits_oversized_on_paragraph_boundaries_losing_nothing():
+    paras = [f"paragraph number {i} " * 8 for i in range(6)]     # ~150 chars each
+    material = "\n\n".join(paras)
+    chunks = decompose._material_chunks(material, budget=400)
+    assert len(chunks) > 1                                        # it split
+    assert all(len(c) <= 400 for c in chunks)                    # each within the measured budget
+    joined = "\n\n".join(chunks)
+    for p in paras:
+        assert p.strip() in joined                               # nothing dropped (unlike a cap)
+
+
+# ------------------------------------------------ pass-error tally (the timeout-tracking signal)
+
+def test_run_pass_tallies_errors_into_stats(capsys):
+    from coursekit.generate.page import page as P
+
+    class _Boom:                                     # a provider that times out on every call
+        def chat_with_tools(self, **_):
+            raise TimeoutError("model call timed out")
+
+    P.reset()
+    P.init("p", None)
+    stats: dict = {}
+    added = decompose._run_pass(_Boom(), "m", "sys", "user", stats=stats)
+    assert added == 0                                # nothing committed
+    assert stats["errors"] == 1                      # …but the error is counted (not swallowed)
+    assert stats["error_types"] == ["TimeoutError"]  # …and typed, so timeouts are visible
+
+
 # ------------------------------------------------ the sliding coherence window (prev/next by name+gist)
 
 def test_neighbour_window_middle_names_both_sides():
