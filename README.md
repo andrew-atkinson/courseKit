@@ -49,7 +49,7 @@ Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint �
 Then verify:
 
 ```bash
-uv run pytest           # 681 tests, all offline — no model needed (names each, not just dots)
+uv run pytest           # 685 tests, all offline — no model needed (names each, not just dots)
 ```
 
 ## Quick start
