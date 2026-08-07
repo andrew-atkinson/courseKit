@@ -167,6 +167,15 @@ def test_build_messages_grounds_length_in_the_concept_map_not_a_detail_dial(tmp_
     assert "BRIEF" not in body and "THOROUGH" not in body     # no detail directive survives
 
 
+def test_system_prompt_injects_the_catalog_palette(tmp_path):
+    # COMP-3: the component guidance comes from the catalog `{palette}`, not hand-written in the prompt.
+    from coursekit.generate.page.context import build_messages
+    sysmsg = build_messages("T")[0]["content"]
+    assert "{palette}" not in sysmsg                          # the slot is filled
+    assert "`add_columns` (contrast)" in sysmsg               # the palette landed
+    assert "`add_pullquote` (signalling)" in sysmsg
+
+
 def test_page_slug_comes_from_the_week_title(tmp_path):
     # A titled week yields a Canvas-style slug (week-3-repetition), not the bare filename slug.
     root = tmp_path / "course"

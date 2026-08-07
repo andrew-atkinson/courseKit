@@ -56,7 +56,7 @@ The artifacts these components compose into; each component's **Used in** says w
 ### `code` — Code block
 - **Serves:** worked-example, representation
 - **What:** A literal, fenced code sample.
-- **Use when:** Show the actual code the material teaches; introduce it with a sentence first.
+- **Use when:** Show the actual code the material teaches — only when the material actually contains code; introduce it with a sentence first.
 - **Avoid:** Never two code blocks back to back with no prose between; never invent code not in the material.
 - **Fields:** code, language
 - **Used in:** page
@@ -82,7 +82,7 @@ The artifacts these components compose into; each component's **Used in** says w
 - **Serves:** contrast
 - **What:** 2–3 side-by-side lists for comparison.
 - **Use when:** Wrong-way/right-way, before/after, or option A vs B.
-- **Avoid:** Not for a single list (use bullets); code reads poorly as bulleted lines (known bug, RICH-1).
+- **Avoid:** Not for a single list (use bullets); code reads poorly as bulleted lines.
 - **Fields:** columns[] (title, items[])
 - **Used in:** page
 

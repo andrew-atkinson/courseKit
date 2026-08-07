@@ -26,12 +26,16 @@ from pathlib import Path
 
 from coursekit import courseconfig, prompts
 from coursekit.discover import find_units, slugify
+from coursekit.generate import catalog
 from coursekit.generate.page import page as pageir
 from coursekit.generate.page import tools
 from coursekit.generate.page.concept_map import load_for_unit
 from coursekit.providers.base import Reply
 
 _ADD_SPECS = [s for s in tools.TOOL_SPECS if s["name"].startswith("add_")]
+# The components a per-concept section BODY composes from (COMP-3 palette scope) — the whole page's
+# heading/pullquote/card/details belong to the frame, the close, or the deterministic section heading.
+_SECTION_KINDS = {"paragraph", "code", "bullets", "columns", "image", "glossary", "callout"}
 # A concept whose material exceeds one pass's budget is SUB-SPLIT into bounded passes under its single
 # heading — nothing dropped, each pass sees a COMPLETE chunk (unlike a truncating cap, which silently
 # loses the tail and can hand the model a broken fragment). The budget is the load-bearing number and
@@ -192,9 +196,14 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
     tools.set_call_log(out_dir / "calls.jsonl")
 
     dpre, vpre = courseconfig.domain_preface(cfg.domain), courseconfig.voice_preface(cfg.voice)
+    # A concept pass fills a section BODY, so it composes from fewer components than a whole page —
+    # no heading (placed for it), no page-opening pullquote, no closing details. The `{palette}` slot
+    # in concept_section.md gets this scoped subset (COMP-3); prompts without the slot are unaffected.
+    section_palette = catalog.render_palette(only=_SECTION_KINDS)
 
     def sysmsg(name):
-        return dpre + vpre + prompts.load("page", name, project_root=project_root).body
+        body = prompts.load("page", name, project_root=project_root).body
+        return dpre + vpre + body.replace("{palette}", section_palette)
 
     names = ", ".join(c.name for c in cm.concepts)
     eu = cm.enduring_understanding or "(none stated)"

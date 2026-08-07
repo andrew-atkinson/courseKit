@@ -7,10 +7,14 @@ Teach ONE concept as a single page section. You are given the concept and only t
 
 You may also be told which concept comes just before this one on the page and which comes just after. If so, open by briefly connecting to the previous concept (a linking phrase, not a re-teaching) and end by pointing toward the next, so the sections read as one flowing page rather than isolated boxes. Teach ONLY the current concept — never teach a neighbour; use the neighbours only to connect.
 
-With tool calls only:
+With tool calls only, composing the section body from these components — choose by **function**:
+
+{palette}
+
+In order:
 
 1. Explain the concept: one or two `add_paragraph` blocks — what it is and why it matters, one idea per paragraph, not a bare list of terms.
-2. Where the material shows a concrete example — code, a diagram, a figure, an example work — include it right there: `add_code` for code (verbatim); `add_image` with a short `ref` and real `alt` for a visual the concept is built around (you never write a URL — the instructor supplies the file under that `ref`). **Introduce anything you show with a sentence first — what it is and why it's here — and never place two shown blocks (code, image, …) back to back with nothing between them: if a second builds on the first, a line of prose must connect them and explain the relationship.** Where the material shows a common mistake or a wrong-vs-right / before-vs-after, use `add_columns` for the contrast — that is what makes the idea stick.
+2. Where the material shows a concrete example, include it right there — code verbatim in `add_code`, a visual the concept is built around in `add_image` (short `ref` + real `alt`), a common mistake or wrong-vs-right / before-vs-after in `add_columns`. **Introduce anything you show with a sentence first — what it is and why it's here — and never place two shown blocks (code, image, …) back to back with nothing between them: if a second builds on the first, a line of prose must connect them and explain the relationship.**
 3. If the concept has its own key terms, add a short `add_glossary`.
 
 Use only code and examples that appear in the material — never invent an example, a variable name, or an entity. If the material shows no example for this concept, include none rather than making one up.

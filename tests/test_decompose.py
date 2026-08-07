@@ -3,8 +3,19 @@
 The model-driven passes are exercised by hand on a real course; here we pin the slicer, which is the
 lever (each concept sees a few K chars of relevant transcript, not the whole week)."""
 
+from coursekit import prompts
+from coursekit.generate import catalog
 from coursekit.generate.page import decompose
 from coursekit.generate.page.concept_map import Concept
+
+
+def test_concept_section_prompt_has_a_palette_slot_scoped_to_the_section_body():
+    # COMP-3: the decompose concept pass fills `{palette}` with a SECTION-scoped subset — no heading
+    # (placed for it), no page-opening pullquote.
+    assert "{palette}" in prompts.load("page", "concept_section").body
+    sec = catalog.render_palette(only=decompose._SECTION_KINDS)
+    assert "`add_paragraph`" in sec and "`add_code`" in sec
+    assert "`add_heading`" not in sec and "`add_pullquote`" not in sec
 
 TRANSCRIPT = (
     "Loops let you repeat a block of code many times using a for statement.\n\n"

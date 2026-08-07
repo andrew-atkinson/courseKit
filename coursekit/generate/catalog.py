@@ -79,7 +79,8 @@ CATALOG: dict[str, Component] = {c.kind: c for c in [
         kind="code", name="Code block",
         summary="A literal, fenced code sample.",
         functions=("worked-example", "representation"),
-        use_when="Show the actual code the material teaches; introduce it with a sentence first.",
+        use_when="Show the actual code the material teaches — only when the material actually contains "
+                 "code; introduce it with a sentence first.",
         avoid_when="Never two code blocks back to back with no prose between; never invent code not in the material.",
         fields="code, language"),
     Component(
@@ -102,7 +103,7 @@ CATALOG: dict[str, Component] = {c.kind: c for c in [
         summary="2–3 side-by-side lists for comparison.",
         functions=("contrast",),
         use_when="Wrong-way/right-way, before/after, or option A vs B.",
-        avoid_when="Not for a single list (use bullets); code reads poorly as bulleted lines (known bug, RICH-1).",
+        avoid_when="Not for a single list (use bullets); code reads poorly as bulleted lines.",
         fields="columns[] (title, items[])"),
     Component(
         kind="pullquote", name="Pull quote",
@@ -162,6 +163,28 @@ def unknown_components(content_type: str, kinds) -> list[str]:
     """The kinds `content_type` is NOT allowed to use (empty = all fine) — the enforcement hook a
     content type's validate step calls once it has a real subset of the vocabulary."""
     return [k for k in kinds if not allows(content_type, k)]
+
+
+# ---- model-facing palette (COMP-3) — injected into the generation prompts as `{palette}` -----------
+def render_palette(content_type: str = "page", only=None) -> str:
+    """A terse, imperative component palette for the GENERATION prompt — the model-facing analog of
+    `render_markdown`. Each line leads with the TOOL the model calls and the FUNCTION it serves, so
+    the model composes BY FUNCTION. This is the single source the page prompts inject via `{palette}`,
+    replacing the hand-written component lists that used to drift across (and between) them.
+
+    `only` restricts to a subset of kinds — a pass that fills a section BODY offers fewer components
+    than a whole page."""
+    out = []
+    for c in components_for(content_type):
+        if only is not None and c.kind not in only:
+            continue
+        line = f"- `add_{c.kind}` ({', '.join(c.functions)}) — {c.use_when}"
+        if c.variants:
+            line += f" [{c.variants}]"
+        if c.avoid_when:
+            line += f" Avoid: {c.avoid_when}"
+        out.append(line)
+    return "\n".join(out)
 
 
 # ---- doc generation (COMP-4) — docs/components.md is rendered from here, never hand-edited ----------

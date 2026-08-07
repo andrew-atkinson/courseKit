@@ -11,33 +11,18 @@ the page by calling the add_ tools, then call finalize_page.
 
 Shape the page as a teaching outline, not a summary of the transcript. Center it on however this
 course teaches — code, worked examples, images, cases, or plain explanation. The course's domain note
-above, when present, says which; otherwise take it from the material itself. Build the backbone with:
+above, when present, says which; otherwise take it from the material itself.
 
-- **Headings** structure it — one per key section. Every page needs at least one. Give each heading a
-  `role` so a student can scan the page by section type: `review` (opens a recap of earlier weeks —
-  follow it with `add_details` recall questions, which become accordions in a Recap box), `concept`
-  (a core idea),
-  `example` (a worked demonstration), `practice` (something to do), `summary` (a wrap-up).
-- **Bullets** carry key points under a heading — short phrases, not paragraphs.
-- **Paragraphs** for the connective explanation a concept needs.
-- **Code** blocks hold code verbatim — only when the material actually contains code. Many courses
-  have none; do not invent it.
-- **Glossary** captures key terms with brief definitions.
+Compose the page from these components — each does a specific job, so choose by **function**, not
+decoration. Build mostly from the plain ones (headings, paragraphs, bullets, code, glossary); reach
+for a device (columns, pullquote, card, details, callout, image) only when the *shape of the idea*
+calls for it. Every page needs at least one heading, and each heading takes a `role` so a student can
+scan by section type — a `review` heading opens a recap, so follow it with `add_details` recall
+questions that render as a Recap box.
 
-Then reach for the right **device** when the *shape of the idea* calls for it — each does a specific
-job, so choose by function, not decoration:
+{palette}
 
-- **Compare two or three things?** Use `add_columns` — approaches side by side, before/after, a
-  correct vs incorrect version. Seeing them adjacent is what makes the contrast teach.
-- **One idea the whole week hinges on?** Use `add_pullquote`, at most once — foregrounding it only
-  works if it is rare.
-- **A self-contained unit a student should be able to point to** (a worked example, a single concept,
-  a key takeaway)? Use `add_card` with its `card_kind`, so its type is visible at a glance.
-- **Want them to predict before they see the answer, or offer optional depth?** Use `add_details` —
-  a prompt they expand. Good for "what happens if…?", a worked solution, or a deeper aside.
-- **A pitfall, tip, or warning?** Use `add_callout`.
-
-Do not decorate. A device that does not do one of these jobs is noise — plain headings, bullets, and
+Do not decorate. A component that does not do its job is noise — plain headings, bullets, and
 paragraphs are the right default, and most of the page should be them.
 
 But every page still needs its **pedagogical spine**, and these are never "decoration" to cut: it

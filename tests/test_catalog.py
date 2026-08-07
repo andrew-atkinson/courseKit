@@ -42,6 +42,22 @@ def test_content_types_registry_has_page():
     assert "page" in catalog.CONTENT_TYPES
 
 
+# ---- the model-facing palette (COMP-3) ----
+
+def test_palette_leads_with_the_tool_and_its_function():
+    p = catalog.render_palette("page")
+    assert "`add_columns` (contrast)" in p          # tool name + the function it serves
+    assert "`add_pullquote` (signalling)" in p
+    assert "`add_details` (retrieval, chunking)" in p
+    assert "Avoid:" in p                             # the tuned anti-patterns ride along
+
+
+def test_palette_only_filters_to_a_section_subset():
+    p = catalog.render_palette(only={"paragraph", "code", "columns"})
+    assert "`add_paragraph`" in p and "`add_code`" in p and "`add_columns`" in p
+    assert "`add_pullquote`" not in p and "`add_heading`" not in p   # out-of-scope components dropped
+
+
 def test_every_component_serves_a_known_function():
     for c in catalog.CATALOG.values():
         assert c.functions, f"{c.kind} serves no pedagogic function (design that serves none doesn't ship)"

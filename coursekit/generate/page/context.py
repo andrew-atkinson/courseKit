@@ -6,6 +6,7 @@ env or file I/O at import.
 """
 
 from coursekit import courseconfig, prompts
+from coursekit.generate import catalog
 
 PAGE_CATEGORY = "page"
 
@@ -69,6 +70,7 @@ def build_messages(transcript: str, *, course_title: str | None = None,
     body = system.body.format(
         context_line=_context_line(course_title, week_label, module),
         transcript=transcript,
+        palette=catalog.render_palette("page"),
     )
     system_message = ("\n" + courseconfig.domain_preface(domain)
                       + courseconfig.voice_preface(voice) + body + "\n")
