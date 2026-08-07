@@ -16,8 +16,6 @@ COMP-3 (pedagogically-driven composition — pick components by `Component.funct
 
 from dataclasses import dataclass
 
-from coursekit.generate.page import page as pageir
-
 # ---- the pedagogic FUNCTIONS a component can serve (the project's CLT + UDL frames) ----------------
 # Named so composition (COMP-3) and evaluation (EVAL-10/12) can reason about a component's FIT, not
 # just its presence. A component earns its place by serving one of these; design that serves none
@@ -138,6 +136,34 @@ CATALOG: dict[str, Component] = {c.kind: c for c in [
 ]}
 
 
+# ---- content types (COMP-2) — which components each artifact composes from ------------------------
+# The catalog is the single authority on composition: a content type's PALETTE is just the components
+# whose `content_types` include it. Composition (COMP-3) picks from the palette; a content type's
+# validate step calls `unknown_components` to reject anything off-palette. New content types
+# (discussion, assignment, overview, …) join CONTENT_TYPES and tag components in `content_types` —
+# one source, no per-type block registry.
+CONTENT_TYPES: dict[str, str] = {
+    "page": "A teaching, reference, or orientation page (page.json).",
+}
+
+
+def components_for(content_type: str) -> list[Component]:
+    """The components a content type may compose from (its palette)."""
+    return [c for c in CATALOG.values() if content_type in c.content_types]
+
+
+def allows(content_type: str, kind: str) -> bool:
+    """Whether `content_type` may use the component `kind`."""
+    c = CATALOG.get(kind)
+    return bool(c and content_type in c.content_types)
+
+
+def unknown_components(content_type: str, kinds) -> list[str]:
+    """The kinds `content_type` is NOT allowed to use (empty = all fine) — the enforcement hook a
+    content type's validate step calls once it has a real subset of the vocabulary."""
+    return [k for k in kinds if not allows(content_type, k)]
+
+
 # ---- doc generation (COMP-4) — docs/components.md is rendered from here, never hand-edited ----------
 def render_markdown() -> str:
     """The `docs/components.md` content, generated from CATALOG + FUNCTIONS. Deterministic, so a test
@@ -158,6 +184,10 @@ def render_markdown() -> str:
     ]
     for name, desc in FUNCTIONS.items():
         lines.append(f"- **{name}** — {desc}")
+    lines += ["", "## Content types", "",
+              "The artifacts these components compose into; each component's **Used in** says which apply.", ""]
+    for name, desc in CONTENT_TYPES.items():
+        lines.append(f"- **{name}** — {desc} ({len(components_for(name))} components)")
     lines += ["", "## Components", ""]
     for c in CATALOG.values():
         lines.append(f"### `{c.kind}` — {c.name}")

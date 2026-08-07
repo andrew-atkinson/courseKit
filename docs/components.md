@@ -20,6 +20,12 @@ The CLT + UDL frames a component can serve; composition and evaluation reason ab
 - **action** — UDL — invite the student to try it.
 - **reference** — Look-up material — terms and definitions to review.
 
+## Content types
+
+The artifacts these components compose into; each component's **Used in** says which apply.
+
+- **page** — A teaching, reference, or orientation page (page.json). (11 components)
+
 ## Components
 
 ### `heading` — Section heading

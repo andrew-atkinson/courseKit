@@ -7,13 +7,39 @@ must be defined, and the generated `docs/components.md` (COMP-4) must not drift 
 
 from pathlib import Path
 
-from coursekit.generate import catalog
+from coursekit.generate import blocks, catalog
 from coursekit.generate.page import page as pageir
 
 
 def test_catalog_covers_every_block_kind_exactly():
-    # The load-bearing guard: a block added to page.py without a catalog entry (or vice versa) fails.
-    assert set(catalog.CATALOG) == set(pageir._KINDS)
+    # The load-bearing guard: a block added to the vocabulary without a catalog entry (or vice versa)
+    # fails. Keyed to the shared `blocks` module (COMP-2), the content-type-neutral import point.
+    assert set(catalog.CATALOG) == set(blocks._KINDS)
+
+
+def test_blocks_module_re_exports_the_page_vocabulary():
+    # COMP-2: the shared import point exposes the same vocabulary the page IR defines today.
+    assert blocks._KINDS is pageir._KINDS
+    assert blocks.build_block is pageir.build_block
+
+
+# ---- content-type governance (COMP-2) ----
+
+def test_page_palette_is_the_whole_catalog_today():
+    palette = {c.kind for c in catalog.components_for("page")}
+    assert palette == set(catalog.CATALOG)                 # every component is a page component (for now)
+
+
+def test_allows_and_unknown_components():
+    assert catalog.allows("page", "heading")
+    assert not catalog.allows("page", "no-such-kind")
+    assert not catalog.allows("discussion", "heading")    # an undeclared content type has no palette
+    assert catalog.unknown_components("page", ["heading", "code"]) == []
+    assert catalog.unknown_components("page", ["heading", "bogus"]) == ["bogus"]
+
+
+def test_content_types_registry_has_page():
+    assert "page" in catalog.CONTENT_TYPES
 
 
 def test_every_component_serves_a_known_function():
