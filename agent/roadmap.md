@@ -52,8 +52,8 @@ The forward view is organized by **capability area**, with a stable semantic ID 
 ## Roadmap outline (by area · do-first → do-last)
 
 **COMP** *(foundation — build before multiplying content types)*
-- `COMP-1 · H1 · 🧭` Component catalog: every block/device + the pedagogic function it serves.
-- `COMP-4 · H1 · 🧭` `docs/components.md` — the reference behind the catalog.
+- `COMP-1 · H1 · ✅` Component catalog: every block/device + the pedagogic function it serves — `coursekit/generate/catalog.py` (a registry, drift-guarded against `page._KINDS`).
+- `COMP-4 · H1 · ✅` `docs/components.md` — generated from the catalog, freshness-tested.
 - `COMP-2 · H2 · 🧭` One shared block vocabulary all content types compose from (canonical-IR, one level up). ⇐ COMP-1
 - `COMP-3 · H2 · 🧭` Pedagogically-driven composition — model/planner picks components by function. ⇐ COMP-2, PROF-3
 
@@ -221,6 +221,7 @@ A running changelog — one line per completed feature, newest first, with its c
 The sections above stay forward-looking; deep detail lives in the offline log + git.
 (Increments 1–9 — GIFT/QTI/CC emitters, `courseconfig`, the quizbot→coursekit rename, the design system, document ingest — predate this changelog; see `architecture.md`'s "Order of operations" and git history.)
 
+- 2026-08-06 · **Component catalog (COMP-1/COMP-4)** — `coursekit/generate/catalog.py`: a registry of every component (the 11 page blocks) with the pedagogic **function(s)** it serves (a named CLT/UDL vocabulary), when-to-use / avoid, schema + variants, and a `content_types` seam for COMP-2. `docs/components.md` is generated from it; drift-guarded (catalog ↔ `page._KINDS`) and freshness-tested. The foundation for COMP-2 (shared vocabulary) + COMP-3 (compose by function) + the upstream evaluators. _(pending commit)_
 - 2026-08-06 · **Page FUNCTION axis + auto-router** — `coursekit generate --pages --function teaching|glossary|overview`; a deterministic multi-signal router (`generate/page/route.py`: length + concept count + largest span, page.yaml-tunable) picks monolithic vs decompose for a teaching page, `--generator auto|monolithic|decompose` overrides; the monolithic `--detail` is removed; decompose is wired into `generate` via a per-unit dispatcher (`generate/page/build.py` + a `unit_runner` seam on `run_course`). The user picks WHAT + quality; the program picks HOW. All functions land under `pages/`. _(pending commit; evaluate/fix still discover only teaching pages — small follow-up)_
 - 2026-08-06 · **Length is a FUNCTION, not a dial** — retired the decompose `--detail` (a per-concept pass can't judge brevity without the whole extent); the teaching page (decompose) now writes only to canonical `pages/<week>/` (no `pages-decomposed/` side tree — that killed the emit-collision class); added the **glossary companion** function (`generate/page/glossary.py` + `prompts/page/glossary.md`: model-extracts terms per material chunk, deterministic harvest + dedup, renders with supplements so a video sits beside the terms); and made `page.validate_final` **page-type-aware** (reference/orientation types skip the retrieval-foldout requirement). Also: the course cartridge now fails **gracefully** on a duplicate-slug collision, naming both source files. _(pending commit)_
 - 2026-08-02 · **Voice on quizzes scoped to feedback only** — after voice went live, a full-course run showed quiz flags rise (~2% → ~6%) while pages improved: a hedged register bleeds into stems/options ("asks why, but the options are syntax"). So the quiz generator + quiz fixer now use a narrower `quiz_voice_preface` (voice in feedback/explanations only; stems and options stay literal); pages keep the full voice. _(pending commit)_
