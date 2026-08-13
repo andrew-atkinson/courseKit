@@ -17,7 +17,7 @@ from coursekit.generate.page import evaluate as pev
 from coursekit.generate.page import page as pageir
 from coursekit.generate.page import tools
 from coursekit.generate.quiz.evaluate import _critic_body
-from coursekit.generate.quiz.fix import FixOutcome, render_outcomes  # noqa: F401 (re-exported)
+from coursekit.generate.quiz.fix import FixOutcome, _abort_if_model_error, render_outcomes  # noqa: F401
 from coursekit.providers.base import Reply
 
 FIX_CATEGORY = "page"
@@ -56,8 +56,9 @@ def fix_one_block(finding, material: str, provider, model: str, *, critic: str,
     for _ in range(max(1, max_turns)):
         try:
             reply = provider.chat_with_tools(model=model, messages=messages, tools=FIX_TOOL_SPECS)
-        except Exception:
-            break
+        except Exception as e:
+            _abort_if_model_error(provider, model, e)   # infra failure → abort the whole run
+            break                                        # content-level error → give up on this item
         if reply.wants_tools:
             provider.append_assistant(messages, reply)
             results = tools.run_tool_calls(reply.tool_calls)

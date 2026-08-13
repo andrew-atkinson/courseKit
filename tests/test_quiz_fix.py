@@ -171,3 +171,24 @@ def test_render_outcomes_summarizes():
     text = qfix.render_outcomes(outs)
     assert "Fixed 2 of 3" in text and "1 now pass" in text
     assert "fixed ✓" in text and "still flagged" in text and "could not fix" in text
+
+
+def test_render_outcomes_uses_the_given_noun():
+    outs = [qfix.FixOutcome("week-8", "g1", "A", "c", True, True)]
+    assert "flagged question(s)" in qfix.render_outcomes(outs)              # default (quizzes)
+    assert "flagged section(s)" in qfix.render_outcomes(outs, noun="section")   # pages
+
+
+def test_abort_if_model_error_aborts_on_infra_but_not_on_content():
+    from coursekit.pipeline import ModelLoadError
+
+    class _P:
+        def check_fit(self, model):
+            return (False, "model ~14 GB but budget ~9 GB")
+
+    # a model-load / connection failure aborts the whole run — NOT a per-item "could not fix"
+    with pytest.raises(ModelLoadError):
+        qfix._abort_if_model_error(_P(), "m",
+                                   RuntimeError("Failed to load model: insufficient system resources"))
+    # a content-level exception does not abort; the caller breaks just that one item
+    assert qfix._abort_if_model_error(_P(), "m", ValueError("some content issue")) is None

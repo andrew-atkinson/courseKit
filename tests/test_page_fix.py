@@ -107,3 +107,19 @@ def test_fix_course_pages_updates_page_on_disk(tmp_path, fresh):
     from coursekit.generate.page.page import Page
     saved = Page.model_validate_json((outd / "page.json").read_text())
     assert "let sound" in saved.blocks["realtime-code"].code                # fix persisted
+
+
+def test_fix_one_block_aborts_on_a_model_load_error(fresh):
+    # A not-loaded / unreachable model is INFRA — abort the whole run, never report per-block
+    # "could not fix" (the OPS-6 bug that sent a whole session down a false trail).
+    from coursekit.pipeline import ModelLoadError
+    tools.add_code("realtime-code", code="sound.play();", language="js")
+
+    class _Down:
+        def chat_with_tools(self, **_):
+            raise RuntimeError("insufficient system resources")             # model not loaded
+        def check_fit(self, model):
+            return (False, "model too big for the budget")
+
+    with pytest.raises(ModelLoadError):
+        pfix.fix_one_block(_finding(), "material", _Down(), "m", critic="C")

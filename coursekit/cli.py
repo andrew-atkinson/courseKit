@@ -545,23 +545,28 @@ def _cmd_fix(args) -> int:
                   f"`evaluate` first)…")
         return fix_call(review)
 
-    if do_quiz:
-        from coursekit.generate.quiz import fix as qfix
-        outs = _run("question", lambda review: qfix.fix_course(
-            args.path, weeks=weeks, provider=provider, model=model, reads=reads,
-            max_turns=args.max_turns, findings=review, progress=_tick), pages=False)
-        if outs:
-            did = True
-            print(qfix.render_outcomes(outs))
+    try:
+        if do_quiz:
+            from coursekit.generate.quiz import fix as qfix
+            outs = _run("question", lambda review: qfix.fix_course(
+                args.path, weeks=weeks, provider=provider, model=model, reads=reads,
+                max_turns=args.max_turns, findings=review, progress=_tick), pages=False)
+            if outs:
+                did = True
+                print(qfix.render_outcomes(outs, noun="question"))
 
-    if do_page:
-        from coursekit.generate.page import fix as pfix
-        outs = _run("section", lambda review: pfix.fix_course_pages(
-            args.path, weeks=weeks, provider=provider, model=model, reads=reads,
-            max_turns=args.max_turns, findings=review, progress=_tick), pages=True)
-        if outs:
-            did = True
-            print(pfix.render_outcomes(outs))
+        if do_page:
+            from coursekit.generate.page import fix as pfix
+            outs = _run("section", lambda review: pfix.fix_course_pages(
+                args.path, weeks=weeks, provider=provider, model=model, reads=reads,
+                max_turns=args.max_turns, findings=review, progress=_tick), pages=True)
+            if outs:
+                did = True
+                print(pfix.render_outcomes(outs, noun="section"))
+    except pipeline.ModelLoadError as e:
+        # A not-loaded / unreachable model is INFRA, not "could not fix" N items — abort clearly.
+        print(str(e))
+        return 2
 
     if not did:
         print("Nothing fixed.")

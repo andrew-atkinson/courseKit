@@ -47,6 +47,16 @@ def _fixer_body(project_root) -> str:
             + prompts.load(FIX_CATEGORY, "fix", project_root=project_root).body)
 
 
+def _abort_if_model_error(provider, model, exc) -> None:
+    """A model-load / connection failure is INFRA, not a per-item 'could not fix' — re-raise it as
+    `ModelLoadError` so the whole fix run aborts with a clear message (the same way `generate` does),
+    rather than reporting every flagged item as unfixable. A content-level exception returns None, and
+    the caller breaks the loop for just that one item. (Shared by the quiz and page fix loops.)"""
+    from coursekit.pipeline import ModelLoadError, _looks_like_model_error, _model_error_message
+    if _looks_like_model_error(exc):
+        raise ModelLoadError(_model_error_message(provider, model, exc)) from exc
+
+
 def fix_one(finding, transcript: str, provider, model: str, *, critic: str,
             project_root=None, max_turns: int = 4) -> FixOutcome:
     """Correct ONE flagged variant in the loaded bank (the singleton), then verify. The variant must
@@ -71,8 +81,9 @@ def fix_one(finding, transcript: str, provider, model: str, *, critic: str,
     for _ in range(max(1, max_turns)):
         try:
             reply = provider.chat_with_tools(model=model, messages=messages, tools=FIX_TOOL_SPECS)
-        except Exception:
-            break
+        except Exception as e:
+            _abort_if_model_error(provider, model, e)   # infra failure → abort the whole run
+            break                                        # content-level error → give up on this item
         if reply.wants_tools:
             provider.append_assistant(messages, reply)
             results = tools.run_tool_calls(reply.tool_calls)
@@ -147,10 +158,10 @@ def _outcome_word(o: "FixOutcome") -> str:
     return "fixed ✓" if o.now_passes else ("revised, still flagged" if o.replaced else "could not fix")
 
 
-def render_outcomes(outcomes: list[FixOutcome]) -> str:
+def render_outcomes(outcomes: list[FixOutcome], noun: str = "question") -> str:
     fixed = [o for o in outcomes if o.replaced]
     passing = [o for o in fixed if o.now_passes]
-    lines = [f"Fixed {len(fixed)} of {len(outcomes)} flagged question(s); "
+    lines = [f"Fixed {len(fixed)} of {len(outcomes)} flagged {noun}(s); "
              f"{len(passing)} now pass a fresh cold read.", ""]
     for o in outcomes:
         lines.append(f"  [{_outcome_word(o)}] {o.week} {o.group_id}/{o.label}")
