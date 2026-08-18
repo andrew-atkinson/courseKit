@@ -46,6 +46,11 @@ def test_generate_page_axis_defaults():
     assert args.function == "teaching" and args.generator == "auto"   # sensible defaults
 
 
+def test_generate_source_targets_one_document():
+    args = _parse("generate", "--quizzes", "--source", "/c/week-3/reading.pdf")
+    assert args.func is cli._cmd_generate and args.quizzes and args.source == "/c/week-3/reading.pdf"
+
+
 def test_generate_rejects_the_removed_detail_flag():
     import pytest
     with pytest.raises(SystemExit):

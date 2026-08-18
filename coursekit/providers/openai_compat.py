@@ -13,11 +13,19 @@ class OpenAICompatProvider(Provider):
     """Any endpoint speaking the OpenAI chat-completions tool format."""
 
     def __init__(self, base_url: str | None = None, api_key: str = "not-needed",
-                 name: str = "openai-compatible", is_local: bool = True, client=None):
+                 name: str = "openai-compatible", is_local: bool = True, client=None,
+                 timeout: float | None = None):
         # `client` is injectable so tests never need a live endpoint.
         if client is None:
+            import os
+
             from openai import OpenAI
-            client = OpenAI(base_url=base_url, api_key=api_key)
+            # A big artifact (a many-concept quiz or a long page) can take a while on a local model,
+            # and the SDK's default request timeout can fire on a generation that is slow-but-fine.
+            # Use a generous, tunable timeout so that doesn't happen; override with MODEL_TIMEOUT (s).
+            if timeout is None:
+                timeout = float(os.getenv("MODEL_TIMEOUT", "1200"))
+            client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
         self._client = client
         self.name = name
         self.is_local = is_local

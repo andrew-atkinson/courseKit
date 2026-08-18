@@ -138,18 +138,29 @@ def test_unsupported_type_raises():
 
 def test_plan_weeks_uses_filename_week_numbers(tmp_path):
     plan = ingest.plan_weeks([tmp_path / "week-3.pdf", tmp_path / "week-1.pdf"])
-    assert [s for s, _ in plan] == ["week-1", "week-3"]      # sorted, keyed by name
+    assert [s for s, _ in plan] == ["week-1", "week-3"]      # sorted numerically, keyed by name
 
 
 def test_plan_weeks_enumerates_when_unnumbered(tmp_path):
     plan = ingest.plan_weeks([tmp_path / "intro.pdf", tmp_path / "basics.pdf"])
     assert [s for s, _ in plan] == ["week-1", "week-2"]      # sorted name order
-    assert plan[0][1].name == "basics.pdf"
+    assert plan[0][1][0].name == "basics.pdf"               # each is its own single-source week
 
 
-def test_plan_weeks_rejects_a_duplicate_week(tmp_path):
-    with pytest.raises(ValueError, match="week-3"):
-        ingest.plan_weeks([tmp_path / "week-3.pdf", tmp_path / "week-3.txt"])
+def test_plan_weeks_consolidates_same_week(tmp_path):
+    # FLOW-2: two docs for one week are a UNION, not a collision error.
+    plan = ingest.plan_weeks([tmp_path / "week-3.pdf", tmp_path / "week-3.txt"])
+    assert len(plan) == 1 and plan[0][0] == "week-3" and len(plan[0][1]) == 2
+
+
+def test_plan_weeks_groups_by_week_folder_and_drops_root_docs(tmp_path):
+    # A folder-per-week course keys off the DIRECTORY; a root-level course outline is not week content.
+    files = [tmp_path / "week-3" / "readings" / "a.md",
+             tmp_path / "week-3" / "slides" / "b.pptx",
+             tmp_path / "course-outline.md"]
+    plan = ingest.plan_weeks(files)
+    assert [s for s, _ in plan] == ["week-3"]
+    assert {p.name for p in plan[0][1]} == {"a.md", "b.pptx"}   # the root outline is dropped
 
 
 # ------------------------------------------------------------- orchestration
@@ -193,6 +204,22 @@ def test_shaping_without_a_provider_errors(tmp_path):
 def test_ingest_no_supported_docs_is_empty(tmp_path):
     (tmp_path / "notes.rtf").write_text("x", encoding="utf-8")   # unsupported type
     assert ingest.ingest(tmp_path, raw=True) == []
+
+
+def test_ingest_consolidates_a_week_folder_with_source_headers(tmp_path):
+    # FLOW-2 v1: a week that is a FOLDER of many docs → ONE week doc, each source under a `##` header
+    # so the week stays source-addressable.
+    (tmp_path / "week-3" / "readings").mkdir(parents=True)
+    (tmp_path / "week-3" / "readings" / "Barrett.md").write_text("criticism text", encoding="utf-8")
+    (tmp_path / "week-3" / "slides").mkdir(parents=True)
+    (tmp_path / "week-3" / "slides" / "ISO.md").write_text("iso text", encoding="utf-8")
+
+    out = ingest.ingest(tmp_path, raw=True)
+    dests = {dest for _, dest in out}
+    assert len(dests) == 1 and dests.pop().name == "week-3.md"   # ONE consolidated week doc
+    doc = (tmp_path / "output" / "week-3.md").read_text(encoding="utf-8")
+    assert "## Barrett" in doc and "## ISO" in doc               # source headers preserved
+    assert "criticism text" in doc and "iso text" in doc         # both sources unioned
 
 
 def test_ingest_writes_into_the_vtconfig_course_output(tmp_path):

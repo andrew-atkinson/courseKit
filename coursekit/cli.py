@@ -171,8 +171,10 @@ def _cmd_ingest(args) -> int:
         return 1
     print("Ingested:")
     for src, dest in results:
-        print(f"  {src.name}  ->  {dest}")
-    print(f"\n{len(results)} week doc(s) written. Now generate with:  coursekit generate \"<course>\"")
+        print(f"  {src.name}  ->  {dest.name}")
+    n_weeks = len({dest for _, dest in results})
+    print(f"\n{n_weeks} week doc(s) from {len(results)} source(s). Now generate with:  "
+          f"coursekit generate \"<course>\"")
     return 0
 
 
@@ -261,7 +263,36 @@ def _cmd_analyze(args) -> int:
     return 0
 
 
+def _cmd_generate_targeted(args) -> int:
+    """A quiz scoped to ONE document (`--source`), not the whole week (ASMT-17)."""
+    if args.pages:
+        raise SystemExit("targeted generation (--source) is quizzes-only for now")
+    if args.dry_run:
+        print(f"DRY RUN — targeted quiz from: {args.source}")
+        return 0
+    model = os.getenv("MODEL_NAME") or courseconfig.load(
+        args.source, config_name="quiz.yaml").value("model")
+    if not model:
+        raise SystemExit("no model configured — set MODEL_NAME or quiz.yaml `model:`")
+    provider = _build_provider()
+    from coursekit.generate.quiz import targeted
+    try:
+        res = targeted.generate_targeted_quiz(args.source, provider, model,
+                                              output_root=args.output_root, max_iters=args.max_iters)
+    except pipeline.ModelLoadError as e:
+        print(str(e))
+        return 2
+    status = "OK" if res.finalized else "INCOMPLETE"
+    print(f"[{status}] targeted quiz — {res.n_groups} group(s), {res.n_variants} variant(s)\n"
+          f"  -> {res.output_dir}")
+    for p in res.problems:
+        print(f"     - {p}")
+    return 0 if res.finalized else 1
+
+
 def _cmd_generate(args) -> int:
+    if getattr(args, "source", None):
+        return _cmd_generate_targeted(args)
     if not args.path:
         raise SystemExit("no PATH given and TRANSCRIPTION is not set")
     weeks = _parse_weeks(args)
@@ -617,6 +648,9 @@ def build_parser() -> argparse.ArgumentParser:
     pg.add_argument("--generator", choices=("auto", "monolithic", "decompose"), default="auto",
                     help="which generator drives a TEACHING page (pages only): auto (default — the "
                          "program picks by measured length) | monolithic | decompose.")
+    pg.add_argument("--source", metavar="DOC",
+                    help="TARGETED quiz from ONE document (a reading / slide deck / PDF / .md), not the "
+                         "whole week — writes to quizzes/<week>-<doc>/. Quizzes only.")
     pg.add_argument("--dry-run", action="store_true",
                     help="list the units that would be processed, without calling the model")
     pg.add_argument("--max-iters", type=int, default=pipeline.DEFAULT_MAX_ITERS,

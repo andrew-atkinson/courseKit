@@ -344,6 +344,23 @@ def test_loop_reraises_non_model_errors(fresh_bank):
         loop(_msgs(), client, "m")
 
 
+def test_looks_like_timeout_matches_timeouts_only():
+    from coursekit.pipeline import _looks_like_timeout
+    assert _looks_like_timeout(TimeoutError("Request timed out."))
+    assert _looks_like_timeout(Exception("httpx.ReadTimeout: timed out"))
+    assert not _looks_like_timeout(ValueError("bad json, unrelated"))
+    assert not _looks_like_timeout(Exception("Failed to load model"))   # a LOAD error, not a timeout
+
+
+def test_loop_ends_cleanly_on_a_timeout(fresh_bank):
+    # A request timeout is transient + per-unit: the loop ends cleanly (no raw traceback), leaving the
+    # artifact unfinalized — so a batch / --source loop moves on. The generate-side of OPS-6/7.
+    from coursekit.generate.quiz import bank as bankmod
+    client = RaisingClient(TimeoutError("Request timed out."))
+    out = loop(_msgs(), client, "m")
+    assert out == "" and not bankmod.is_finalized()
+
+
 def test_stop_turn_is_reappended_as_a_plain_dict_not_the_native_message(fresh_bank):
     """Pins a subtle, easily-'cleaned-up' decision in loop().
 

@@ -32,6 +32,15 @@ def _looks_like_model_error(exc: Exception) -> bool:
     return getattr(exc, "status_code", None) == 404
 
 
+def _looks_like_timeout(exc: Exception) -> bool:
+    """A request TIMEOUT (or dropped connection) — transient and PER-UNIT (the model was slow on a
+    big artifact), unlike a model-LOAD error which fails every unit. Handled by ending this unit
+    cleanly, not aborting the batch."""
+    s = str(exc).lower()
+    return ("timed out" in s or "timeout" in s or "connection error" in s
+            or type(exc).__name__.lower().endswith("timeouterror"))
+
+
 def _model_error_message(provider, model: str, exc: Exception) -> str:
     lines = [f"Could not use model '{model}'."]
     verdict, msg = provider.check_fit(model)
@@ -82,6 +91,13 @@ def loop(messages, provider, model, generator: Generator | None = None, *,
             # and abort the whole batch rather than failing identically on every unit.
             if _looks_like_model_error(exc):
                 raise ModelLoadError(_model_error_message(provider, model, exc)) from exc
+            # A request TIMEOUT is transient and per-unit — end THIS artifact cleanly (it finishes
+            # unfinalized → reported INCOMPLETE) instead of crashing with a raw traceback, so a batch
+            # or a --source loop moves on. Give a slow local model more room with MODEL_TIMEOUT.
+            if _looks_like_timeout(exc):
+                show("[yellow]Model request timed out — leaving this artifact unfinished "
+                     "(raise MODEL_TIMEOUT to give a slow local model more time).[/yellow]")
+                break
             raise
 
         if reply.wants_tools:
