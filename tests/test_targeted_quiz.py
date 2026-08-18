@@ -19,6 +19,14 @@ def test_targeted_slug_carries_the_week_and_the_doc():
     assert targeted.targeted_slug(Path("/c/loose/Some Reading.md")) == "some-reading"   # no week ancestor
 
 
+def test_targeted_slug_ignores_a_bare_numeric_ancestor():
+    # A numeric ancestor (a year, a course number) is NOT a week — reuse ingest's strict `week-N`
+    # match, not the loose per-ancestor week_key that turned `2024/` into `week-2024-...`.
+    assert targeted.targeted_slug(Path("/c/2024/readings/Barrett.pdf")) == "barrett"
+    # ...but a real `week-N` ancestor deeper than a numeric one still wins.
+    assert targeted.targeted_slug(Path("/c/2024/week-7/Barrett.pdf")) == "week-7-barrett"
+
+
 def _course(tmp_path):
     root = tmp_path / "course"
     (root / ".vtconfig").mkdir(parents=True)

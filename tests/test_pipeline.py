@@ -361,6 +361,29 @@ def test_loop_ends_cleanly_on_a_timeout(fresh_bank):
     assert out == "" and not bankmod.is_finalized()
 
 
+class _APIConnectionError(Exception):
+    """Mimics openai.APIConnectionError by name — a DOWN endpoint, not a slow one."""
+
+
+def test_looks_like_unreachable_matches_down_endpoints_not_slow_ones():
+    from coursekit.pipeline import _looks_like_timeout, _looks_like_unreachable
+    assert _looks_like_unreachable(_APIConnectionError("Connection error."))
+    assert _looks_like_unreachable(ConnectionRefusedError("[Errno 61] Connection refused"))
+    assert not _looks_like_unreachable(TimeoutError("Request timed out."))   # slow, not down
+    # a bare 'Connection error.' is a down server now, NOT a per-unit timeout (reclassified so a
+    # dead endpoint aborts the batch instead of marking every unit INCOMPLETE)
+    assert not _looks_like_timeout(_APIConnectionError("Connection error."))
+
+
+def test_loop_aborts_the_batch_on_an_unreachable_endpoint(fresh_bank):
+    # A down endpoint fails every unit identically → abort with a clear message, not N misleading
+    # per-unit 'timed out's. ModelLoadError propagates out of run_course → the CLI exits 2.
+    client = RaisingClient(_APIConnectionError("Connection error."))
+    with pytest.raises(ModelLoadError) as ei:
+        loop(_msgs(), client, "m")
+    assert "Could not reach the model endpoint" in str(ei.value)
+
+
 def test_stop_turn_is_reappended_as_a_plain_dict_not_the_native_message(fresh_bank):
     """Pins a subtle, easily-'cleaned-up' decision in loop().
 

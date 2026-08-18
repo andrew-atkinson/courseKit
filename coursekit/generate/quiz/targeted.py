@@ -15,21 +15,17 @@ from pathlib import Path
 from coursekit import courseconfig
 from coursekit.discover import Unit, slugify
 from coursekit.ingest.extract import SUPPORTED_SUFFIXES, extract_text, is_supported
-
-
-def _week_from_path(source: Path) -> str | None:
-    """The week number from a `week-N` ancestor directory, if any — so the output slug carries it."""
-    for p in source.parents:
-        k = courseconfig.week_key(p.name)
-        if k:
-            return k
-    return None
+from coursekit.ingest.ingest import _week_of
 
 
 def targeted_slug(source: Path) -> str:
     """A distinct output slug for a targeted quiz: `week-<n>-<doc>` (or just `<doc>` off-week). Distinct
-    from the plain `week-<n>` so a targeted quiz never overwrites the week quiz or another element's."""
-    wk = _week_from_path(source)
+    from the plain `week-<n>` so a targeted quiz never overwrites the week quiz or another element's.
+
+    Week detection reuses ingest's `_week_of` — the SAME strict `week-N` ancestor match ingest uses,
+    so a bare-numeric ancestor (`.../2024/readings/foo.pdf`) is NOT mistaken for a week (which the old
+    loose per-ancestor `week_key` did, yielding `week-2024-foo`)."""
+    wk = _week_of(source)
     doc = slugify(source.stem)
     return f"week-{wk}-{doc}" if wk else doc
 

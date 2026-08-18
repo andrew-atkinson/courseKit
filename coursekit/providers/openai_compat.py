@@ -24,7 +24,14 @@ class OpenAICompatProvider(Provider):
             # and the SDK's default request timeout can fire on a generation that is slow-but-fine.
             # Use a generous, tunable timeout so that doesn't happen; override with MODEL_TIMEOUT (s).
             if timeout is None:
-                timeout = float(os.getenv("MODEL_TIMEOUT", "1200"))
+                raw = os.getenv("MODEL_TIMEOUT", "1200")
+                try:
+                    timeout = float(raw)
+                except ValueError:
+                    # A typo like MODEL_TIMEOUT=20m shouldn't crash every command with a bare
+                    # ValueError from deep in provider construction — fall back with a clear note.
+                    print(f"MODEL_TIMEOUT={raw!r} is not a number of seconds; using 1200.")
+                    timeout = 1200.0
             client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
         self._client = client
         self.name = name

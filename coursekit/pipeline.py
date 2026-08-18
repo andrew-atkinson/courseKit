@@ -19,7 +19,9 @@ from coursekit.providers import Reply
 
 
 class ModelLoadError(RuntimeError):
-    """LM Studio could not load/serve the requested model (usually out of RAM)."""
+    """The model endpoint could not serve the request in a way that fails EVERY unit — the model
+    would not load (usually out of RAM) or the endpoint was unreachable (server down). Aborts the
+    batch, unlike a per-unit timeout, which leaves one artifact unfinished and moves on."""
 
 
 _LOAD_MARKERS = ("failed to load model", "insufficient system resources",
@@ -33,12 +35,23 @@ def _looks_like_model_error(exc: Exception) -> bool:
 
 
 def _looks_like_timeout(exc: Exception) -> bool:
-    """A request TIMEOUT (or dropped connection) — transient and PER-UNIT (the model was slow on a
-    big artifact), unlike a model-LOAD error which fails every unit. Handled by ending this unit
-    cleanly, not aborting the batch."""
+    """A request TIMEOUT — the model was slow on a big artifact. Transient and PER-UNIT: end this
+    unit cleanly (reported INCOMPLETE) and move on, don't abort the batch. Distinct from an
+    UNREACHABLE endpoint (below), which fails every unit and should stop the run."""
     s = str(exc).lower()
-    return ("timed out" in s or "timeout" in s or "connection error" in s
-            or type(exc).__name__.lower().endswith("timeouterror"))
+    return "timed out" in s or "timeout" in s or type(exc).__name__.lower().endswith("timeouterror")
+
+
+def _looks_like_unreachable(exc: Exception) -> bool:
+    """The endpoint is DOWN — the server isn't running, refused/reset the connection, or DNS failed.
+    Like a model-LOAD error this fails EVERY unit identically, so abort the batch rather than marking
+    each unit INCOMPLETE with a misleading 'raise MODEL_TIMEOUT'. Checked AFTER `_looks_like_timeout`,
+    because openai's APITimeoutError subclasses APIConnectionError (a slow reply is not a dead
+    server)."""
+    s = str(exc).lower()
+    return (type(exc).__name__.lower().endswith("connectionerror")
+            or "connection error" in s or "connection refused" in s
+            or "connection reset" in s or "failed to establish a connection" in s)
 
 
 def _model_error_message(provider, model: str, exc: Exception) -> str:
@@ -98,6 +111,14 @@ def loop(messages, provider, model, generator: Generator | None = None, *,
                 show("[yellow]Model request timed out — leaving this artifact unfinished "
                      "(raise MODEL_TIMEOUT to give a slow local model more time).[/yellow]")
                 break
+            # A DOWN endpoint (server not running, refused) fails every unit — abort the batch with a
+            # clear message instead of N misleading per-unit 'timed out's. Checked after timeout so a
+            # genuinely slow reply isn't mistaken for a dead server.
+            if _looks_like_unreachable(exc):
+                raise ModelLoadError(
+                    f"Could not reach the model endpoint for '{model}': {exc}\n"
+                    "Fix: start the local server (e.g. LM Studio) and check its address "
+                    "(LOCAL_HOST_URL / base_url).") from exc
             raise
 
         if reply.wants_tools:

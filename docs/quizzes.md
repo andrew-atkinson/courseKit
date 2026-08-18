@@ -34,6 +34,28 @@ Expect a few minutes per week on a local model.
 If the path happens to sit under a videotranscriber project (marked by a `.vtconfig/` folder), coursekit reads its `context.yaml` to enrich the prompt with week titles and module names.
 It never requires it.
 
+## Target one document instead of the whole week
+
+A whole-week quiz draws on everything in `week-N.md`. Sometimes you want a quiz on **one source** — a single reading, one slide deck, a PDF — not the week entire:
+
+```bash
+uv run coursekit generate "/path/to/course" \
+  --source "/path/to/course/week-3/readings/Barrett.pdf"
+```
+
+It extracts that document, writes it as `source.md`, and generates a quiz into a **distinct** slug — `quizzes/week-3-barrett/` — so a targeted quiz never overwrites the whole-week quiz or another document's.
+The week number comes from a `week-N` ancestor directory when there is one; otherwise the slug is just the document name.
+Targeted generation is **quizzes only**, and honours the course's `domain.md`, voice, and `quiz.yaml` exactly as a whole-week run does.
+The supported document types are the same as `ingest` (PDF, slides, docx, odt, txt, md).
+
+To quiz every source in a week separately, loop over them:
+
+```bash
+for f in "/path/to/course/week-3"/*/*; do
+  uv run coursekit generate "/path/to/course" --source "$f"
+done
+```
+
 ## Where output goes
 
 **With the course, never in this repo.** Artifacts land in a `quizzes/` tree beside the course's own files:
