@@ -10,7 +10,7 @@ one model call. No network.
 import re
 from pathlib import Path
 
-from coursekit import courseconfig, prompts
+from coursekit import courseconfig, coursestructure, prompts
 from coursekit.ingest.extract import extract_text, is_supported
 
 SHAPE_CATEGORY = "ingest"
@@ -98,31 +98,54 @@ def shape(raw_text: str, provider, model: str, *, project_root=None) -> str:
 
 # ------------------------------------------------------------- orchestration
 
+def _plan_from_structure(struct, out_dir) -> list[tuple[Path, list[Path]]]:
+    """The consolidation plan straight from the DECLARED structure (FLOW-7 Phase 3) — group by the
+    manifest, not by filename inference. Each week's declared sources are resolved to paths (missing or
+    non-document sources — e.g. a video-only week — are skipped, since coursekit ingests documents), and
+    the week doc goes to the declared `doc` path (or the default) so `ingest` and `find_units` agree."""
+    base = Path(out_dir).expanduser() if out_dir else None
+    plan = []
+    for week_num, _entry in struct.iter_weeks():
+        srcs = [s.resolve(struct.root) for s in struct.sources_for(week_num)]
+        srcs = [p for p in srcs if p.is_file() and is_supported(p)]
+        if not srcs:
+            continue
+        dest = (base / f"week-{week_num}.md") if base else struct.week_doc(week_num)
+        plan.append((dest, srcs))
+    return plan
+
+
 def ingest(path, *, out_dir=None, raw: bool = False, provider=None,
            model: str | None = None) -> list[tuple[Path, Path]]:
-    """Ingest every supported document under `path` into `output/week-N.md`.
+    """Ingest a course's documents into per-week `.md` docs.
+
+    When the course DECLARES its structure (FLOW-7 — an overlay/`context.yaml` with `sources`), that
+    is authoritative: files are grouped by the manifest, so a week's docs need not encode the week in
+    their names. Otherwise the week is inferred from filenames (`plan_weeks`/`_week_of`).
 
     Returns [(source, written)] in week order. With `raw=True` the extracted text is written as-is
     (deterministic, no model); otherwise each doc is reshaped by the local model — `provider` and
     `model` are then required.
     """
-    inputs = _inputs(path)
-    if not inputs:
+    root = courseconfig.find_root(Path(path))
+    struct = coursestructure.CourseStructure.load(path)
+    if struct.has_declared_structure():
+        plan = _plan_from_structure(struct, out_dir)             # the manifest is authoritative
+    else:
+        out = _output_dir(path, out_dir)
+        plan = [(out / f"{slug}.md", srcs) for slug, srcs in plan_weeks(_inputs(path))]
+
+    if not plan:
         return []
     if not raw and provider is None:
         raise ValueError("shaping needs a provider; pass raw=True to skip the model")
-
-    plan = plan_weeks(inputs)
-    out = _output_dir(path, out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    root = courseconfig.find_root(Path(path))
 
     def _text(src: Path) -> str:
         t = extract_text(src)
         return shape(t, provider, model, project_root=root) if not raw else t
 
     written = []
-    for slug, sources in plan:
+    for dest, sources in plan:
         if len(sources) == 1:
             body = _text(sources[0]).strip()          # a single source: the doc as-is (back-compat)
         else:
@@ -130,7 +153,7 @@ def ingest(path, *, out_dir=None, raw: bool = False, provider=None,
             # stays SOURCE-ADDRESSABLE (a targeted quiz / a source-scoped page can still find it) —
             # structure preserved, not a flat blob (FLOW-2 / PAGE-13).
             body = "\n\n".join(f"## {s.stem}\n\n{_text(s).strip()}" for s in sources)
-        dest = out / f"{slug}.md"
+        dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(body.strip() + "\n", encoding="utf-8")
         for s in sources:
             written.append((s, dest))

@@ -85,3 +85,16 @@ def test_cli_targeted_handler_runs_end_to_end(monkeypatch, tmp_path):
                                  output_root=None, max_iters=80)
     assert cli._cmd_generate_targeted(args) == 0
     assert seen["source"] == "/c/week-3/reading.pdf"
+
+
+def test_targeted_slug_prefers_the_declared_week(tmp_path):
+    # a source under materials/ (no week in its PATH), assigned to week 7 by the manifest → week-7-…
+    from coursekit import courseconfig
+    from coursekit.coursestructure import CourseStructure
+    ctx = {"weeks": {"week 7": {"sources": [{"path": "materials/Barrett.pdf", "kind": "reading"}]}}}
+    cfg = courseconfig.CourseConfig(root=tmp_path, config={}, context=ctx,
+                                    config_path=None, context_path=None)
+    struct = CourseStructure(cfg)
+    src = tmp_path / "materials" / "Barrett.pdf"
+    assert targeted.targeted_slug(src, struct) == "week-7-barrett"   # declared week wins
+    assert targeted.targeted_slug(src) == "barrett"                  # no struct → path has no week

@@ -181,7 +181,7 @@ flowchart LR
 Precedence is defined: `context.yaml` (the transcriber's) owns *identity* — which weeks exist, their titles; a coursekit-owned `structure.overlay.yaml` only *adds* typed sources and a `doc` pointer, never overriding titles.
 This is the pattern the project already uses for **shipped prompts + `.vtconfig/prompts` overrides** and **base domain + course `domain.md`** — structure just joins them.
 FLOW-7 Phase 1 (built) is the *reader* half — `coursestructure.py` composes the declared structure, and `find_units` builds units from it when present (so a week doc can be named anything, not only `week-N.md`), else the filename glob.
-The *writer* half — the proposer — is Phase 2.
+The *writer* half — the proposer (`coursekit propose`, writing `structure.coursekit.yaml`) — is Phase 2; Phase 3 then pointed `ingest` (grouping) and targeted quizzes (`--source` placement) at the declared structure too, so the manifest is authoritative end-to-end, with filename inference the fallback when nothing is declared.
 
 **The proposer is one station, not three.**
 Its job is **input-structure analysis** — read the real materials, declare what exists. Descriptive, grounded in the faculty's own files, low-risk.
