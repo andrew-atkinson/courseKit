@@ -127,8 +127,7 @@ def load_materials(path) -> dict | None:
 
 def load_materials_for_unit(unit) -> dict | None:
     """The per-concept materials for a discovered week `unit`, or None. Best-effort, like the map loader."""
-    from coursekit import courseconfig
     if not getattr(unit, "course_root", None):
         return None
-    key = courseconfig.week_key(unit.week_slug)
+    key = unit.week_num
     return load_materials(materials_path(unit.course_root, key)) if key else None

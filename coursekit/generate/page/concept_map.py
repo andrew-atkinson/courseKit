@@ -213,8 +213,7 @@ def load_for_unit(unit) -> ConceptMap | None:
     without it). Shared by the page and quiz generators (the analyze artifact isn't page-specific)."""
     if not getattr(unit, "course_root", None):
         return None
-    from coursekit import courseconfig
-    key = courseconfig.week_key(unit.week_slug)
+    key = unit.week_num
     if not key:
         return None
     try:

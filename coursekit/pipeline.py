@@ -201,7 +201,7 @@ def _week_matches(ref, unit: Unit) -> bool:
     """
     k = courseconfig.week_key(ref)
     if k is not None:
-        return courseconfig.week_key(unit.week_slug) == k
+        return unit.week_num == k                 # carried on the unit, not re-derived from the slug
     return slugify(str(ref)) == unit.week_slug
 
 

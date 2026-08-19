@@ -70,7 +70,7 @@ def build_page_unit(unit, provider, model, *, function: str = "teaching", genera
 
     if function == "overview":
         from coursekit.generate.overview import build_week_overview
-        num = courseconfig.week_key(unit.week_slug)
+        num = unit.week_num
         page = build_week_overview(unit.course_title or "Course", num,
                                    unit.week_label or unit.week_slug, unit.module or "",
                                    load_for_unit(unit))

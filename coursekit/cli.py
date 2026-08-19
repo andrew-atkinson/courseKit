@@ -222,7 +222,7 @@ def _cmd_analyze(args) -> int:
         if not u.course_root:
             print(f"  [skip] {label}: no .vtconfig course root to write the map into")
             continue
-        key = courseconfig.week_key(u.week_slug)
+        key = u.week_num
         if not key:
             print(f"  [skip] {label}: could not resolve a week number for the filename")
             continue

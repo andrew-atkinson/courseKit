@@ -27,6 +27,7 @@ def test_single_file_yields_one_unit(tmp_path):
     assert len(units) == 1
     assert units[0].transcript_path == f.resolve()
     assert units[0].week_slug == "week-3"
+    assert units[0].week_num == "3"          # carried, so consumers don't re-derive it from the slug
 
 
 def test_single_file_without_vtconfig_anchors_output_beside_it(tmp_path):
@@ -43,6 +44,7 @@ def test_non_week_filename_still_works(tmp_path):
     unit = find_units(f)[0]
     assert unit.week_slug == "lecture-notes"
     assert unit.week_label == "lecture-notes"
+    assert unit.week_num is None             # a non-week unit carries no number
 
 
 # ------------------------------------------------------- directory
@@ -171,3 +173,84 @@ def test_output_collision_raises_rather_than_clobbering(tmp_path):
     (d / "b" / "week-3.md").write_text("two", encoding="utf-8")
     with pytest.raises(ValueError, match="same output directory"):
         find_units(d)
+
+
+# ------------------------------------------------------------- manifest-driven discovery (FLOW-7)
+
+def _manifest_course(tmp_path, context_body: str) -> Path:
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    (root / ".vtconfig" / "context.yaml").write_text(context_body, encoding="utf-8")
+    return root
+
+
+def test_manifest_declared_weeks_drive_discovery_with_arbitrary_doc_names(tmp_path):
+    # a DECLARED structure (doc/sources per week) is authoritative — so a week doc can be named
+    # anything, not just week-N.md, and week identity/label/module come from the manifest.
+    root = _manifest_course(tmp_path, textwrap.dedent("""
+        course_title: Digital Photography
+        weeks:
+          "week 3":
+            title: Exposure
+            module: Unit 2
+            doc: docs/exposure.md
+            sources:
+              - {path: readings/barrett.pdf, kind: reading}
+          "week 4":
+            title: Composition
+            doc: docs/composition.md
+    """))
+    (root / "docs").mkdir()
+    (root / "docs" / "exposure.md").write_text("exposure body", encoding="utf-8")
+    (root / "docs" / "composition.md").write_text("composition body", encoding="utf-8")
+
+    units = find_units(root)
+    assert [u.week_slug for u in units] == ["week-3", "week-4"]
+    u3 = units[0]
+    assert u3.week_num == "3"
+    assert u3.transcript_path == (root / "docs" / "exposure.md").resolve()   # arbitrary name works
+    assert u3.week_label == "Week 3: Exposure" and u3.module == "Unit 2"
+    assert u3.course_root == root.resolve()
+    assert u3.output_dir == (root / "quizzes" / "week-3").resolve()
+
+
+def test_manifest_week_with_sources_but_no_doc_uses_the_default_output_path(tmp_path):
+    root = _manifest_course(tmp_path, textwrap.dedent("""
+        weeks:
+          "week 3":
+            sources:
+              - {path: readings/x.pdf, kind: reading}
+    """))
+    (root / "output").mkdir()
+    (root / "output" / "week-3.md").write_text("consolidated", encoding="utf-8")
+    units = find_units(root)
+    assert len(units) == 1
+    assert units[0].transcript_path == (root / "output" / "week-3.md").resolve()
+
+
+def test_manifest_skips_a_declared_week_whose_doc_is_not_on_disk(tmp_path):
+    # a declared-but-not-yet-ingested week is skipped, exactly as the glob skips a missing file
+    root = _manifest_course(tmp_path, textwrap.dedent("""
+        weeks:
+          "week 3": {doc: docs/w3.md}
+          "week 5": {doc: docs/w5.md}
+    """))
+    (root / "docs").mkdir()
+    (root / "docs" / "w3.md").write_text("body", encoding="utf-8")     # w5 intentionally absent
+    assert [u.week_slug for u in find_units(root)] == ["week-3"]
+
+
+def test_decoration_only_context_still_uses_the_glob(tmp_path):
+    # title/module WITHOUT doc/sources must NOT trigger manifest discovery — the glob still runs and
+    # enrichment still applies (back-compat with today's transcriber courses).
+    root = _manifest_course(tmp_path, textwrap.dedent("""
+        course_title: C
+        weeks:
+          "week 3": {title: T, module: M}
+    """))
+    (root / "output").mkdir()
+    (root / "output" / "week-3.md").write_text("body", encoding="utf-8")
+    units = find_units(root)
+    assert [u.week_slug for u in units] == ["week-3"]
+    assert units[0].transcript_path == (root / "output" / "week-3.md").resolve()   # from the glob
+    assert units[0].week_label == "Week 3: T"                                       # still enriched

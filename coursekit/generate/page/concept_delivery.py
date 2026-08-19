@@ -92,7 +92,6 @@ def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None
     Returns (per-page results, out_path_or_None) — for reviewing already-generated pages."""
     from pathlib import Path
 
-    from coursekit import courseconfig
     from coursekit.discover import find_units
     from coursekit.generate.page.concept_map import concept_map_path, load_concept_map
     from coursekit.generate.page.page import Page
@@ -111,7 +110,7 @@ def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None
         material = Path(u.transcript_path).read_text(encoding="utf-8")
         # Score against the week's concept map when one exists — a fixed list, not a re-derivation.
         names = None
-        key = courseconfig.week_key(u.week_slug) if u.course_root else None
+        key = u.week_num if u.course_root else None
         if key:
             try:
                 cmap = load_concept_map(concept_map_path(u.course_root, key))
