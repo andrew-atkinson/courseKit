@@ -12,20 +12,33 @@ on it. The course's `domain.md` / voice / `quiz.yaml` still apply — they resol
 
 from pathlib import Path
 
-from coursekit import courseconfig
+from coursekit import courseconfig, coursestructure
 from coursekit.discover import Unit, slugify
 from coursekit.ingest.extract import SUPPORTED_SUFFIXES, extract_text, is_supported
 from coursekit.ingest.ingest import _week_of
 
 
-def targeted_slug(source: Path) -> str:
+def _declared_week_of(source: Path, struct) -> str | None:
+    """The week a `--source` belongs to per the DECLARED structure — matched by resolved path, so a
+    source the manifest assigns to a week is placed there even when its path doesn't encode the week."""
+    src = Path(source).expanduser().resolve()
+    for week_num, _ in struct.iter_weeks():
+        for s in struct.sources_for(week_num):
+            if s.resolve(struct.root).resolve() == src:
+                return week_num
+    return None
+
+
+def targeted_slug(source: Path, struct=None) -> str:
     """A distinct output slug for a targeted quiz: `week-<n>-<doc>` (or just `<doc>` off-week). Distinct
     from the plain `week-<n>` so a targeted quiz never overwrites the week quiz or another element's.
 
-    Week detection reuses ingest's `_week_of` — the SAME strict `week-N` ancestor match ingest uses,
-    so a bare-numeric ancestor (`.../2024/readings/foo.pdf`) is NOT mistaken for a week (which the old
-    loose per-ancestor `week_key` did, yielding `week-2024-foo`)."""
-    wk = _week_of(source)
+    Week detection prefers the DECLARED structure (FLOW-7) — a source the manifest assigns to a week
+    uses THAT week — then falls back to ingest's strict `_week_of` ancestor match (which, unlike the old
+    loose per-ancestor `week_key`, won't mistake a bare-numeric ancestor like `.../2024/` for a week)."""
+    wk = _declared_week_of(source, struct) if struct is not None else None
+    if wk is None:
+        wk = _week_of(source)
     doc = slugify(source.stem)
     return f"week-{wk}-{doc}" if wk else doc
 
@@ -47,7 +60,7 @@ def generate_targeted_quiz(source, provider, model, *, output_root=None, max_ite
 
     cfg = courseconfig.load(source, config_name="quiz.yaml")     # domain.md / voice / quiz.yaml from here
     root = cfg.root
-    slug = targeted_slug(source)
+    slug = targeted_slug(source, coursestructure.CourseStructure(cfg))   # declared week wins, reusing cfg
     base = Path(output_root).expanduser().resolve() if output_root else (root or source.parent)
     out_dir = base / "quizzes" / slug
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -240,3 +240,61 @@ def test_ingest_makes_no_network_calls():
     src = inspect.getsource(ingest) + inspect.getsource(extract)
     for bad in ("requests", "urllib", "httpx", "socket", "urlopen"):
         assert bad not in src, f"ingest must stay offline, found {bad!r}"
+
+
+# ------------------------------------------------- manifest-driven ingest (FLOW-7 Phase 3)
+
+def _overlay(root, body):
+    (root / ".vtconfig").mkdir(parents=True, exist_ok=True)
+    (root / ".vtconfig" / "structure.coursekit.yaml").write_text(body, encoding="utf-8")
+
+
+def test_ingest_uses_the_declared_structure_over_filenames(tmp_path):
+    # files whose NAMES don't encode a week, assigned to week 3 by the overlay → consolidated anyway
+    root = tmp_path / "course"
+    _overlay(root,
+             'weeks:\n'
+             '  "week 3":\n'
+             '    sources:\n'
+             '      - {path: materials/exposure.md, kind: notes}\n'
+             '      - {path: materials/barrett.md, kind: reading}\n')
+    (root / "materials").mkdir()
+    (root / "materials" / "exposure.md").write_text("exposure text", encoding="utf-8")
+    (root / "materials" / "barrett.md").write_text("barrett text", encoding="utf-8")
+
+    out = ingest.ingest(root, raw=True)
+    dests = {d for _, d in out}
+    assert dests == {root / "output" / "week-3.md"}          # one consolidated week doc, default path
+    doc = (root / "output" / "week-3.md").read_text(encoding="utf-8")
+    assert "## exposure" in doc and "## barrett" in doc       # both declared sources, source-tagged
+    assert "exposure text" in doc and "barrett text" in doc
+
+
+def test_ingest_honors_a_declared_doc_path(tmp_path):
+    # a week may point its consolidated doc anywhere; ingest writes there so find_units agrees
+    root = tmp_path / "course"
+    _overlay(root,
+             'weeks:\n'
+             '  "week 3":\n'
+             '    doc: custom/w3.md\n'
+             '    sources:\n'
+             '      - {path: r.md, kind: reading}\n')
+    (root / "r.md").write_text("body", encoding="utf-8")
+
+    out = ingest.ingest(root, raw=True)
+    assert out[0][1] == root / "custom" / "w3.md"
+    assert (root / "custom" / "w3.md").read_text(encoding="utf-8").startswith("body")
+
+
+def test_ingest_skips_a_video_only_declared_week(tmp_path):
+    # coursekit ingests DOCUMENTS; a week whose declared sources are all video is skipped (vt's job)
+    root = tmp_path / "course"
+    _overlay(root,
+             'weeks:\n'
+             '  "week 3": {sources: [{path: lecture.mp4, kind: video}]}\n'
+             '  "week 4": {sources: [{path: reading.md, kind: reading}]}\n')
+    (root / "lecture.mp4").write_text("not really video", encoding="utf-8")
+    (root / "reading.md").write_text("week four", encoding="utf-8")
+
+    out = ingest.ingest(root, raw=True)
+    assert {d.name for _, d in out} == {"week-4.md"}          # week 3 (video-only) produced nothing
