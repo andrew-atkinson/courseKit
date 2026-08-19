@@ -23,6 +23,15 @@ A source's week is its own filename (`week-3.pdf`) or its nearest `week-N` ances
 When several docs share a week they consolidate into one source-tagged week doc (so a later `--source` quiz can still target one reading); when no file names a week, each doc becomes its own week in sorted order.
 A document that names no week is skipped once any week-numbered content is present (a course-level outline at the root is not week content).
 
+| Structure Commands                   | What it does                                                       | Uses LLM |
+| ------------------------------------ | ----------------------------------------------------------------- | -------- |
+| `coursekit propose PATH`             | Scan the course tree → **declare** its structure (weeks + typed sources) into `.vtconfig/structure.coursekit.yaml`, and surface any files it couldn't key. | x |
+| `coursekit propose PATH --dry-run`   | Print the proposal without writing the overlay.                   | x        |
+| `coursekit propose PATH --force`     | Redraft an existing overlay (discards manual edits).              | x        |
+
+`propose` writes coursekit's **own** overlay file — never `context.yaml` — which the tools then read as authoritative (a week doc can be named anything; sources carry a `kind`).
+It's descriptive: it maps what exists and shows unassigned files rather than dropping them; you edit the overlay freely afterward.
+
 | Analyze Commands                    | What it does                                                        | Uses LLM |
 | ----------------------------------- | ------------------------------------------------------------------ | -------- |
 | `coursekit analyze PATH`            | Build each week's concept map (from the transcriber's `knowledge.json`, or the week text when absent) → `.vtconfig/concepts/week-N.yaml`. | ✓ |

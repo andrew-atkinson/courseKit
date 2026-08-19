@@ -207,3 +207,37 @@ def test_review_pages_flags_and_writes_a_review(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "section(s) flagged" in out
     assert (course / "pages" / "page-review.md").exists()
+
+
+# ------------------------------------------------------------- propose (FLOW-7)
+
+def test_propose_routes_with_flags():
+    args = _parse("propose", "/course", "--dry-run", "--force")
+    assert args.func is cli._cmd_propose
+    assert args.path == "/course" and args.dry_run and args.force
+
+
+def test_propose_handler_writes_the_overlay(tmp_path, capsys):
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    (root / "week-3").mkdir()
+    (root / "week-3" / "Barrett.pdf").write_text("x", encoding="utf-8")
+    (root / "loose.pdf").write_text("x", encoding="utf-8")   # unassigned
+
+    import types
+    rc = cli._cmd_propose(types.SimpleNamespace(path=str(root), dry_run=False, force=False))
+    assert rc == 0
+    assert (root / ".vtconfig" / "structure.coursekit.yaml").is_file()
+    out = capsys.readouterr().out
+    assert "week 3" in out and "Unassigned" in out and "loose.pdf" in out
+
+
+def test_propose_dry_run_writes_nothing(tmp_path):
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    (root / "week-3").mkdir()
+    (root / "week-3" / "a.pdf").write_text("x", encoding="utf-8")
+
+    import types
+    cli._cmd_propose(types.SimpleNamespace(path=str(root), dry_run=True, force=False))
+    assert not (root / ".vtconfig" / "structure.coursekit.yaml").exists()
