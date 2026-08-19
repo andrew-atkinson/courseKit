@@ -22,6 +22,10 @@ from pathlib import Path
 
 from coursekit import courseconfig
 
+# coursekit's OWN structure file, composed with the transcriber's context.yaml on read. The proposer
+# writes only this file (never context.yaml) — the one-writer-per-file rule (see agent/architecture.md).
+OVERLAY_NAME = "structure.coursekit.yaml"
+
 # extension -> source kind: a deterministic fallback when a source doesn't declare `kind`.
 _KIND_BY_SUFFIX = {
     ".pdf": "reading", ".docx": "reading", ".odt": "reading",
@@ -73,14 +77,42 @@ def _as_source(raw, *, default_kind: str | None = None, default_role: str = "con
     return Source(path=path, title=str(title), kind=str(kind), role=str(role))
 
 
+def _read_overlay_weeks(cfg: courseconfig.CourseConfig) -> dict:
+    """coursekit's own overlay weeks (`.vtconfig/structure.coursekit.yaml`), or {}. Same graceful
+    degradation as every other yaml read — a missing/partial/bad file yields {}."""
+    if cfg.root is None:
+        return {}
+    data = courseconfig._read_yaml(cfg.root / courseconfig.VTCONFIG_DIR_NAME / OVERLAY_NAME)
+    weeks = data.get("weeks")
+    return weeks if isinstance(weeks, dict) else {}
+
+
+def _compose(base: dict, overlay: dict) -> dict:
+    """Merge the transcriber's context.yaml weeks (`base`) with coursekit's overlay. The overlay wins
+    on the fields it owns (doc, sources); `context.yaml` keeps IDENTITY (title, module) — so the two
+    programs' contributions coexist without either clobbering the other's."""
+    out = {}
+    for key in set(base) | set(overlay):
+        b = base.get(key) if isinstance(base.get(key), dict) else {}
+        o = overlay.get(key) if isinstance(overlay.get(key), dict) else {}
+        merged = {**b, **o}
+        for identity in ("title", "module"):     # context.yaml owns identity; the overlay never overrides it
+            if b.get(identity) is not None:
+                merged[identity] = b[identity]
+        out[key] = merged
+    return out
+
+
 class CourseStructure:
-    """A read-only view of the declared course structure in `context.yaml`. Never raises; a missing
-    or partial manifest yields empty results, so callers fall back to inference."""
+    """A read-only view of the declared course structure: the transcriber's `context.yaml` composed
+    with coursekit's own `structure.coursekit.yaml` overlay. Never raises; a missing or partial
+    manifest yields empty results, so callers fall back to inference."""
 
     def __init__(self, cfg: courseconfig.CourseConfig):
         self._cfg = cfg
-        weeks = (cfg.context or {}).get("weeks")
-        self._weeks = weeks if isinstance(weeks, dict) else {}
+        base = (cfg.context or {}).get("weeks")
+        base = base if isinstance(base, dict) else {}
+        self._weeks = _compose(base, _read_overlay_weeks(cfg))
 
     @classmethod
     def load(cls, start, *, config_name: str = "quiz.yaml") -> "CourseStructure":

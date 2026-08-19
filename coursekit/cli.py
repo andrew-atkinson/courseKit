@@ -155,6 +155,36 @@ def _review_pages(args, provider) -> tuple[str | None, dict | None]:
 
 # ---------------------------------------------------------------- ingest
 
+def _cmd_propose(args) -> int:
+    """Scan a course tree and DECLARE its structure into coursekit's own overlay (FLOW-7). Offline,
+    no model. Prints the proposed weeks + the files it could not key, then writes the overlay unless
+    --dry-run. coursekit writes only its own `.vtconfig/structure.coursekit.yaml`, never context.yaml."""
+    from coursekit.ingest import propose as proposer
+    prop = proposer.propose(args.path)
+
+    if prop.weeks:
+        print("Proposed structure:")
+        for wk, entry in prop.weeks.items():
+            print(f"  {wk}:")
+            for s in entry["sources"]:
+                frame = "  (framing)" if s["role"] == "framing" else ""
+                print(f"      [{s['kind']:<7}] {s['path']}{frame}")
+    else:
+        print("No weeks could be keyed from the materials — name them week-N or nest under week-N/,\n"
+              "or edit the overlay by hand once it's written.")
+    if prop.unassigned:
+        print(f"\nUnassigned — {len(prop.unassigned)} file(s) under no week (assign in the overlay, or ignore):")
+        for p in prop.unassigned:
+            print(f"      {p}")
+
+    if args.dry_run:
+        print("\n(dry run — nothing written)")
+        return 0
+    dest = proposer.write_overlay(prop, force=args.force)
+    print(f"\nWrote {dest}\nEdit it freely; generate reads it as authoritative.")
+    return 0
+
+
 def _cmd_ingest(args) -> int:
     """Turn documents (PDF/pptx/txt/md) under PATH into output/week-N.md, then stop. Local-first:
     with --raw it never calls the model; otherwise it reshapes each doc with the local model."""
@@ -619,6 +649,15 @@ def build_parser() -> argparse.ArgumentParser:
     pi.add_argument("--raw", action="store_true",
                     help="extract text only; skip the local-LLM shaping pass (fully offline)")
     pi.set_defaults(func=_cmd_ingest)
+
+    # propose — scan the tree → declare structure into coursekit's own overlay (FLOW-7, offline)
+    pp = sub.add_parser("propose",
+                        help="scan a course tree → declare its structure (weeks + typed sources) into "
+                             ".vtconfig/structure.coursekit.yaml — offline, no model")
+    pp.add_argument("path", help="the course root (or any directory of materials)")
+    pp.add_argument("--dry-run", action="store_true", help="print the proposal without writing the overlay")
+    pp.add_argument("--force", action="store_true", help="redraft an existing overlay (discards manual edits)")
+    pp.set_defaults(func=_cmd_propose)
 
     # analyze — week text + knowledge.json → the per-week concept map (uses the model)
     pa = sub.add_parser("analyze",

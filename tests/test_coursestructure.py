@@ -100,3 +100,61 @@ def test_load_reads_a_real_vtconfig(tmp_path):
     assert s.has_declared_structure()
     assert s.week_label("3") == "Week 3: Exposure"
     assert [x.kind for x in s.sources_for("3")] == ["reading"]
+
+
+# --------------------------------------------------- overlay composition (FLOW-7 Phase 2)
+
+def _course_with_files(tmp_path, context_yaml=None, overlay_yaml=None):
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    if context_yaml is not None:
+        (root / ".vtconfig" / "context.yaml").write_text(context_yaml, encoding="utf-8")
+    if overlay_yaml is not None:
+        (root / ".vtconfig" / "structure.coursekit.yaml").write_text(overlay_yaml, encoding="utf-8")
+    return root
+
+
+def test_overlay_composes_with_context_yaml(tmp_path):
+    import textwrap
+    # context.yaml carries identity (title/module); the overlay adds typed sources
+    root = _course_with_files(
+        tmp_path,
+        context_yaml=textwrap.dedent("""
+            weeks:
+              "week 3": {title: Exposure, module: Unit 2}
+        """),
+        overlay_yaml=textwrap.dedent("""
+            weeks:
+              "week 3":
+                sources:
+                  - {path: readings/barrett.pdf, kind: reading}
+        """))
+    s = CourseStructure.load(root)
+    assert s.has_declared_structure()                     # the overlay's sources trigger it
+    assert s.week_label("3") == "Week 3: Exposure"        # identity from context.yaml
+    assert s.week_module("3") == "Unit 2"
+    assert [x.kind for x in s.sources_for("3")] == ["reading"]   # sources from the overlay
+
+
+def test_overlay_never_overrides_context_identity(tmp_path):
+    import textwrap
+    root = _course_with_files(
+        tmp_path,
+        context_yaml='weeks: {"week 3": {title: Canonical}}\n',
+        overlay_yaml=textwrap.dedent("""
+            weeks:
+              "week 3": {title: SHOULD-NOT-WIN, sources: [{path: r.pdf}]}
+        """))
+    # context.yaml owns identity — the overlay's title is ignored, its sources are kept
+    s = CourseStructure.load(root)
+    assert s.week_label("3") == "Week 3: Canonical"
+    assert [x.path for x in s.sources_for("3")] == ["r.pdf"]
+
+
+def test_overlay_only_week_appears(tmp_path):
+    # a week declared ONLY in the overlay (context.yaml doesn't mention it) still shows up
+    root = _course_with_files(tmp_path, context_yaml="course_title: C\n",
+                              overlay_yaml='weeks: {"week 4": {sources: [{path: x.pdf, kind: reading}]}}\n')
+    s = CourseStructure.load(root)
+    assert [n for n, _ in s.iter_weeks()] == ["4"]
+    assert s.has_declared_structure()
