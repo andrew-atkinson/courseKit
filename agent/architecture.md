@@ -5,6 +5,7 @@ Presented version: <https://claude.ai/code/artifact/e0d099ed-016c-4911-a75d-7805
 
 Verified 31 July 2026 against `main`.
 Since the 27 July pass (CLI subcommands + `emit course`) this adds the **analyze** phase (a per-week concept map), the **output-worth evaluator** (facticity · pedagogy · concept-delivery cold reads), and the targeted **fix** loop that regenerates flagged items in place.
+The 18 Aug pass adds **[the adapter architecture](#the-adapter-architecture--ingeststructure--ir--generation)** — the three-layer ingest/structure · IR · generation model, the one-writer-per-file rule, and the declared course-structure IR (FLOW-7 Phase 1: `coursestructure.py` + manifest-driven discovery).
 The videotranscriber (separate repo at `~/video_transcription`) is unchanged since the 19 July pass.
 The test count lives only in `README.md`, where a meta-test (`tests/test_docs_facts.py`) keeps it honest — it is deliberately not repeated here, because a number stated in two places rots in one of them.
 
@@ -155,9 +156,44 @@ Beyond generation, coursekit **understands, measures, and repairs** its own outp
 
 Evaluate and fix read the same IR the emitters do, so the whole flow is **generate → audit → repair → emit**, and only `emit` needs no model.
 
+## The adapter architecture — ingest/structure · IR · generation
+
+The four-layer view above is *where files live*; this is *who does what to the IR* — the conceptual layering that decides where a new capability belongs.
+Three layers over one shared IR:
+
+1. **Ingest / structure adapters.** Turn raw materials into the IR, distinguished by input *modality*, not concept. The **videotranscriber** (media → text; heavy Apple-Silicon stack, its own repo) and **`coursekit/ingest`** (documents → `week-N.md`) are the two built adapters; the **structure proposer** (FLOW-7, planned) is a third — it reads a messy folder tree and *declares* its structure. Multiple entry points, all producing the same IR; they are **peers, not a sequence**.
+2. **The IR.** `context.yaml` (declared structure), `week-N.md` (text), the concept map, and the canonical `bank.json` / `page.json`. The convergence point.
+3. **Generation** (`generate` · `evaluate` · `emit`) — **read-only on the IR**, never writes structure.
+
+**The rule that keeps the modularity: one writer per file, composed on read.**
+Two programs must never write one file — a YAML rewrite reserialises the whole file, so even disjoint keys race and clobber each other's comments and formatting.
+So each adapter writes only its **own** file, and the reader (`coursestructure` over `courseconfig`) merges them into one effective structure at load time:
+
+```mermaid
+flowchart LR
+    vt2["videotranscriber<br/>separate repo"] -. "writes" .-> ctx2["context.yaml<br/>identity · weeks · titles"]
+    prop["structure proposer<br/><i>planned</i>"] -. "writes" .-> ov["structure.overlay.yaml<br/>typed sources · doc"]
+    ctx2 --> reader["coursestructure<br/>reads · merges"]
+    ov --> reader
+    reader ==> gen["generate · evaluate · emit<br/><b>read-only</b>"]
+```
+
+Precedence is defined: `context.yaml` (the transcriber's) owns *identity* — which weeks exist, their titles; a coursekit-owned `structure.overlay.yaml` only *adds* typed sources and a `doc` pointer, never overriding titles.
+This is the pattern the project already uses for **shipped prompts + `.vtconfig/prompts` overrides** and **base domain + course `domain.md`** — structure just joins them.
+FLOW-7 Phase 1 (built) is the *reader* half — `coursestructure.py` composes the declared structure, and `find_units` builds units from it when present (so a week doc can be named anything, not only `week-N.md`), else the filename glob.
+The *writer* half — the proposer — is Phase 2.
+
+**The proposer is one station, not three.**
+Its job is **input-structure analysis** — read the real materials, declare what exists. Descriptive, grounded in the faculty's own files, low-risk.
+Two adjacent temptations are *separate* stations, deliberately not folded in: **output-structure proposal** (what the course *should* contain by pedagogical best practice) is a *prescriptive* course-design advisor (CRSE), grounded in best practice + domain rather than the file tree; **sequencing / pacing** across the term is a course-level planner (STRC).
+They chain — analyse inputs → propose output → sequence — but the chain is the *pipeline's* job, not one module's; fusing them would put a descriptive reader and a prescriptive designer behind one interface at one authority level, which is how a tool starts inventing structure and calling it analysis.
+Presented companion diagram: <https://claude.ai/code/artifact/74b690a9-4e17-46f4-bc42-c51a55cd555c>.
+
 ## Finding the course folder
 
 Layer ② is located, not configured: coursekit **walks up from its input** to find the `.vtconfig/` marker (the way git finds `.git`) and reads `context.yaml` for week titles and module names.
+Structure is **declared when present, inferred when not** (FLOW-7): `coursestructure.py` reads the declared weeks/sources, and `find_units` builds units from the manifest — a week doc named anything, sources typed by kind — falling back to the `week-*.md` filename glob when nothing is declared.
+Each `Unit` now **carries its `week_num`**, so consumers stop re-deriving it from the slug with `week_key`.
 It **degrades gracefully** — no `.vtconfig/` at all means coursekit infers the week from the filename, so a loose `week-3.md` still works.
 (`.vtconfig/` is the transcriber-era name; a rename to something tool-neutral is noted in the backlog.)
 

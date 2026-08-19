@@ -1,0 +1,321 @@
+<title>coursekit architecture</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --ground:#f5f7f9; --surface:#ffffff; --surface-2:#eef1f5; --band:#e9edf2;
+    --ink:#141a1f; --muted:#5c6773; --faint:#8b96a2; --line:#d6dce3;
+    --accent:#0d7d8c; --accent-ink:#0a6774; --accent-soft:#d6ecef;
+    --vt:#a86a0c; --vt-soft:#f3e6cd; --vt-line:#d9b877;
+    --shadow:0 1px 2px rgba(20,26,31,.05), 0 6px 20px rgba(20,26,31,.05);
+    --font-sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#0d1115; --surface:#161c22; --surface-2:#1b232b; --band:#151b21;
+      --ink:#e7ecf1; --muted:#98a4b0; --faint:#6d7883; --line:#29323c;
+      --accent:#38b9ca; --accent-ink:#5fcdda; --accent-soft:#0f2f36;
+      --vt:#dca24a; --vt-soft:#2b2415; --vt-line:#5c4a23;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0d1115; --surface:#161c22; --surface-2:#1b232b; --band:#151b21;
+    --ink:#e7ecf1; --muted:#98a4b0; --faint:#6d7883; --line:#29323c;
+    --accent:#38b9ca; --accent-ink:#5fcdda; --accent-soft:#0f2f36;
+    --vt:#dca24a; --vt-soft:#2b2415; --vt-line:#5c4a23;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.28);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:var(--font-sans); line-height:1.55;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  }
+  .wrap{max-width:1040px; margin:0 auto; padding:48px 24px 80px}
+
+  /* ---- header ---- */
+  .eyebrow{font:600 12px/1 var(--font-mono); letter-spacing:.16em; text-transform:uppercase; color:var(--accent-ink)}
+  h1{font-size:clamp(28px,4.5vw,42px); font-weight:800; letter-spacing:-.02em; margin:.5rem 0 .4rem; text-wrap:balance}
+  .lede{font-size:17px; color:var(--muted); max-width:64ch; margin:0}
+  .legend{display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:22px; padding-top:20px; border-top:1px solid var(--line); font-size:13px; color:var(--muted)}
+  .legend span{display:inline-flex; align-items:center; gap:8px}
+  .key{width:26px; height:0; border-top:2px solid var(--accent); flex:none}
+  .key.dash{border-top:2px dashed var(--faint)}
+  .key.repo{border-top:3px solid var(--vt)}
+  .key.dot{width:11px; height:11px; border-top:0; border-radius:50%; background:var(--accent)}
+
+  /* ---- pipeline ---- */
+  .pipe{margin-top:40px; display:flex; flex-direction:column; align-items:stretch}
+  .band{background:var(--band); border:1px solid var(--line); border-radius:14px; padding:16px 18px 18px}
+  .band.ext{background:transparent; border-style:dashed}
+  .band.ir{background:var(--accent-soft); border-color:color-mix(in srgb,var(--accent) 40%, var(--line))}
+  .band-head{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:14px}
+  .band-head .eyebrow{color:var(--ink)}
+  .band.ir .band-head .eyebrow{color:var(--accent-ink)}
+  .band-role{font-size:13px; color:var(--muted)}
+  .nodes{display:flex; flex-wrap:wrap; gap:10px}
+
+  .node{position:relative; flex:1 1 200px; min-width:180px; background:var(--surface); border:1.5px solid var(--line);
+        border-radius:10px; padding:12px 13px 12px; box-shadow:var(--shadow)}
+  .node .n-name{font:600 13.5px/1.3 var(--font-mono); letter-spacing:-.01em; word-break:break-word}
+  .node .n-meta{font-size:12px; color:var(--muted); margin-top:4px; line-height:1.4}
+  .node .tag{position:absolute; top:10px; right:10px; font:600 9.5px/1 var(--font-mono); letter-spacing:.1em;
+             text-transform:uppercase; color:var(--faint); border:1px solid var(--line); border-radius:20px; padding:3px 7px; background:var(--ground)}
+  .node.pad-r .n-name{padding-right:66px}
+
+  .node.built{border-left:3px solid var(--accent)}
+  .node.planned{border-style:dashed; border-color:var(--faint); background:transparent; box-shadow:none}
+  .node.planned .n-name{color:var(--muted)}
+  .node.planned .tag{color:var(--accent-ink); border-color:color-mix(in srgb,var(--accent) 45%, transparent)}
+  .node.vt{border-left:3px solid var(--vt); background:var(--vt-soft); border-color:var(--vt-line)}
+  .node.vt .tag{color:var(--vt); border-color:var(--vt-line); background:transparent}
+
+  .flow{display:flex; align-items:center; justify-content:center; gap:10px; padding:9px 0; color:var(--muted)}
+  .flow svg{display:block; color:var(--accent)}
+  .flow .verb{font:600 11px/1 var(--font-mono); letter-spacing:.12em; text-transform:uppercase}
+
+  /* ---- spine ---- */
+  .spine{margin-top:14px; border:1px solid var(--line); border-radius:14px; background:var(--surface); padding:14px 18px}
+  .spine .eyebrow{color:var(--muted)}
+  .spine-items{display:flex; flex-wrap:wrap; gap:6px 8px; margin-top:10px}
+  .chip{font:500 12.5px/1 var(--font-mono); color:var(--ink); background:var(--surface-2); border:1px solid var(--line); border-radius:7px; padding:6px 9px}
+
+  /* ---- figures ---- */
+  .figs{margin-top:56px; display:grid; gap:28px}
+  figure{margin:0; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:24px; box-shadow:var(--shadow)}
+  figure h2{font-size:19px; font-weight:700; letter-spacing:-.01em; margin:0 0 4px}
+  figure .sub{font-size:14px; color:var(--muted); margin:0 0 18px; max-width:70ch}
+  .figbox{overflow-x:auto}
+  figure svg{max-width:100%; height:auto; display:block; margin:0 auto}
+  figcaption{margin-top:16px; font-size:13.5px; color:var(--muted); line-height:1.6; border-top:1px solid var(--line); padding-top:14px}
+  figcaption b{color:var(--ink); font-weight:650}
+
+  /* ---- scope table ---- */
+  .roles{display:grid; grid-template-columns:1fr; gap:12px; margin-top:4px}
+  @media(min-width:720px){.roles{grid-template-columns:1fr 1fr 1fr}}
+  .role{border:1px solid var(--line); border-radius:12px; padding:15px 15px 16px; background:var(--surface-2)}
+  .role.inscope{border-color:color-mix(in srgb,var(--accent) 50%, var(--line)); background:var(--accent-soft)}
+  .role .rn{font:700 11px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--accent-ink)}
+  .role.out .rn{color:var(--muted)}
+  .role h3{font-size:15px; margin:8px 0 6px; font-weight:700}
+  .role p{font-size:13px; color:var(--muted); margin:0 0 10px; line-height:1.5}
+  .verdict{font:600 11px/1.3 var(--font-mono); letter-spacing:.02em; padding:5px 8px; border-radius:6px; display:inline-block}
+  .verdict.yes{color:var(--accent-ink); background:color-mix(in srgb,var(--accent) 16%, transparent)}
+  .verdict.no{color:var(--muted); border:1px dashed var(--faint)}
+
+  a.src{color:var(--accent-ink); text-decoration:none; border-bottom:1px solid color-mix(in srgb,var(--accent) 35%, transparent)}
+  a.src:hover{border-bottom-color:var(--accent)}
+  .foot{margin-top:48px; padding-top:18px; border-top:1px solid var(--line); font-size:13px; color:var(--faint)}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">coursekit · videotranscriber</div>
+    <h1>The course pipeline, layer by layer</h1>
+    <p class="lede">How raw teaching materials converge on one canonical intermediate form, and where every built and
+      proposed part sits — including videotranscriber's role as a separate-repo ingest adapter.</p>
+    <div class="legend">
+      <span><i class="key"></i> built</span>
+      <span><i class="key dash"></i> proposed</span>
+      <span><i class="key repo"></i> videotranscriber — separate repo</span>
+      <span><i class="key dot"></i> the canonical IR</span>
+    </div>
+  </header>
+
+  <div class="pipe">
+
+    <!-- raw -->
+    <section class="band ext">
+      <div class="band-head"><span class="eyebrow">Raw materials</span><span class="band-role">what a faculty member already has — named and nested however they like</span></div>
+      <div class="nodes">
+        <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">lecture videos</div></div>
+        <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">readings · PDFs · slides</div></div>
+        <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">a Canvas export</div></div>
+        <div class="node planned"><div class="n-name">just an outline</div><div class="tag">planned</div></div>
+      </div>
+    </section>
+
+    <div class="flow"><span class="verb">analyzed by</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
+
+    <!-- ingest -->
+    <section class="band">
+      <div class="band-head"><span class="eyebrow">Ingest &amp; structure adapters</span><span class="band-role">source → the IR · each one a <b>single writer of its own file</b></span></div>
+      <div class="nodes">
+        <div class="node vt pad-r"><div class="n-name">videotranscriber</div><div class="n-meta">media → text; writes context.yaml + knowledge.json. Heavy media stack (mlx-whisper) — its own repo.</div><span class="tag">separate repo</span></div>
+        <div class="node built pad-r"><div class="n-name">coursekit/ingest</div><div class="n-meta">PDF · slides · docx → week-N.md; folder-per-week consolidation (FLOW-2 v1).</div><span class="tag">built</span></div>
+        <div class="node planned pad-r"><div class="n-name">structure proposer</div><div class="n-meta">scans the messy tree → drafts the declared structure; surfaces unassigned files (FLOW-7 P2 / UX-2).</div><span class="tag">planned</span></div>
+        <div class="node planned pad-r"><div class="n-name">canvas import</div><div class="n-meta">an existing course export → the IR (FLOW-5).</div><span class="tag">planned</span></div>
+      </div>
+    </section>
+
+    <div class="flow"><span class="verb">produce</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
+
+    <!-- IR -->
+    <section class="band ir">
+      <div class="band-head"><span class="eyebrow">The IR — canonical &amp; shared</span><span class="band-role">every input converges here; everything downstream is <b>read-only</b> on it</span></div>
+      <div class="nodes">
+        <div class="node built"><div class="n-name">context.yaml <span style="color:var(--vt);font-weight:600">+</span> overlay</div><div class="n-meta">declared structure — weeks, sources, titles. Composed on read by <code>coursestructure</code> (FLOW-7 P1, built).</div></div>
+        <div class="node built"><div class="n-name">week-N.md</div><div class="n-meta">the consolidated week text.</div></div>
+        <div class="node built"><div class="n-name">concept map</div><div class="n-meta">the week's concepts (analyze) — grounds generation + evaluation.</div></div>
+        <div class="node built"><div class="n-name">bank.json · page.json</div><div class="n-meta">canonical quiz / page artifacts — the one form every emitter reads.</div></div>
+      </div>
+    </section>
+
+    <div class="flow"><span class="verb">read by</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
+
+    <!-- generation -->
+    <section class="band">
+      <div class="band-head"><span class="eyebrow">Generation</span><span class="band-role"><code>coursekit/generate</code> — reads the IR, never writes it</span></div>
+      <div class="nodes">
+        <div class="node built"><div class="n-name">quizzes</div><div class="n-meta">randomized banks; whole-week + per-source (targeted).</div></div>
+        <div class="node built"><div class="n-name">pages</div><div class="n-meta">teaching · glossary · overview functions; COMP block palette.</div></div>
+        <div class="node planned pad-r"><div class="n-name">course-design advisor</div><div class="n-meta">proposes an <b>output</b> structure by pedagogical best practice (CRSE / FLOW-4).</div><span class="tag">planned</span></div>
+        <div class="node planned pad-r"><div class="n-name">sequencing planner</div><div class="n-meta">pacing &amp; spacing across the term (course-level).</div><span class="tag">planned</span></div>
+      </div>
+    </section>
+
+    <div class="flow"><span class="verb">checked by · emitted by</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
+
+    <!-- eval + emit side by side -->
+    <section class="band">
+      <div class="band-head"><span class="eyebrow">Evaluation</span><span class="band-role">the critics — read-only, cold-read audits</span></div>
+      <div class="nodes">
+        <div class="node built"><div class="n-name">facticity</div><div class="n-meta">is each claim correct &amp; in-scope?</div></div>
+        <div class="node built"><div class="n-name">pedagogy (form)</div><div class="n-meta">scan · signal · engage · retrieval.</div></div>
+        <div class="node built"><div class="n-name">concept-delivery</div><div class="n-meta">is each concept actually taught well?</div></div>
+        <div class="node planned pad-r"><div class="n-name">source-groundedness</div><div class="n-meta">faculty ↔ LLM knowledge split (EVAL-15).</div><span class="tag">planned</span></div>
+      </div>
+    </section>
+
+    <div class="flow"><span class="verb">emitted by</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
+
+    <section class="band">
+      <div class="band-head"><span class="eyebrow">Emit</span><span class="band-role">canonical IR → LMS files · <b>model-free</b>, deterministic</span></div>
+      <div class="nodes">
+        <div class="node built"><div class="n-name">QTI .zip</div><div class="n-meta">Canvas quizzes.</div></div>
+        <div class="node built"><div class="n-name">Common Cartridge</div><div class="n-meta">pages + whole-course .imscc.</div></div>
+        <div class="node built"><div class="n-name">GIFT · HTML</div><div class="n-meta">Moodle text · standalone pages.</div></div>
+        <div class="node planned pad-r"><div class="n-name">Canvas API · LTI</div><div class="n-meta">direct push (SHIP-4/5).</div><span class="tag">planned</span></div>
+      </div>
+    </section>
+
+    <div class="flow"><span class="verb">imported into</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
+
+    <section class="band ext">
+      <div class="band-head"><span class="eyebrow">LMS</span><span class="band-role">where students meet the course</span></div>
+      <div class="nodes">
+        <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">Canvas</div></div>
+        <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">Moodle</div></div>
+      </div>
+    </section>
+
+    <!-- spine -->
+    <div class="spine">
+      <span class="eyebrow">The spine — cross-cutting, shared by every layer</span>
+      <div class="spine-items">
+        <span class="chip">providers</span><span class="chip">prompts</span><span class="chip">courseconfig</span>
+        <span class="chip">coursestructure</span><span class="chip">domain.md</span><span class="chip">voice.md</span>
+        <span class="chip">design themes</span><span class="chip">hardware pre-flight</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FIGURES ================= -->
+  <div class="figs">
+
+    <!-- overlay mechanism -->
+    <figure>
+      <h2>One writer per file — structure is composed, not owned</h2>
+      <p class="sub">The rule that keeps two programs out of each other's files: each adapter writes only its own file, and the
+        reader merges them into one effective structure. No file ever has two writers.</p>
+      <div class="figbox">
+        <svg viewBox="0 0 760 300" role="img" aria-label="videotranscriber writes context.yaml and the proposer writes a coursekit overlay file; the coursestructure reader merges both into one effective structure that generation reads, so no file has two writers.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+          <!-- writers -->
+          <g font-family="ui-monospace,Menlo,monospace">
+            <rect x="16" y="30" width="176" height="58" rx="9" style="fill:var(--vt-soft);stroke:var(--vt-line)" stroke-width="1.5"/>
+            <text x="104" y="55" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--vt)">videotranscriber</text>
+            <text x="104" y="73" text-anchor="middle" font-size="11" style="fill:var(--muted)">separate repo</text>
+
+            <rect x="16" y="210" width="176" height="58" rx="9" style="fill:none;stroke:var(--faint)" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text x="104" y="235" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--ink)">structure proposer</text>
+            <text x="104" y="253" text-anchor="middle" font-size="11" style="fill:var(--muted)">coursekit · planned</text>
+
+            <!-- files -->
+            <rect x="286" y="34" width="176" height="50" rx="9" style="fill:var(--surface-2);stroke:var(--line)" stroke-width="1.5"/>
+            <text x="374" y="55" text-anchor="middle" font-size="12.5" font-weight="700" style="fill:var(--ink)">context.yaml</text>
+            <text x="374" y="72" text-anchor="middle" font-size="10.5" style="fill:var(--muted)">weeks · titles · videos</text>
+
+            <rect x="286" y="214" width="176" height="50" rx="9" style="fill:var(--surface-2);stroke:var(--line)" stroke-width="1.5"/>
+            <text x="374" y="235" text-anchor="middle" font-size="12.5" font-weight="700" style="fill:var(--ink)">structure.overlay.yaml</text>
+            <text x="374" y="252" text-anchor="middle" font-size="10.5" style="fill:var(--muted)">typed sources · doc</text>
+
+            <!-- reader -->
+            <rect x="556" y="94" width="188" height="110" rx="11" style="fill:var(--accent-soft);stroke:var(--accent)" stroke-width="1.8"/>
+            <text x="650" y="132" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--accent-ink)">coursestructure</text>
+            <text x="650" y="151" text-anchor="middle" font-size="11" style="fill:var(--muted)">reads · merges</text>
+            <text x="650" y="176" text-anchor="middle" font-size="11.5" font-weight="600" style="fill:var(--ink)">→ generation</text>
+          </g>
+          <!-- arrows -->
+          <g stroke-width="1.8" fill="none" style="color:var(--muted);stroke:currentColor">
+            <line x1="192" y1="59" x2="282" y2="59" marker-end="url(#ar)"/>
+            <line x1="192" y1="239" x2="282" y2="239" marker-end="url(#ar)"/>
+            <line x1="462" y1="59" x2="552" y2="130" marker-end="url(#ar)"/>
+            <line x1="462" y1="239" x2="552" y2="168" marker-end="url(#ar)"/>
+          </g>
+          <g font-family="ui-monospace,Menlo,monospace" font-size="10.5" text-anchor="middle" style="fill:var(--faint)">
+            <text x="237" y="50">writes</text>
+            <text x="237" y="230">writes</text>
+            <text x="505" y="86">reads</text>
+            <text x="505" y="216">reads</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Same pattern the project already uses for <b>shipped prompts + <code>.vtconfig</code> overrides</b> and
+        <b>base domain + course <code>domain.md</code></b>. Precedence is defined: <code>context.yaml</code> owns identity
+        (which weeks exist, titles); the overlay only <i>adds</i> coursekit's typed sources and a <code>doc</code> pointer.
+        The interim-safe version writes nothing programmatically — the proposer emits a draft the faculty commits, so the
+        <b>human is the writer</b> until you decide auto-write is worth it.</figcaption>
+    </figure>
+
+    <!-- proposer scope -->
+    <figure>
+      <h2>The proposer's scope — one station, not three</h2>
+      <p class="sub">Your instinct that these roles relate in sequence is right. The refinement: they're distinct stations on
+        the pipeline, and fusing them into one "proposer" is where the scope over-extends. Keep the proposer descriptive;
+        let the prescriptive work be its own advisor.</p>
+      <div class="roles">
+        <div class="role inscope">
+          <div class="rn">the proposer</div>
+          <h3>Input-structure analysis</h3>
+          <p>Read the messy tree of real materials → declare what exists (weeks, sources, kinds). <b>Descriptive</b>: it maps reality, grounded in the faculty's own files.</p>
+          <span class="verdict yes">✓ in scope · FLOW-7</span>
+        </div>
+        <div class="role out">
+          <div class="rn">a separate advisor</div>
+          <h3>Output-structure proposal</h3>
+          <p>What the course <i>should</i> contain &amp; how it's organized, by pedagogical best practice. <b>Prescriptive</b> — higher stakes, different grounding (best practice + domain, not the file tree).</p>
+          <span class="verdict no">→ course-design advisor · CRSE</span>
+        </div>
+        <div class="role out">
+          <div class="rn">a separate planner</div>
+          <h3>Sequencing &amp; pacing</h3>
+          <p>How content types relate in sequence across the term — spacing, prerequisites, <code>teaches_toward</code> edges. A <b>course-level</b> concern over the whole IR.</p>
+          <span class="verdict no">→ sequencing planner · STRC</span>
+        </div>
+      </div>
+      <figcaption>Why split them: input-analysis is low-risk (it describes materials); output-proposal is prescriptive and
+        must not fabricate a curriculum the faculty didn't intend; sequencing reasons over the whole term. Different inputs,
+        different authority, different failure modes. They chain in sequence — <b>analyze inputs → propose output → sequence</b>
+        — but the chain is the <i>pipeline's</i> job, not one module's. The proposer owns the first station only.</figcaption>
+    </figure>
+  </div>
+
+  <p class="foot">Solid = built &amp; tested · dashed = on the roadmap. Source of truth: <a class="src" href="#">agent/architecture.md</a> and <a class="src" href="#">agent/roadmap.md</a>.</p>
+</div>
