@@ -48,32 +48,44 @@ def _excluded(rel: Path) -> bool:
     return any(part in _EXCLUDE or part.startswith(".") for part in rel.parts)
 
 
+def scan_supported(path) -> tuple[Path | None, list[Path]]:
+    """(course root, supported documents under `path`), excluding coursekit's own generated/config
+    trees. The shared scan for both the deterministic and the model-assisted proposers."""
+    path = Path(path).expanduser().resolve()
+    root = courseconfig.find_root(path)
+    anchor = root or path
+    files = []
+    for p in sorted(path.rglob("*")):
+        if not p.is_file() or not is_supported(p):
+            continue
+        rel = p.relative_to(anchor) if _is_under(p, anchor) else Path(p.name)
+        if _excluded(rel):
+            continue
+        files.append(p)
+    return root, files
+
+
+def _sort_sources(entry: dict) -> None:
+    # framing first, then by path — matches ingest._source_order so the consolidated doc agrees
+    entry["sources"].sort(key=lambda s: (0 if s["role"] == "framing" else 1, s["path"].lower()))
+
+
 def propose(path) -> Proposal:
     """Scan `path` for supported documents and group them into weeks by the SAME heuristics discovery
     used to use (`_week_of`: a `week-N` filename or ancestor directory). Files with no keyable week are
     collected as `unassigned` rather than dropped."""
-    path = Path(path).expanduser().resolve()
-    root = courseconfig.find_root(path)
-    anchor = root or path
-
+    root, files = scan_supported(path)
     weeks: dict = {}
     unassigned: list = []
-    for p in sorted(path.rglob("*")):
-        if not p.is_file() or not is_supported(p):
-            continue
-        rel_to_anchor = p.relative_to(anchor) if _is_under(p, anchor) else Path(p.name)
-        if _excluded(rel_to_anchor):
-            continue
+    for p in files:
         k = _week_of(p)
         if k:
-            entry = weeks.setdefault(f"week {k}", {"sources": []})
-            entry["sources"].append(_source_entry(p, root))
+            weeks.setdefault(f"week {k}", {"sources": []})["sources"].append(_source_entry(p, root))
         else:
             unassigned.append(p)
 
     for entry in weeks.values():
-        # framing first, then by path — matches ingest._source_order so the consolidated doc agrees
-        entry["sources"].sort(key=lambda s: (0 if s["role"] == "framing" else 1, s["path"].lower()))
+        _sort_sources(entry)
     weeks = {k: weeks[k] for k in sorted(weeks, key=_week_num_of)}
     return Proposal(weeks=weeks, unassigned=unassigned, root=root)
 
