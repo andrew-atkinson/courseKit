@@ -160,7 +160,18 @@ def _cmd_propose(args) -> int:
     no model. Prints the proposed weeks + the files it could not key, then writes the overlay unless
     --dry-run. coursekit writes only its own `.vtconfig/structure.coursekit.yaml`, never context.yaml."""
     from coursekit.ingest import propose as proposer
-    prop = proposer.propose(args.path)
+    if getattr(args, "model", False):
+        model = os.getenv("MODEL_NAME") or courseconfig.load(args.path, config_name="quiz.yaml").value("model")
+        if not model:
+            raise SystemExit("no model configured — set MODEL_NAME or quiz.yaml `model:` (or drop --model)")
+        from coursekit.ingest import propose_model
+        try:
+            prop = propose_model.propose_with_model(args.path, _build_provider(), model, deep=args.deep)
+        except pipeline.ModelLoadError as e:
+            print(str(e))
+            return 2
+    else:
+        prop = proposer.propose(args.path)
 
     if prop.weeks:
         print("Proposed structure:")
@@ -655,6 +666,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="scan a course tree → declare its structure (weeks + typed sources) into "
                              ".vtconfig/structure.coursekit.yaml — offline, no model")
     pp.add_argument("path", help="the course root (or any directory of materials)")
+    pp.add_argument("--model", action="store_true",
+                    help="group with a local model instead of filename heuristics — for trees that "
+                         "don't encode weeks in names/folders (uses the model)")
+    pp.add_argument("--deep", action="store_true",
+                    help="with --model, give the model a short content peek of each file (slower, "
+                         "better on topic-named piles)")
     pp.add_argument("--dry-run", action="store_true", help="print the proposal without writing the overlay")
     pp.add_argument("--force", action="store_true", help="redraft an existing overlay (discards manual edits)")
     pp.set_defaults(func=_cmd_propose)

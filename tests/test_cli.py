@@ -241,3 +241,30 @@ def test_propose_dry_run_writes_nothing(tmp_path):
     import types
     cli._cmd_propose(types.SimpleNamespace(path=str(root), dry_run=True, force=False))
     assert not (root / ".vtconfig" / "structure.coursekit.yaml").exists()
+
+
+def test_propose_model_and_deep_parse():
+    args = _parse("propose", "/c", "--model", "--deep")
+    assert args.func is cli._cmd_propose and args.model and args.deep
+
+
+def test_propose_model_flag_routes_to_the_model_engine(tmp_path, monkeypatch):
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    monkeypatch.setenv("MODEL_NAME", "m")
+    monkeypatch.setattr(cli, "_build_provider", lambda: object())
+    from coursekit.ingest import propose_model
+    from coursekit.ingest.propose import Proposal
+    seen = {}
+
+    def _fake(path, provider, model, *, deep=False):
+        seen["deep"] = deep
+        return Proposal(weeks={"week 1": {"sources": [
+            {"path": "a.md", "title": "a", "kind": "notes", "role": "content"}]}}, unassigned=[], root=root)
+
+    monkeypatch.setattr(propose_model, "propose_with_model", _fake)
+    import types
+    rc = cli._cmd_propose(types.SimpleNamespace(path=str(root), model=True, deep=True,
+                                                dry_run=False, force=False))
+    assert rc == 0 and seen["deep"] is True                      # --deep threaded through
+    assert (root / ".vtconfig" / "structure.coursekit.yaml").is_file()
