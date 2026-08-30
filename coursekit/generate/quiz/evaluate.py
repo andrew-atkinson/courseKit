@@ -173,32 +173,37 @@ def evaluate_course(path, *, weeks=None, provider, model, out_path=None,
     """Discover a course's weeks, pair each `bank.json` with its transcript, cold-read every
     question `reads` times, and write one `quiz-review.md`. Returns (findings, review_path_or_None).
     `progress(msg)` gives a per-week / per-question heartbeat."""
-    from coursekit.discover import find_units
+    from coursekit import courseconfig
     from coursekit.generate.quiz.bank import Bank
-    from coursekit.pipeline import _week_matches
 
-    units = find_units(path)
-    if weeks:
-        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
+    # Discover by the quizzes/ tree, not by week units — so TARGETED quizzes (quizzes/week-N-<doc>/,
+    # each with its own source.md) are found too, not just whole-week quizzes/week-N/.
+    root = courseconfig.find_root(path) or Path(path).expanduser().resolve()
+    want = {courseconfig.week_key(w) for w in weeks} if weeks else None
+    qroot = root / "quizzes"
 
     findings: list[Finding] = []
-    for u in units:
-        bj = Path(u.output_dir) / "bank.json"
-        if not bj.exists():
+    for bj in sorted(qroot.glob("*/bank.json")):
+        slug = bj.parent.name
+        wk = courseconfig.week_key(slug)
+        if want is not None and wk not in want:
+            continue
+        # a targeted quiz cold-reads against its own source.md; a whole-week quiz against the week doc
+        src = bj.parent / "source.md"
+        tpath = src if src.exists() else (root / "output" / f"week-{wk}.md" if wk else None)
+        if tpath is None or not tpath.exists():
             continue
         bank = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
-        transcript = Path(u.transcript_path).read_text(encoding="utf-8")
         n = sum(len(g.variants) for g in bank.groups.values())
         if progress:
-            progress(f"cold-reading {u.week_slug} — {n} question(s)…")
-        findings += evaluate_bank(bank, transcript, provider, model, week=u.week_slug,
-                                  project_root=u.course_root, reads=reads, progress=progress)
+            progress(f"cold-reading {slug} — {n} question(s)…")
+        findings += evaluate_bank(bank, tpath.read_text(encoding="utf-8"), provider, model,
+                                  week=slug, project_root=root, reads=reads, progress=progress)
 
     if not findings:
         return [], None
     if out_path is None:
-        base = Path(units[0].output_dir).parent   # the course's quizzes/ tree
-        out_path = base / "quiz-review.md"
+        out_path = qroot / "quiz-review.md"
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(render_review(findings), encoding="utf-8")

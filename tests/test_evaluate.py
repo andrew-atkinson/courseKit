@@ -104,3 +104,18 @@ def test_evaluate_course_writes_a_review(tmp_path):
     findings, review = ev.evaluate_course(course, provider=_FakeCritic("OUTOFSCOPE"), model="m")
     assert len(findings) == 4 and review is not None and review.exists()
     assert "flagged" in review.read_text()
+
+
+def test_evaluate_course_finds_targeted_quizzes_via_source_md(tmp_path):
+    # a targeted quiz lives in quizzes/week-N-<doc>/ with its own source.md — evaluate must find it
+    course = tmp_path / "course"
+    (course / ".vtconfig").mkdir(parents=True)
+    qd = course / "quizzes" / "week-2-barrett-reading"
+    qd.mkdir(parents=True)
+    (qd / "bank.json").write_text(_bank().model_dump_json(), encoding="utf-8")
+    (qd / "source.md").write_text("Barrett on criticizing photographs", encoding="utf-8")
+
+    findings, review = ev.evaluate_course(course, weeks=["2"],
+                                          provider=_FakeCritic("OUTOFSCOPE"), model="m")
+    assert findings and review is not None and review.exists()
+    assert review == course / "quizzes" / "quiz-review.md"
