@@ -117,36 +117,28 @@ def fix_course(path, *, weeks=None, provider, model, reads: int = ev.DEFAULT_REA
     re-audit, so "generate flagged 1 → fix it" is near-instant. Otherwise cold-read every week to find
     the flags first. `progress(msg)` gives a live heartbeat. The QTI/`.imscc` package is NOT re-emitted
     here — bank.json + GIFT are; re-run `emit qti`/`emit course` to refresh the Canvas package."""
-    from coursekit.discover import find_units
     from coursekit.generate.quiz.bank import Bank
-    from coursekit.pipeline import _week_matches
 
-    units = find_units(path)
-    if weeks:
-        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
-
+    # Shared discovery with evaluate — whole-week AND targeted quizzes (see ev._iter_quiz_banks).
     outcomes: list[FixOutcome] = []
-    for u in units:
-        bj = Path(u.output_dir) / "bank.json"
-        if not bj.exists():
-            continue
+    for slug, bj, tpath, proot in ev._iter_quiz_banks(path, weeks):
         bank_obj = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
-        transcript = Path(u.transcript_path).read_text(encoding="utf-8")
+        transcript = tpath.read_text(encoding="utf-8")
         if findings is not None:
-            flagged = [f for f in findings if f.flagged and f.week == u.week_slug]
+            flagged = [f for f in findings if f.flagged and f.week == slug]
         else:
-            fnd = ev.evaluate_bank(bank_obj, transcript, provider, model, week=u.week_slug,
-                                   project_root=u.course_root, reads=reads, progress=progress)
+            fnd = ev.evaluate_bank(bank_obj, transcript, provider, model, week=slug,
+                                   project_root=proot, reads=reads, progress=progress)
             flagged = [f for f in fnd if f.flagged]
         if not flagged:
             continue
-        bank.load(bank_obj, out_dir=u.output_dir)         # adopt this bank; put_variant autosaves it
-        critic = ev._critic_body(ev.EVALUATE_CATEGORY, u.course_root)
+        bank.load(bank_obj, out_dir=bj.parent)            # adopt this bank; put_variant autosaves it
+        critic = ev._critic_body(ev.EVALUATE_CATEGORY, proot)
         for f in flagged:
             if progress:
-                progress(f"fixing {u.week_slug} {f.group_id}/{f.label}…")
+                progress(f"fixing {slug} {f.group_id}/{f.label}…")
             o = fix_one(f, transcript, provider, model, critic=critic,
-                        project_root=u.course_root, max_turns=max_turns)
+                        project_root=proot, max_turns=max_turns)
             if progress:
                 progress(f"  → {_outcome_word(o)}")
             outcomes.append(o)
