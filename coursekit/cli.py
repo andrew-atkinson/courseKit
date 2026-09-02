@@ -304,6 +304,35 @@ def _cmd_analyze(args) -> int:
     return 0
 
 
+def _review_targeted_quiz(res, provider) -> None:
+    """Opt-in cold read of a single targeted quiz (report-only, best-effort — never sinks the generate).
+    Precise: reviews just THIS quiz's bank against its own source.md, not the whole week."""
+    from coursekit.generate.quiz import evaluate as ev
+    from coursekit.generate.quiz.bank import Bank
+    model, reads = _critic_model_and_reads(str(res.output_dir))
+    if not model:
+        print("\n(skipping review: no critic model — set MODEL_NAME or evaluate.yaml `model:`)")
+        return
+    print("\nReviewing the quiz (cold read)…")
+    try:
+        bank = Bank.model_validate_json((res.output_dir / "bank.json").read_text(encoding="utf-8"))
+        transcript = (res.output_dir / "source.md").read_text(encoding="utf-8")
+        findings = ev.evaluate_bank(bank, transcript, provider, model, week=res.output_dir.name,
+                                    project_root=courseconfig.find_root(res.output_dir), reads=reads,
+                                    progress=_tick)
+    except Exception as e:
+        print(f"(review skipped: {type(e).__name__}: {e})")
+        return
+    flagged = [f for f in findings if f.flagged]
+    print(f"Quiz review: {len(flagged)} of {len(findings)} question(s) flagged.")
+    for f in flagged:
+        print(f"  [{f.verdict}] {f.group_id}/{f.label}: {f.concern}")
+    if flagged:
+        review = res.output_dir / "quiz-review.md"
+        review.write_text(ev.render_review(findings), encoding="utf-8")
+        print(f"-> {review}")
+
+
 def _cmd_generate_targeted(args) -> int:
     """A quiz scoped to ONE document (`--source`), not the whole week (ASMT-17)."""
     if args.pages:
@@ -328,6 +357,8 @@ def _cmd_generate_targeted(args) -> int:
           f"  -> {res.output_dir}")
     for p in res.problems:
         print(f"     - {p}")
+    if res.finalized and getattr(args, "review_targeted", False):
+        _review_targeted_quiz(res, provider)          # opt-in (--review); off by default for targeted
     return 0 if res.finalized else 1
 
 
@@ -707,6 +738,9 @@ def build_parser() -> argparse.ArgumentParser:
     pg.add_argument("--source", metavar="DOC",
                     help="TARGETED quiz from ONE document (a reading / slide deck / PDF / .md), not the "
                          "whole week — writes to quizzes/<week>-<doc>/. Quizzes only.")
+    pg.add_argument("--review", dest="review_targeted", action="store_true",
+                    help="with --source: cold-read the generated quiz (targeted quizzes don't review "
+                         "by default; whole-week generation reviews unless --no-review)")
     pg.add_argument("--dry-run", action="store_true",
                     help="list the units that would be processed, without calling the model")
     pg.add_argument("--max-iters", type=int, default=pipeline.DEFAULT_MAX_ITERS,

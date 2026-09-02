@@ -55,6 +55,8 @@ It's descriptive: it maps what exists and shows unassigned files rather than dro
 
 **`PATH` vs `--source`.** `PATH` is a course directory or a `week-*.md` file, and it is **optional** — omitted, it falls back to `$TRANSCRIPTION`. Given a `PATH`, `generate` processes the whole course (every week, or the ones `--week` selects). Given `--source DOC` it quizzes that ONE document à la carte, and **`PATH` is ignored** — point `--source` at any supported file anywhere, even outside a course (output lands beside the doc, or in its course when it sits under one).
 
+Whole-week generation ends with a cold-read review by default (`--no-review` skips it); a `--source` quiz does **not** review by default (you make many, one at a time) — add **`--review`** to cold-read that one quiz right after generating it.
+
 | Emit Commands                      | What it does                                                                      | Uses LLM |
 |------------------------------------|-----------------------------------------------------------------------------------|----------|
 | `coursekit emit qti PATH`          | One Canvas quiz `.zip` per week.                                                  | x        |

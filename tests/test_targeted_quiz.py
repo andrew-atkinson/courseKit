@@ -98,3 +98,30 @@ def test_targeted_slug_prefers_the_declared_week(tmp_path):
     src = tmp_path / "materials" / "Barrett.pdf"
     assert targeted.targeted_slug(src, struct) == "week-7-barrett"   # declared week wins
     assert targeted.targeted_slug(src) == "barrett"                  # no struct → path has no week
+
+
+def test_targeted_review_flag_parses():
+    from coursekit import cli
+    p = cli.build_parser()
+    assert p.parse_args(["generate", "--source", "/c/r.pdf", "--review"]).review_targeted is True
+    assert p.parse_args(["generate", "--source", "/c/r.pdf"]).review_targeted is False   # off by default
+
+
+def test_targeted_review_runs_only_with_the_flag(monkeypatch, tmp_path):
+    import types
+    from coursekit import cli
+    monkeypatch.setenv("MODEL_NAME", "m")
+    monkeypatch.setattr(cli, "_build_provider", lambda: object())
+    res = types.SimpleNamespace(finalized=True, n_groups=1, n_variants=4, output_dir=tmp_path, problems=[])
+    monkeypatch.setattr(targeted, "generate_targeted_quiz", lambda *a, **k: res)
+    seen = []
+    monkeypatch.setattr(cli, "_review_targeted_quiz", lambda r, p: seen.append(r))
+
+    def _args(**kw):
+        return types.SimpleNamespace(pages=False, dry_run=False, source="/c/r.pdf",
+                                     output_root=None, max_iters=80, **kw)
+
+    cli._cmd_generate_targeted(_args(review_targeted=False))
+    assert seen == []                                   # off by default
+    cli._cmd_generate_targeted(_args(review_targeted=True))
+    assert seen == [res]                                # opt-in runs it
