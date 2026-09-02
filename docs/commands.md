@@ -14,70 +14,72 @@ The CLI is four phases, in the order work flows through them, plus a review verb
 Artifacts land beside the course (`quizzes/` and `pages/` trees), never in this repo.
 `python app.py <verb> …` is equivalent to `coursekit <verb> …` everywhere below.
 
-| Ingest Commands               | What it does                                               | Uses LLM |
-| ----------------------------- | ---------------------------------------------------------- | -------- |
+| Ingest Commands               | What it does                                                                                                                                                                                                                | Uses LLM |
+|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
 | `coursekit ingest PATH`       | Documents (PDF/docx/odt/pptx/txt/md) → `output/week-N.md`. A week that is a **folder** of many docs (a `week-3/` directory of readings + slides) consolidates into one `week-3.md`, each source under a `## <name>` header. | ✓        |
-| `coursekit ingest PATH --raw` | Same, extract only, fully offline.                         | x        |
+| `coursekit ingest PATH --raw` | Same, extract only, fully offline.                                                                                                                                                                                          | x        |
 
 A source's week is its own filename (`week-3.pdf`) or its nearest `week-N` ancestor directory (`.../week-3/readings/Barrett.pdf`).
 When several docs share a week they consolidate into one source-tagged week doc (so a later `--source` quiz can still target one reading); when no file names a week, each doc becomes its own week in sorted order.
 A document that names no week is skipped once any week-numbered content is present (a course-level outline at the root is not week content).
 
-| Structure Commands                   | What it does                                                       | Uses LLM |
-| ------------------------------------ | ----------------------------------------------------------------- | -------- |
-| `coursekit propose PATH`             | Scan the course tree → **declare** its structure (weeks + typed sources) into `.vtconfig/structure.coursekit.yaml`, and surface any files it couldn't key. | x |
-| `coursekit propose PATH --model`     | Group with a local **model** instead of filename heuristics — for trees that don't encode weeks in names/folders. Validated so it can only group files that exist. | ✓ |
-| `coursekit propose PATH --model --deep` | Also give the model a short content peek of each file (slower; better on topic-named piles). | ✓ |
-| `coursekit propose PATH --dry-run`   | Print the proposal without writing the overlay.                   | x        |
-| `coursekit propose PATH --force`     | Redraft an existing overlay (discards manual edits).              | x        |
+| Structure Commands                      | What it does                                                                                                                                                       | Uses LLM |
+|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `coursekit propose PATH`                | Scan the course tree → **declare** its structure (weeks + typed sources) into `.vtconfig/structure.coursekit.yaml`, and surface any files it couldn't key.         | x        |
+| `coursekit propose PATH --model`        | Group with a local **model** instead of filename heuristics — for trees that don't encode weeks in names/folders. Validated so it can only group files that exist. | ✓        |
+| `coursekit propose PATH --model --deep` | Also give the model a short content peek of each file (slower; better on topic-named piles).                                                                       | ✓        |
+| `coursekit propose PATH --dry-run`      | Print the proposal without writing the overlay.                                                                                                                    | x        |
+| `coursekit propose PATH --force`        | Redraft an existing overlay (discards manual edits).                                                                                                               | x        |
 
 `propose` writes coursekit's **own** overlay file — never `context.yaml` — which the tools then read as authoritative (a week doc can be named anything; sources carry a `kind`).
 It's descriptive: it maps what exists and shows unassigned files rather than dropping them; you edit the overlay freely afterward.
 
-| Analyze Commands                    | What it does                                                        | Uses LLM |
-| ----------------------------------- | ------------------------------------------------------------------ | -------- |
-| `coursekit analyze PATH`            | Build each week's concept map (from the transcriber's `knowledge.json`, or the week text when absent) → `.vtconfig/concepts/week-N.yaml`. | ✓ |
-| `coursekit analyze PATH --dry-run`  | List the weeks and their knowledge-component counts, no model.     | x        |
-| `coursekit analyze PATH --week 3`   | One week (`--week` repeatable; `--weeks 3-8` a range).             | ✓        |
+| Analyze Commands                   | What it does                                                                                                                              | Uses LLM |
+|------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `coursekit analyze PATH`           | Build each week's concept map (from the transcriber's `knowledge.json`, or the week text when absent) → `.vtconfig/concepts/week-N.yaml`. | ✓        |
+| `coursekit analyze PATH --dry-run` | List the weeks and their knowledge-component counts, no model.                                                                            | x        |
+| `coursekit analyze PATH --week 3`  | One week (`--week` repeatable; `--weeks 3-8` a range).                                                                                    | ✓        |
 
-| Generate Commands                               | What it does                                                     | Uses LLM |
-| ----------------------------------------------- | ---------------------------------------------------------------- | -------- |
-| `coursekit generate PATH`                       | Both quizzes and pages, every week found.                        | ✓        |
-| `coursekit generate PATH --dry-run`             | List the weeks it would process.                                 | x        |
-| `coursekit generate PATH --week 3`              | One week. `--week` is repeatable; `--weeks 3-8` a range.         | ✓        |
-| `coursekit generate PATH --source DOC`          | **Targeted quiz** from ONE document (a reading / slide deck / PDF / `.md`), not the whole week → `quizzes/<week>-<doc>/`. Quizzes only. | ✓ |
-| `coursekit generate PATH --pages`               | Only pages (`--quizzes` for only quizzes).                       | ✓        |
-| `coursekit generate PATH --pages --function glossary` | Page function: `teaching` (default) / `glossary` / `overview`. | ✓  |
-| `coursekit generate PATH --pages --generator decompose` | Force the teaching generator (default `auto` — picks by length). | ✓ |
-| `coursekit generate PATH --output-root DIR`     | Write elsewhere instead of with the course.                      | ✓        |
-| `coursekit generate PATH --max-iters N`         | Cap model turns per week (default 80).                           | ✓        |
-| `coursekit generate PATH --no-review`           | Skip the cold-read quiz review a `generate` runs by default.     | ✓        |
+| Generate Commands                                       | What it does                                                                                                                            | Uses LLM |
+|---------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `coursekit generate PATH`                               | Both quizzes and pages, every week found.                                                                                               | ✓        |
+| `coursekit generate PATH --dry-run`                     | List the weeks it would process.                                                                                                        | x        |
+| `coursekit generate PATH --week 3`                      | One week. `--week` is repeatable; `--weeks 3-8` a range.                                                                                | ✓        |
+| `coursekit generate --source DOC`                       | **Targeted quiz** from ONE document — à la carte; no `PATH` needed → `quizzes/<week>-<doc>/`. Quizzes only.                             | ✓        |
+| `coursekit generate PATH --pages`                       | Only pages (`--quizzes` for only quizzes).                                                                                              | ✓        |
+| `coursekit generate PATH --pages --function glossary`   | Page function: `teaching` (default) / `glossary` / `overview`.                                                                          | ✓        |
+| `coursekit generate PATH --pages --generator decompose` | Force the teaching generator (default `auto` — picks by length).                                                                        | ✓        |
+| `coursekit generate PATH --output-root DIR`             | Write elsewhere instead of with the course.                                                                                             | ✓        |
+| `coursekit generate PATH --max-iters N`                 | Cap model turns per week (default 80).                                                                                                  | ✓        |
+| `coursekit generate PATH --no-review`                   | Skip the cold-read quiz review a `generate` runs by default.                                                                            | ✓        |
 
-| Emit Commands                      | What it does                      | Uses LLM |
-| ---------------------------------- | --------------------------------- | -------- |
-| `coursekit emit qti PATH`          | One Canvas quiz `.zip` per week.  | x        |
-| `coursekit emit qti PATH --bundle` | One `.zip` for all quizzes.       | x        |
-| `coursekit emit html PATH`         | Re-render pages from `page.json`. | x        |
-| `coursekit emit cc PATH`           | One Canvas `.imscc` of all pages. | x        |
-| `coursekit emit course PATH`       | One Canvas `.imscc` of the whole course — pages **and** quizzes, in week modules. | x |
+**`PATH` vs `--source`.** `PATH` is a course directory or a `week-*.md` file, and it is **optional** — omitted, it falls back to `$TRANSCRIPTION`. Given a `PATH`, `generate` processes the whole course (every week, or the ones `--week` selects). Given `--source DOC` it quizzes that ONE document à la carte, and **`PATH` is ignored** — point `--source` at any supported file anywhere, even outside a course (output lands beside the doc, or in its course when it sits under one).
 
-| Review Command                     | What it does                                                        | Uses LLM |
-| ---------------------------------- | ------------------------------------------------------------------ | -------- |
-| `coursekit evaluate PATH`          | Cold-read review of already-generated quizzes **and** pages → `quiz-review.md`, `page-review.md`. | ✓ |
-| `coursekit evaluate PATH --pages`  | Only the pages (`--quizzes` for only quizzes).                     | ✓ |
-| `coursekit evaluate PATH --all`    | Every evaluation: facticity + page **pedagogy** (form) + **concept-delivery** → `page-pedagogy.md`, `page-concepts.md`. | ✓ |
-| `coursekit evaluate PATH --week 3` | Scope to one week (`--weeks A-B` a range); `--reads N` cold-reads each item N times and unions the flags. | ✓ |
+| Emit Commands                      | What it does                                                                      | Uses LLM |
+|------------------------------------|-----------------------------------------------------------------------------------|----------|
+| `coursekit emit qti PATH`          | One Canvas quiz `.zip` per week.                                                  | x        |
+| `coursekit emit qti PATH --bundle` | One `.zip` for all quizzes.                                                       | x        |
+| `coursekit emit html PATH`         | Re-render pages from `page.json`.                                                 | x        |
+| `coursekit emit cc PATH`           | One Canvas `.imscc` of all pages.                                                 | x        |
+| `coursekit emit course PATH`       | One Canvas `.imscc` of the whole course — pages **and** quizzes, in week modules. | x        |
 
-| Fix Command                        | What it does                                                       | Uses LLM |
-| ---------------------------------- | ------------------------------------------------------------------ | -------- |
-| `coursekit fix PATH`               | **Regenerate each item flagged by the last review in place** (quizzes **and** pages), then verify — no re-audit, so a just-flagged item is fixed at once. Updates `bank.json`/GIFT + `page.json`/HTML; re-run `emit` to refresh the Canvas package. | ✓ |
-| `coursekit fix PATH --reaudit`     | Cold-read the whole course afresh instead of acting on the last review. | ✓ |
-| `coursekit fix PATH --pages`       | Only the pages (`--quizzes` for only quizzes). | ✓ |
-| `coursekit fix PATH --week N`      | Only that week (`--weeks A-B` for a range); `--max-turns N` caps model turns per fix; `--reads N` on a `--reaudit` cold-reads each item N times. | ✓ |
+| Review Command                     | What it does                                                                                                            | Uses LLM |
+|------------------------------------|-------------------------------------------------------------------------------------------------------------------------|----------|
+| `coursekit evaluate PATH`          | Cold-read review of already-generated quizzes **and** pages → `quiz-review.md`, `page-review.md`.                       | ✓        |
+| `coursekit evaluate PATH --pages`  | Only the pages (`--quizzes` for only quizzes).                                                                          | ✓        |
+| `coursekit evaluate PATH --all`    | Every evaluation: facticity + page **pedagogy** (form) + **concept-delivery** → `page-pedagogy.md`, `page-concepts.md`. | ✓        |
+| `coursekit evaluate PATH --week 3` | Scope to one week (`--weeks A-B` a range); `--reads N` cold-reads each item N times and unions the flags.               | ✓        |
 
-| Test Command         | What it does                                                    | Uses LLM |
-| -------------------- | --------------------------------------------------------------- | -------- |
-| `uv run pytest`      | The offline unit suite. Deterministic, no model.                | x        |
-| `uv run pytest evals/` | Model-in-the-loop evals (critic judgment). Skips without a model. | ✓ |
+| Fix Command                    | What it does                                                                                                                                                                                                                                        | Uses LLM |
+|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `coursekit fix PATH`           | **Regenerate each item flagged by the last review in place** (quizzes **and** pages), then verify — no re-audit, so a just-flagged item is fixed at once. Updates `bank.json`/GIFT + `page.json`/HTML; re-run `emit` to refresh the Canvas package. | ✓        |
+| `coursekit fix PATH --reaudit` | Cold-read the whole course afresh instead of acting on the last review.                                                                                                                                                                             | ✓        |
+| `coursekit fix PATH --pages`   | Only the pages (`--quizzes` for only quizzes).                                                                                                                                                                                                      | ✓        |
+| `coursekit fix PATH --week N`  | Only that week (`--weeks A-B` for a range); `--max-turns N` caps model turns per fix; `--reads N` on a `--reaudit` cold-reads each item N times.                                                                                                    | ✓        |
+
+| Test Command           | What it does                                                      | Uses LLM |
+|------------------------|-------------------------------------------------------------------|----------|
+| `uv run pytest`        | The offline unit suite. Deterministic, no model.                  | x        |
+| `uv run pytest evals/` | Model-in-the-loop evals (critic judgment). Skips without a model. | ✓        |
 
 Exit codes: `0` success · `1` a unit failed to finalize · `2` the model could not be loaded.
