@@ -168,6 +168,35 @@ def read_verdicts(bank, transcript: str, provider, model: str, *, reads: int = D
     return out
 
 
+def _iter_quiz_banks(path, weeks=None):
+    """Yield (slug, bank_json, transcript_path, project_root) for every quiz in a course — whole-week
+    (via `find_units`, keeping all its transcript resolution) AND TARGETED (quizzes/week-N-<doc>/, each
+    with its own source.md). Shared by evaluate and fix so both see the same set."""
+    from coursekit import courseconfig
+    from coursekit.discover import find_units
+    from coursekit.pipeline import _week_matches
+
+    root = courseconfig.find_root(path) or Path(path).expanduser().resolve()
+    seen = set()
+    units = find_units(path)
+    if weeks:
+        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
+    for u in units:
+        bj = Path(u.output_dir) / "bank.json"
+        if bj.exists():
+            seen.add(bj.resolve())
+            yield u.week_slug, bj, Path(u.transcript_path), (u.course_root or root)
+    # targeted quizzes are per-source dirs find_units doesn't enumerate; they carry their own source.md
+    want = {courseconfig.week_key(w) for w in weeks} if weeks else None
+    for bj in sorted((root / "quizzes").glob("*/bank.json")):
+        src = bj.parent / "source.md"
+        if bj.resolve() in seen or not src.exists():
+            continue
+        slug = bj.parent.name
+        if want is None or courseconfig.week_key(slug) in want:
+            yield slug, bj, src, root
+
+
 def evaluate_course(path, *, weeks=None, provider, model, out_path=None,
                     reads: int = DEFAULT_READS, progress=None) -> tuple[list[Finding], Path | None]:
     """Discover a course's weeks, pair each `bank.json` with its transcript, cold-read every
@@ -176,34 +205,20 @@ def evaluate_course(path, *, weeks=None, provider, model, out_path=None,
     from coursekit import courseconfig
     from coursekit.generate.quiz.bank import Bank
 
-    # Discover by the quizzes/ tree, not by week units — so TARGETED quizzes (quizzes/week-N-<doc>/,
-    # each with its own source.md) are found too, not just whole-week quizzes/week-N/.
-    root = courseconfig.find_root(path) or Path(path).expanduser().resolve()
-    want = {courseconfig.week_key(w) for w in weeks} if weeks else None
-    qroot = root / "quizzes"
-
     findings: list[Finding] = []
-    for bj in sorted(qroot.glob("*/bank.json")):
-        slug = bj.parent.name
-        wk = courseconfig.week_key(slug)
-        if want is not None and wk not in want:
-            continue
-        # a targeted quiz cold-reads against its own source.md; a whole-week quiz against the week doc
-        src = bj.parent / "source.md"
-        tpath = src if src.exists() else (root / "output" / f"week-{wk}.md" if wk else None)
-        if tpath is None or not tpath.exists():
-            continue
+    for slug, bj, tpath, proot in _iter_quiz_banks(path, weeks):
         bank = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
         n = sum(len(g.variants) for g in bank.groups.values())
         if progress:
             progress(f"cold-reading {slug} — {n} question(s)…")
         findings += evaluate_bank(bank, tpath.read_text(encoding="utf-8"), provider, model,
-                                  week=slug, project_root=root, reads=reads, progress=progress)
+                                  week=slug, project_root=proot, reads=reads, progress=progress)
 
     if not findings:
         return [], None
     if out_path is None:
-        out_path = qroot / "quiz-review.md"
+        root = courseconfig.find_root(path) or Path(path).expanduser().resolve()
+        out_path = root / "quizzes" / "quiz-review.md"
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(render_review(findings), encoding="utf-8")

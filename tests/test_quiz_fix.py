@@ -192,3 +192,28 @@ def test_abort_if_model_error_aborts_on_infra_but_not_on_content():
                                    RuntimeError("Failed to load model: insufficient system resources"))
     # a content-level exception does not abort; the caller breaks just that one item
     assert qfix._abort_if_model_error(_P(), "m", ValueError("some content issue")) is None
+
+def test_fix_course_repairs_a_targeted_quiz(tmp_path, fresh):
+    pytest.importorskip("yaml")
+    # a TARGETED quiz: quizzes/week-2-<doc>/ with its own source.md — fix must find + repair it
+    (tmp_path / ".vtconfig").mkdir()
+    outd = tmp_path / "quizzes" / "week-2-barrett-reading"
+    outd.mkdir(parents=True)
+    (outd / "source.md").write_text("Barrett on the nature of photographs.")
+    b = bank.Bank(run_id="c-week-2-barrett", title="t")
+    b.groups["c1"] = bank.Group(group_id="c1", concept_title="key vs keyCode",
+                                question_type="multiple_choice",
+                                variants={"A": bank.MCVariant(
+                                    group_id="c1", label="A", question_text="What does `key` hold?",
+                                    variant_summary="meaning of key",
+                                    options=["a string character", "a numeric code"], correct_index=1)})
+    (outd / "bank.json").write_text(b.model_dump_json())
+
+    corrected = {"group_id": "c1", "variant_label": "A", "question_text": "What does `key` hold? FIXED",
+                 "variant_summary": "key is the character", "options": ["a string character", "a numeric code"],
+                 "correct_index": 0}
+    findings = [ev.Finding("week-2-barrett-reading", "c1", "A", "", "FLAG", "wrong key")]
+    outcomes = qfix.fix_course(tmp_path, provider=FixProvider(corrected), model="m", findings=findings)
+    assert len(outcomes) == 1 and outcomes[0].now_passes
+    saved = bank.Bank.model_validate_json((outd / "bank.json").read_text())
+    assert saved.groups["c1"].variants["A"].correct_index == 0     # repaired in place
