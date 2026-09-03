@@ -584,6 +584,22 @@ def _cmd_evaluate(args) -> int:
             metrics["concepts"] = {"pages": len(concepts),
                                    "avg": round(sum(c.average for c in concepts) / len(concepts), 1)}
 
+        from coursekit.generate.page import groundedness as gnd
+        grounded, gout = gnd.evaluate_course_groundedness(args.path, weeks=weeks, provider=provider,
+                                                          model=model, progress=_tick)
+        if grounded:
+            did_something = True
+            print(f"Groundedness: read {len(grounded)} page(s).")
+            for g in grounded:
+                print(f"  {g.page_id}: {g.coverage*100:.0f}% engage material · "
+                      f"{len(g.model_supplied)} model-supplied · {len(g.tensions)} in tension")
+            print(f"  -> {gout}")
+            reviews.append(gout)
+            tot = sum(g.total for g in grounded) or 1
+            metrics["groundedness"] = {"pages": len(grounded),
+                                       "coverage": round(sum(g.engaging for g in grounded) / tot, 2),
+                                       "in_tension": sum(len(g.tensions) for g in grounded)}
+
     if not did_something:
         print("Nothing found to evaluate (need generated bank.json / page.json under the course).")
         return 1
