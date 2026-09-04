@@ -98,36 +98,52 @@ def evaluate_page(page, material: str, provider, model: str, *, week: str = "",
     return findings
 
 
-def evaluate_course_pages(path, *, weeks=None, provider, model, out_path=None,
-                          reads: int = DEFAULT_READS, progress=None) -> tuple[list[Finding], Path | None]:
-    """Discover a course's weeks, pair each `page.json` with its transcript, cold-read every section,
-    and write one `page-review.md`. Returns (findings, review_path_or_None). `progress(msg)` gives a
-    per-week / per-section heartbeat."""
+def _iter_page_jsons(path, weeks=None):
+    """Yield (label, page_json, transcript_path, project_root, week_slug) for EVERY page under the
+    course's pages/ tree — the per-week teaching page AND its function siblings (`-glossary`,
+    `-overview`). `label` is the page dir name (distinguishes the siblings in a review); `week_slug`
+    is the base week, shared by a week's pages (for supplements + material). Mirrors the quiz side's
+    `_iter_quiz_banks` so evaluate and fix discover the same set."""
     from coursekit.discover import find_units
-    from coursekit.generate.page.page import Page
     from coursekit.pipeline import _week_matches
 
     units = find_units(path, subdir="pages")
     if weeks:
         units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
-
-    findings: list[Finding] = []
     for u in units:
-        pj = Path(u.output_dir) / "page.json"
-        if not pj.exists():
-            continue
+        pages_root = Path(u.output_dir).parent
+        slug = u.week_slug
+        # the teaching page dir (== slug) plus its function siblings (slug-glossary, slug-overview, …);
+        # `slug-*` needs the trailing hyphen, so week-3 never sweeps in week-30.
+        dirs = [pages_root / slug] + sorted(d for d in pages_root.glob(f"{slug}-*") if d.is_dir())
+        for d in dirs:
+            pj = d / "page.json"
+            if pj.exists():
+                yield d.name, pj, Path(u.transcript_path), u.course_root, u.week_slug
+
+
+def evaluate_course_pages(path, *, weeks=None, provider, model, out_path=None,
+                          reads: int = DEFAULT_READS, progress=None) -> tuple[list[Finding], Path | None]:
+    """Discover every page in a course (teaching + `-glossary`/`-overview` siblings), pair each
+    `page.json` with its week transcript, cold-read every section, and write one `page-review.md`.
+    Returns (findings, review_path_or_None). `progress(msg)` gives a per-page / per-section heartbeat."""
+    from coursekit.generate.page.page import Page
+
+    items = list(_iter_page_jsons(path, weeks))
+    findings: list[Finding] = []
+    for label, pj, tpath, proot, _wk in items:
         page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
-        material = Path(u.transcript_path).read_text(encoding="utf-8")
+        material = tpath.read_text(encoding="utf-8")
         n = sum(1 for b in page.blocks.values() if b.kind not in _SKIP_KINDS)
         if progress:
-            progress(f"cold-reading {u.week_slug} — {n} section(s)…")
-        findings += evaluate_page(page, material, provider, model, week=u.week_slug,
-                                  project_root=u.course_root, reads=reads, progress=progress)
+            progress(f"cold-reading {label} — {n} section(s)…")
+        findings += evaluate_page(page, material, provider, model, week=label,
+                                  project_root=proot, reads=reads, progress=progress)
 
     if not findings:
         return [], None
     if out_path is None:
-        out_path = Path(units[0].output_dir).parent / "page-review.md"     # the course's pages/ tree
+        out_path = items[0][1].parent.parent / "page-review.md"     # the course's pages/ tree
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(render_review(findings, title="Page review", noun="section"), encoding="utf-8")

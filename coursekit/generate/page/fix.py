@@ -88,53 +88,44 @@ def fix_course_pages(path, *, weeks=None, provider, model, reads: int = pev.DEFA
     outcomes. When `findings` is given (parsed from an existing `page-review.md`), fix exactly those —
     no re-audit; otherwise cold-read every page to find the flags first. `progress(msg)` gives a live
     heartbeat. page.json is autosaved on each fix."""
-    from coursekit.discover import find_units
     from coursekit.generate.page.page import Page
-    from coursekit.pipeline import _week_matches
     from coursekit.generate.quiz.fix import _outcome_word
 
-    units = find_units(path, subdir="pages")
-    if weeks:
-        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
-
     outcomes: list[FixOutcome] = []
-    for u in units:
-        pj = Path(u.output_dir) / "page.json"
-        if not pj.exists():
-            continue
+    for label, pj, tpath, proot, wk in pev._iter_page_jsons(path, weeks):
         page_obj = Page.model_validate_json(pj.read_text(encoding="utf-8"))
-        material = Path(u.transcript_path).read_text(encoding="utf-8")
+        material = tpath.read_text(encoding="utf-8")
         if findings is not None:
-            flagged = [f for f in findings if f.flagged and f.week == u.week_slug]
+            flagged = [f for f in findings if f.flagged and f.week == label]
         else:
-            fnd = pev.evaluate_page(page_obj, material, provider, model, week=u.week_slug,
-                                    project_root=u.course_root, reads=reads, progress=progress)
+            fnd = pev.evaluate_page(page_obj, material, provider, model, week=label,
+                                    project_root=proot, reads=reads, progress=progress)
             flagged = [f for f in fnd if f.flagged]
         if not flagged:
             continue
-        pageir.load(page_obj, out_dir=u.output_dir)       # adopt this page; put_block autosaves it
-        critic = _critic_body(pev.PAGE_CATEGORY, u.course_root)
+        pageir.load(page_obj, out_dir=pj.parent)          # adopt this page; put_block autosaves it
+        critic = _critic_body(pev.PAGE_CATEGORY, proot)
         for f in flagged:
             if progress:
-                progress(f"fixing {u.week_slug} {f.group_id} ({f.label})…")
+                progress(f"fixing {label} {f.group_id} ({f.label})…")
             o = fix_one_block(f, material, provider, model, critic=critic,
-                              project_root=u.course_root, max_turns=max_turns)
+                              project_root=proot, max_turns=max_turns)
             if progress:
                 progress(f"  → {_outcome_word(o)}")
             outcomes.append(o)
-        _rerender(u)
+        _rerender(pj.parent, proot, wk)
     return outcomes
 
 
-def _rerender(unit) -> None:
+def _rerender(out_dir, course_root, week_slug) -> None:
     """Re-render the page HTML after the fixes, merging supplements + theme (mirrors the generator).
-    Best-effort: a render hiccup must not lose the fixes, which are already saved to page.json."""
+    Best-effort: a render hiccup must not lose the fixes, which are already saved to page.json.
+    Supplements key off the base `week_slug` (shared by a week's teaching + function pages)."""
     try:
         from coursekit.emit import html as html_emit
         from coursekit.generate.page.renderer import load_supplements
         from coursekit.generate.page.style import load_style
-        supplements = load_supplements(unit.course_root, unit.week_slug)
-        html_emit.write_html(pageir.get(), Path(unit.output_dir), supplements,
-                             load_style(unit.course_root))
+        supplements = load_supplements(course_root, week_slug)
+        html_emit.write_html(pageir.get(), Path(out_dir), supplements, load_style(course_root))
     except Exception:
         pass

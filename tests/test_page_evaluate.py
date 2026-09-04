@@ -65,3 +65,17 @@ def test_evaluate_course_pages_writes_a_review(tmp_path):
     assert findings and review is not None and review.exists()
     text = review.read_text()
     assert "Page review" in text and "section(s) flagged" in text and "b2/paragraph" in text
+
+
+def test_evaluate_course_pages_covers_function_siblings(tmp_path):
+    # a week with a teaching page AND a -glossary sibling → both are discovered (PAGE-2)
+    course = tmp_path / "course"
+    (course / "output").mkdir(parents=True)
+    (course / "output" / "week-3.md").write_text("loops and iteration", encoding="utf-8")
+    for slug in ("week-3", "week-3-glossary"):
+        pd = course / "pages" / slug
+        pd.mkdir(parents=True)
+        (pd / "page.json").write_text(_page().model_dump_json(), encoding="utf-8")
+
+    labels = {lab for lab, *_ in pev._iter_page_jsons(course)}
+    assert labels == {"week-3", "week-3-glossary"}
