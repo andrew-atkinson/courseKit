@@ -560,6 +560,24 @@ def _cmd_evaluate(args) -> int:
             metrics["page"] = {"reviewed": len(findings),
                                "flagged": sum(1 for f in findings if f.flagged)}
 
+    # --all adds groundedness (provenance) on top of the quiz facticity pass.
+    if args.all and do_quiz:
+        from coursekit.generate.quiz import groundedness as qgnd
+        qg, qout = qgnd.evaluate_course_groundedness(args.path, weeks=weeks, provider=provider,
+                                                     model=model, progress=_tick)
+        if qg:
+            did_something = True
+            print(f"Quiz groundedness: read {len(qg)} quiz(zes).")
+            for q in qg:
+                print(f"  {q.quiz_id}: {q.coverage*100:.0f}% answerable from material · "
+                      f"{len(q.model_supplied)} model-knowledge")
+            print(f"  -> {qout}")
+            reviews.append(qout)
+            tot = sum(q.total for q in qg) or 1
+            metrics["quiz_groundedness"] = {"quizzes": len(qg),
+                                            "coverage": round(sum(q.engaging for q in qg) / tot, 2),
+                                            "model_knowledge": sum(len(q.model_supplied) for q in qg)}
+
     # --all adds the deeper page-quality rubrics (form + concept delivery) on top of facticity.
     if args.all and do_page:
         rubrics, out = ped.evaluate_course_pedagogy(args.path, weeks=weeks, provider=provider, model=model)
