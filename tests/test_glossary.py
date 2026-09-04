@@ -109,7 +109,7 @@ def test_empty_glossary_does_not_finalize(fresh, tmp_path):
     unit = _unit(tmp_path)
     pg, problems = glossary.build_glossary_page(unit, GlossaryProvider([]), "m",
                                                 unit.output_dir.parent / "g")
-    assert problems                                          # a lone heading with no terms is not shippable
+    assert problems                                          # no terms → no blocks at all → not shippable
 
 
 # --------------------------------------------------------------- page-type-aware validate_final
