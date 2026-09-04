@@ -301,7 +301,11 @@ def validate_final() -> list[str]:
     problems = []
     if not _page.blocks:
         problems.append("the page has no blocks")
-    if not any(b.kind == "heading" for b in _page.blocks.values()):
+    # A teaching page needs a heading to structure it; a reference page (a glossary companion, an
+    # overview) is self-structuring — its glossary/overview block carries its own label — so a
+    # redundant heading is not required (and would just repeat the block's label).
+    if _page.page_type not in _REFERENCE_PAGE_TYPES and \
+            not any(b.kind == "heading" for b in _page.blocks.values()):
         problems.append("the page has no heading block to structure it")
     # A page must ask the student to RETRIEVE — the testing effect is core pedagogy, and this device
     # is the first to get dropped as the prompt grows. So gate it structurally (unlike the hook /

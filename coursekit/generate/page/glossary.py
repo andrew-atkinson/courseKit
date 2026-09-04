@@ -56,9 +56,9 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
     tools.reset_state()
     tools.set_call_log(out_dir / "calls.jsonl")
 
-    # The single section heading is placed deterministically; the pass only fills the terms beneath it.
-    pageir.put_block(pageir.build_block("heading", block_id="terms-h", text="Key Terms", role="review"))
-
+    # No heading block: the glossary block is self-labeling (a framed "Key Terms" box), so a separate
+    # heading would just repeat that label — and once carried role="review", which mis-rendered the
+    # terms as a "Key Terms Recap" container. The pass only fills the terms; the box IS the section.
     system = (courseconfig.domain_preface(cfg.domain)
               + prompts.load("page", "glossary", project_root=project_root).body)
     budget = int(cfg.value("max_pass_chars", decompose.DEFAULT_PASS_CHARS))
