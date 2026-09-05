@@ -17,10 +17,12 @@ def _shape_directive(concept_map, questions=None) -> str:
     """How many question groups, and covering what — the quiz analog of the page's concept checklist.
     The number is FLEXIBLE, not a hardcoded five: an explicit `questions` (quiz.yaml) fixes it (the
     user's choice); otherwise the week's concept map suggests it — one group per teaching concept, its
-    variants drawn from that concept's knowledge components, plus one group on the enduring
-    understanding, and a second group for a concept whose components clearly support more than one
-    question (the model's suggestion, grounded in the map); otherwise the model chooses from the
-    material. Rides at the end of the brief, where a small model attends most."""
+    variants drawn from that concept's knowledge components, and a second group for a concept whose
+    components clearly support more than one question (the model's suggestion, grounded in the map);
+    otherwise the model chooses from the material. The enduring understanding FRAMES the questions but
+    is never its own MC group — a transferable idea isn't a multiple-choice item (ASMT-1; a
+    performance-task instrument for it is ASMT-3). Rides at the end of the brief, where a small model
+    attends most."""
     concepts = getattr(concept_map, "concepts", None) if concept_map is not None else None
     eu = getattr(concept_map, "enduring_understanding", "") if concept_map is not None else ""
 
@@ -30,15 +32,16 @@ def _shape_directive(concept_map, questions=None) -> str:
             kcs = ", ".join(c.components) if getattr(c, "components", None) else ""
             out.append(f"  - {c.name}" + (f"  (aspects: {kcs})" if kcs else ""))
         if eu:
-            out.append(f"\nThe week's enduring understanding (the transferable idea): {eu}")
+            out.append(f"\nThe week's enduring understanding — the transferable idea the questions "
+                       f"should keep pointing at, but NOT its own group (multiple choice can't test a "
+                       f"transferable understanding): {eu}")
         return out
 
     if questions and concepts:                     # a fixed count, still grounded in the map
         lines = [f"\n\n**How many groups: create EXACTLY {questions} question groups.** Cover the "
                  f"week's concepts, one group each:"] + _concept_lines()
         lines.append(f"\nIf {questions} is more than the concepts above, add a second group for the "
-                     f"richest concepts and one for the enduring understanding; if fewer, cover the "
-                     f"most important. Four variants per group.")
+                     f"richest concepts; if fewer, cover the most important. Four variants per group.")
         return "\n".join(lines)
     if questions:
         return (f"\n\n**How many groups.** Create EXACTLY {questions} question groups, one concept "
@@ -48,9 +51,9 @@ def _shape_directive(concept_map, questions=None) -> str:
                  "number.** The concepts this week teaches, each its own group:"] + _concept_lines()
         lines.append("\nMake ONE group per concept above, its variants testing different aspects of "
                      "it. Where a concept's aspects clearly support more than one distinct question, "
-                     "add a second group for it. Then add ONE final group testing the ENDURING "
-                     "UNDERSTANDING — the transferable idea, not a single technical detail. You choose "
-                     "the total; let the concept map decide it, not a fixed count.")
+                     "add a second group for it. Do NOT add a group for the enduring understanding "
+                     "itself — it frames the questions, but multiple choice can't test a transferable "
+                     "idea. You choose the total; let the concept map decide it, not a fixed count.")
         return "\n".join(lines)
     return ("\n\n**How many groups — let the material decide.** Make one group for each of the most "
             "important ideas the lecture teaches (usually four to six), not a fixed count.")
@@ -82,8 +85,9 @@ def build_messages(transcript: str, *, course_title: str | None = None,
     """The chat messages for one lecture. Metadata is woven in only when supplied.
 
     `project_root` lets a course override either prompt from its own .vtconfig/prompts/quiz/. When a
-    `concept_map` is present its concepts set the quiz's shape (one group each + the enduring
-    understanding), and an explicit `questions` count overrides that — so the number of questions is
+    `concept_map` is present its concepts set the quiz's shape (one group each; the enduring
+    understanding frames the questions but gets no group of its own), and an explicit `questions`
+    count overrides that — so the number of questions is
     flexible and content-relative, not a hardcoded five. The leading/trailing newlines are restored
     here rather than stored in the files, so the prompt files stay clean readable Markdown.
     """

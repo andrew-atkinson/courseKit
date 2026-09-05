@@ -113,8 +113,8 @@ def test_shape_directive_from_concept_map():
     d = _shape_directive(cm)
     assert "for loop" in d and "map()" in d                # one group per concept
     assert "initialization, condition" in d                # KCs seed the variants
-    assert "Structure lets one pattern govern many." in d  # enduring understanding
-    assert "ENDURING UNDERSTANDING" in d                   # + its own group
+    assert "Structure lets one pattern govern many." in d  # enduring understanding shown (frames questions)
+    assert "Do NOT add a group for the enduring understanding" in d   # ASMT-1: no MC group for the EU
 
 
 def test_shape_directive_default_lets_material_decide():
