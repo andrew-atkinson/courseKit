@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>coursekit — capabilities overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#F4F5F3;
+    --surface:#FFFFFF;
+    --surface-2:#FBFCFA;
+    --ink:#17262A;
+    --muted:#5C6A66;
+    --faint:#E3E7E2;
+    --hair:#D6DCD5;
+    --accent:#0F6E5C;
+    --accent-ink:#0B5145;
+    --accent-soft:#E6F0EC;
+    --code-bg:#EDF0EC;
+    --offline:#7A8781;
+    --shadow:0 1px 2px rgba(23,38,42,.04),0 6px 22px rgba(23,38,42,.06);
+    --serif:"Newsreader",Georgia,"Times New Roman",serif;
+    --grot:"Bricolage Grotesque","Newsreader",system-ui,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#111817;
+      --surface:#18211F;
+      --surface-2:#1C2624;
+      --ink:#E8ECE6;
+      --muted:#94A39C;
+      --faint:#28322F;
+      --hair:#2E3936;
+      --accent:#4FBFA6;
+      --accent-ink:#8FD9CA;
+      --accent-soft:#173029;
+      --code-bg:#1E2826;
+      --offline:#7C8A84;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 26px rgba(0,0,0,.36);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#111817;
+    --surface:#18211F;
+    --surface-2:#1C2624;
+    --ink:#E8ECE6;
+    --muted:#94A39C;
+    --faint:#28322F;
+    --hair:#2E3936;
+    --accent:#4FBFA6;
+    --accent-ink:#8FD9CA;
+    --accent-soft:#173029;
+    --code-bg:#1E2826;
+    --offline:#7C8A84;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 26px rgba(0,0,0,.36);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--serif);
+    font-size:18px;
+    line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  img{max-width:100%}
+  [hidden]{display:none!important}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 28px}
+  .col{max-width:66ch}
+  p{margin:0 0 1.05em}
+  a{color:var(--accent-ink)}
+  strong{font-weight:500;color:var(--ink)}
+  em{font-style:italic}
+
+  code,.mono{font-family:var(--mono);font-size:.82em;letter-spacing:-.01em}
+  p code,li code{background:var(--code-bg);padding:.08em .38em;border-radius:4px;color:var(--accent-ink);white-space:nowrap}
+
+  h1,h2,h3{font-family:var(--grot);font-weight:700;line-height:1.08;text-wrap:balance;letter-spacing:-.015em}
+
+  .eyebrow{
+    font-family:var(--mono);font-size:12px;font-weight:500;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--accent);
+    margin:0 0 14px;display:flex;align-items:center;gap:10px;
+  }
+  .eyebrow::before{content:"";width:26px;height:2px;background:var(--accent);display:inline-block}
+
+  header{padding:96px 0 20px}
+  .brand{font-family:var(--grot);font-weight:800;font-size:clamp(56px,11vw,120px);line-height:.9;letter-spacing:-.04em;margin:0}
+  .brand b{color:var(--accent);font-weight:800}
+  .lede{font-size:clamp(20px,2.4vw,25px);line-height:1.42;margin:26px 0 0;max-width:34ch;color:var(--ink)}
+  .metaline{
+    font-family:var(--mono);font-size:13px;color:var(--muted);
+    margin-top:30px;display:flex;flex-wrap:wrap;gap:8px 18px;padding-top:22px;border-top:1px solid var(--hair)
+  }
+  .metaline span{display:inline-flex;gap:8px;align-items:center}
+  .metaline b{color:var(--accent);font-weight:600}
+
+  section{padding:52px 0;border-top:1px solid var(--faint)}
+  section h2{font-size:clamp(27px,3.6vw,36px);margin:0 0 8px}
+  .sub{color:var(--muted);font-size:16.5px;margin:0 0 30px;max-width:60ch}
+
+  .thesis{border-left:3px solid var(--accent);padding:6px 0 6px 26px;margin:0}
+  .thesis p{font-family:var(--grot);font-weight:600;font-size:clamp(21px,2.6vw,27px);line-height:1.3;letter-spacing:-.02em;margin:0;color:var(--ink)}
+  .thesis .foot{font-family:var(--serif);font-weight:400;font-size:16.5px;color:var(--muted);margin-top:14px;line-height:1.5}
+
+  .pipe{display:flex;flex-direction:column;gap:2px;margin-top:8px}
+  .step{display:grid;grid-template-columns:52px 1fr auto;gap:22px;align-items:baseline;padding:20px 0;border-top:1px solid var(--faint)}
+  .step:first-child{border-top:none}
+  .step .n{font-family:var(--mono);font-size:14px;color:var(--muted);font-weight:500;padding-top:5px}
+  .step .verb{font-family:var(--mono);font-weight:600;font-size:18px;color:var(--accent);letter-spacing:-.01em}
+  .step .body{grid-column:2}
+  .step .body p{margin:6px 0 0;font-size:16.5px;line-height:1.5;color:var(--ink)}
+  .pill{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:5px 10px;border-radius:999px;white-space:nowrap;align-self:center}
+  .pill.model{background:var(--accent-soft);color:var(--accent-ink)}
+  .pill.offline{background:transparent;color:var(--offline);border:1px solid var(--hair)}
+
+  .feat{display:grid;grid-template-columns:1fr 1fr;gap:40px 56px}
+  @media(max-width:760px){.feat{grid-template-columns:1fr;gap:34px}}
+  .feat h3{font-size:20px;margin:0 0 8px;display:flex;align-items:center;gap:11px}
+  .feat h3 .dot{width:8px;height:8px;border-radius:2px;background:var(--accent);flex:none;transform:translateY(1px)}
+  .feat p{font-size:16.5px;line-height:1.55;margin:0 0 .8em}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:0;list-style:none}
+  .chips li{font-family:var(--mono);font-size:13px;background:var(--surface);border:1px solid var(--hair);color:var(--ink);padding:7px 12px;border-radius:6px}
+  .chips li b{color:var(--accent-ink);font-weight:600}
+
+  .crit{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:8px}
+  @media(max-width:760px){.crit{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:22px 22px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:9px}
+  .card .top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .card h3{font-family:var(--grot);font-size:19px;margin:0;letter-spacing:-.01em}
+  .card .scope{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border:1px solid var(--hair);padding:4px 8px;border-radius:999px;white-space:nowrap}
+  .card p{font-size:15.5px;line-height:1.5;margin:0;color:var(--ink)}
+  .card .q{font-family:var(--serif);font-style:italic;color:var(--muted);font-size:15px}
+  .card.wide{grid-column:1 / -1}
+
+  .status{background:var(--surface-2);border:1px solid var(--faint);border-radius:14px;padding:30px 32px;margin-top:8px}
+  .status p{font-size:16.5px;line-height:1.55}
+  .status p:last-child{margin-bottom:0}
+
+  footer{padding:40px 0 90px;color:var(--muted);font-family:var(--mono);font-size:12.5px;letter-spacing:.02em}
+
+  .toggle{position:fixed;top:18px;right:18px;z-index:10;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;background:var(--surface);color:var(--muted);border:1px solid var(--hair);border-radius:999px;padding:8px 13px;cursor:pointer;box-shadow:var(--shadow)}
+  .toggle:hover{color:var(--accent-ink);border-color:var(--accent)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeBtn" aria-label="Toggle light or dark theme">◑ theme</button>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Local-first course authoring</p>
+    <h1 class="brand">course<b>kit</b></h1>
+    <p class="lede">A course's own material becomes correct, well-taught, Canvas-ready quizzes and pages — on a model you run yourself.</p>
+    <div class="metaline">
+      <span><b>◆</b> runs on your machine</span>
+      <span><b>◆</b> no cloud, no API token</span>
+      <span><b>◆</b> Python&nbsp;·&nbsp;a command-line tool</span>
+    </div>
+  </header>
+
+  <section>
+    <p class="eyebrow">The one load-bearing idea</p>
+    <div class="thesis col">
+      <p>Every input converges on one canonical form — <code>bank.json</code> for quizzes, <code>page.json</code> for pages — and every export reads only that form.</p>
+      <p class="foot">Adding a new LMS or file format is one new emitter, not a rewrite. The model <em>commits</em> each finished piece through a structured tool call rather than free text, so a revision overwrites its slot instead of piling up discarded drafts.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">How the work flows</p>
+    <h2>Five phases, in order</h2>
+    <p class="sub">A small pipeline; each phase is a verb, and it's always clear which ones call the model and which run fully offline.</p>
+    <div class="pipe">
+      <div class="step">
+        <div class="n">01</div>
+        <div class="verb">ingest</div>
+        <div class="body"><p>Turns a week's documents — PDF, PowerPoint, Word, ODT, text, Markdown — into the consolidated week text the generators read. A folder of readings and slides becomes one source-tagged week document.</p></div>
+        <div class="pill offline">offline</div>
+      </div>
+      <div class="step">
+        <div class="n">02</div>
+        <div class="verb">propose</div>
+        <div class="body"><p>Scans a course tree and <em>declares</em> its structure — weeks and typed sources — into an explicit manifest, rather than guessing from filenames. It surfaces any file it couldn't place instead of silently dropping it.</p></div>
+        <div class="pill offline">offline</div>
+      </div>
+      <div class="step">
+        <div class="n">03</div>
+        <div class="verb">analyze</div>
+        <div class="body"><p>Builds each week's concept map — an instructor-editable list of the concepts a week teaches — which grounds both generation and evaluation.</p></div>
+        <div class="pill model">uses model</div>
+      </div>
+      <div class="step">
+        <div class="n">04</div>
+        <div class="verb">generate</div>
+        <div class="body"><p>Turns week text into randomized quizzes and designed pages. Target the whole course, selected weeks, or a single document for an à-la-carte quiz. A run ends with a cold-read review of what it produced, by default.</p></div>
+        <div class="pill model">uses model</div>
+      </div>
+      <div class="step">
+        <div class="n">05</div>
+        <div class="verb">emit</div>
+        <div class="body"><p>Packages the canonical JSON into LMS files: a Canvas quiz <code>.zip</code> (QTI), page HTML, a Common Cartridge <code>.imscc</code> of pages, or one whole-course <code>.imscc</code> of pages and quizzes in weekly modules.</p></div>
+        <div class="pill offline">offline</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">What it produces</p>
+    <h2>Quizzes &amp; pages</h2>
+    <div class="feat">
+      <div>
+        <h3><span class="dot"></span>Randomized quizzes</h3>
+        <p>Each concept becomes a group of variant questions, and every student draws a different variant per concept. A hardened tool-calling loop copes with an unreliable local model — guardrails are written as <em>steering</em>, so a rejected question becomes a correction rather than a failed run.</p>
+        <ul class="chips">
+          <li><b>multiple choice</b></li>
+          <li>multiple answer</li>
+          <li>true / false</li>
+          <li>short answer</li>
+          <li>numerical</li>
+          <li>matching</li>
+        </ul>
+      </div>
+      <div>
+        <h3><span class="dot"></span>Designed teaching pages</h3>
+        <p>Not text dumps — pages compose from a catalog of typed blocks (headings, pull quotes, columns, cards, glossaries, code, predict-then-reveal foldouts), each chosen for a documented function drawn from Cognitive Load Theory and Universal Design for Learning.</p>
+        <p>A page takes one of three functions, and the teaching generator auto-selects a monolithic or decomposed strategy by length.</p>
+        <ul class="chips">
+          <li><b>teaching</b></li>
+          <li>glossary</li>
+          <li>overview</li>
+        </ul>
+      </div>
+      <div>
+        <h3><span class="dot"></span>Canvas-safe by construction</h3>
+        <p>Everything renders to HTML restricted to the properties Canvas's sanitizer actually allows, so it survives import intact — including flexbox layout and native collapsible sections. Instructor-supplied links and embeds enter through a per-course supplements file; the model is never allowed to invent a URL.</p>
+      </div>
+      <div>
+        <h3><span class="dot"></span>A design system, not a stylesheet</h3>
+        <p>Four shipped visual identities — each a full design language of type, spacing, shape, and color — chosen per course and applied at render time, so a theme change re-renders every page with no model involved.</p>
+        <ul class="chips">
+          <li>bauhaus</li>
+          <li>terminal</li>
+          <li>plotter</li>
+          <li>studio</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">The part most tools don't have</p>
+    <h2>Evaluation, not just generation</h2>
+    <p class="sub">coursekit measures whether the result is pedagogically sound — five calibrated critics that read already-generated content off disk. <code>evaluate&nbsp;--all</code> runs the battery and writes a report per dimension; <code>fix</code> regenerates each flagged item in place and re-renders.</p>
+    <div class="crit">
+      <div class="card">
+        <div class="top"><h3>Facticity</h3><span class="scope">quiz · page</span></div>
+        <p class="q">Is each claim or answer correct?</p>
+        <p>The correctness floor — a question or a page statement that's simply wrong gets flagged.</p>
+      </div>
+      <div class="card">
+        <div class="top"><h3>Pedagogy rubric</h3><span class="scope">page</span></div>
+        <p class="q">Does it scan, signal, engage, show examples, prompt retrieval?</p>
+        <p>Scored 0–3 per dimension with coaching notes, not a pass/fail verdict.</p>
+      </div>
+      <div class="card">
+        <div class="top"><h3>Concept delivery</h3><span class="scope">page</span></div>
+        <p class="q">Is each concept actually conveyed well?</p>
+        <p>For every concept the week teaches — is it explained, exemplified, and pitched at the right level?</p>
+      </div>
+      <div class="card">
+        <div class="top"><h3>Groundedness</h3><span class="scope">quiz · page</span></div>
+        <p class="q">Is this from the source, or the model's own knowledge?</p>
+        <p>A low-coverage quiz warns the source is too thin to ground it; on pages, contradictions with the material are flagged.</p>
+      </div>
+      <div class="card wide">
+        <div class="top"><h3>The audit → repair loop</h3><span class="scope">quiz · page</span></div>
+        <p>Because the critics read finished artifacts off disk, you can audit a course you already have — then <code>fix</code> repairs exactly the flagged items, quizzes and pages alike (including glossary and overview pages), and re-renders so a just-flagged item is corrected at once.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Why it's built this way</p>
+    <h2>Local-first, portable, faculty-owned</h2>
+    <div class="feat">
+      <div>
+        <h3><span class="dot"></span>Your machine, your model</h3>
+        <p>It runs against a model <em>you</em> host — LM Studio by default, or any OpenAI-compatible provider — so course material and intellectual property never leave your machine. No cloud dependency, no per-seat cost.</p>
+      </div>
+      <div>
+        <h3><span class="dot"></span>Pinned to the right domain</h3>
+        <p>A per-course domain profile keeps every generator in the correct knowledge domain — <code>p5.js</code>, not Processing — and corrects a transcript that drifts.</p>
+      </div>
+      <div>
+        <h3><span class="dot"></span>No token required</h3>
+        <p>The output is standard, reviewable import files that work without an LMS API token — which matters for the many adjunct and contingent faculty who can't get one.</p>
+      </div>
+      <div>
+        <h3><span class="dot"></span>A clear content boundary</h3>
+        <p>By design it handles instructor-authored material only, never student submissions — which keeps it clear of FERPA scope.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Where it stands</p>
+    <h2>Status</h2>
+    <div class="status col">
+      <p>Today coursekit is a working command-line <strong>prototype</strong> — a fit for the technically comfortable early adopter. The generation and evaluation engines are real and run offline against a fast test suite.</p>
+      <p>The road ahead is largely the interface: a friendly app any instructor could use, and eventually a packaged desktop application with the local model bundled in.</p>
+    </div>
+  </section>
+
+  <footer>coursekit — capabilities overview · one canonical form, many emitters</footer>
+
+</div>
+
+<script>
+  (function(){
+    var btn=document.getElementById('themeBtn');
+    var root=document.documentElement;
+    try{var saved=localStorage.getItem('ck-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+    function current(){
+      var t=root.getAttribute('data-theme');
+      if(t)return t;
+      return window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+    }
+    btn.addEventListener('click',function(){
+      var next=current()==='dark'?'light':'dark';
+      root.setAttribute('data-theme',next);
+      try{localStorage.setItem('ck-theme',next);}catch(e){}
+    });
+  })();
+</script>
+</body>
+</html>
