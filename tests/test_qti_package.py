@@ -122,6 +122,25 @@ def test_points_possible_equals_group_count():
     assert top_points.text == "5.0"
 
 
+def test_quiz_introduction_gives_a_reason_not_just_grading():
+    # ASMT-2: the description motivates taking the quiz, not the old "Auto-generated … Grading" line.
+    b, quiz = _mc_bank(n_groups=4)
+    desc = qti._description(b, quiz, 4.0)
+    assert "Auto-generated" not in desc                       # the old bureaucratic opener is gone
+    assert "another look" in desc                             # a reason: self-check, spot what to revisit
+    assert "rewards understanding" in desc                    # per-student variants framed as a benefit
+    assert "4 concept" in desc and "4 point" in desc          # still names scope + grading
+    # XML-safe: a hostile source survives escaping into a well-formed meta document.
+    bankmod.reset()
+    bankmod.init("run2", None, title="t", source='A & B <x> "q"')
+    bankmod.create_group("c1", "C", "multiple_choice")
+    bankmod.put_variant(bankmod.MCVariant(group_id="c1", label="A", variant_summary="c1 a",
+                                          question_text="Q c1A: what is x?", options=["a", "b"],
+                                          correct_index=0))
+    b2, quiz2 = bankmod.get(), bankmod.pick_quiz(seed=1)
+    ET.fromstring(qti.emit_assessment_meta(b2, quiz2))        # raises if the escaped description broke it
+
+
 # ---------------------------------------------------- zip integrity
 
 def test_imscc_is_a_valid_zip_with_manifest_at_root(tmp_path):
