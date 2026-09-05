@@ -608,13 +608,16 @@ def emit_assessment(bank, quiz: dict) -> str:
 
 
 def _description(bank, quiz: dict, points: float) -> str:
-    """A human quiz description with the grading criteria. HTML, then XML-escaped for the
-    text/html field."""
+    """A student-facing quiz introduction — a reason to take it, not just the grading line (ASMT-2).
+    HTML, then XML-escaped for the text/html field."""
     n = len(_quiz_groups(quiz))
-    src = f" from the lecture <em>{html.escape(bank.source)}</em>" if bank.source else ""
+    src = f" from <em>{html.escape(bank.source)}</em>" if bank.source else " from this week's material"
     html_body = (
-        f"<p>Auto-generated quiz{src}. It covers {n} concept"
-        f"{'s' if n != 1 else ''}, with one question drawn from each.</p>"
+        f"<p>A quick check on the key ideas{src} — {n} concept"
+        f"{'s' if n != 1 else ''}, one question each. Take it to see what's landed and spot what's "
+        f"worth another look before you move on.</p>"
+        f"<p>Every student gets a different version, so it rewards understanding the ideas over "
+        f"recognizing a particular answer.</p>"
         f"<p><strong>Grading:</strong> {points:.0f} point"
         f"{'s' if points != 1 else ''} total, 1 point per question, single attempt.</p>"
     )
