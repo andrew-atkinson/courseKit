@@ -293,7 +293,7 @@ def report() -> str:
 
 # Page FUNCTIONS whose job is reference/orientation, not a teaching arc — they carry no retrieval
 # foldout (see the retrieval check below). The teaching page (`week_intro`) is deliberately absent.
-_REFERENCE_PAGE_TYPES = {"glossary", "week_overview", "module_overview", "reference"}
+_REFERENCE_PAGE_TYPES = {"glossary", "week_overview", "module_overview", "week_recap", "reference"}
 
 
 def validate_final() -> list[str]:

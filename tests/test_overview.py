@@ -40,6 +40,34 @@ def test_week_overview_without_a_big_idea_or_levels_stays_minimal():
     assert page.blocks["cover"].items == ["x"]
 
 
+def test_week_recap_recalls_each_concept_with_a_foldout():
+    cm = _cm("Repetition lets code do the labour.",
+             [Concept(name="for loop", gist="repeat a block"),
+              Concept(name="nesting", gist="grids")])
+    page = overview.build_week_recap("Creative Coding", "3", "Repetition", "Chaos & Control", cm)
+    assert page.page_type == "week_recap" and page.slug == "week-3-recap"
+    assert page.title == "Week 3: Repetition — Recap" and page.finalized
+
+    kinds = [b.kind for b in page.blocks.values()]
+    assert kinds.count("details") == 2                          # one recall foldout per concept
+    assert "pullquote" in kinds                                 # the big idea to carry forward
+    assert page.blocks["big-idea"].text == "Repetition lets code do the labour."
+    assert page.blocks["recall-h"].role == "review"            # → the theme's Recap container
+    d0 = page.blocks["recall-0"]
+    assert d0.summary == "Can you explain for loop?" and d0.text == "repeat a block"
+
+
+def test_week_recap_without_a_gist_points_back_to_the_material():
+    page = overview.build_week_recap("C", "3", "T", "", _cm(concepts=[Concept(name="x")]))
+    assert page.blocks["recall-0"].text == "Look back at x in the week's material."
+
+
+def test_week_recap_without_concepts_stays_minimal():
+    page = overview.build_week_recap("C", "5", "T", "", _cm())
+    assert {b.kind for b in page.blocks.values()} == {"paragraph"}   # just the intro; no faked foldouts
+    assert page.finalized
+
+
 def test_module_overview_lists_its_weeks_with_themes():
     page = overview.build_module_overview("C", "Chaos and Control",
                                           [("3", "Repetition", "Loops manage repetition."),

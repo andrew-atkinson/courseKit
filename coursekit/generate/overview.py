@@ -51,6 +51,29 @@ def build_week_overview(course_title: str, num, title: str, module: str, cm, *, 
                 week_ref=f"week-{num}" if num else None, slug=slug, blocks=_blocks(pairs), finalized=True)
 
 
+def build_week_recap(course_title: str, num, title: str, module: str, cm) -> Page:
+    """A week RECAP: consolidation AFTER the week — the big idea to carry forward, then a
+    predict-then-reveal recall of each concept. Assembled from the concept map (the retrieval
+    foldouts are the point); the `review`-role heading + the details render as one Recap box."""
+    intro = (f"A quick recap of {title} before you move on — recall the big idea, then test "
+             "yourself on each concept.")
+    pairs = [("intro", "paragraph", {"text": intro})]
+    if cm is not None and cm.enduring_understanding:
+        pairs.append(("big-idea", "pullquote", {"text": cm.enduring_understanding}))
+    concepts = list(cm.concepts) if cm is not None else []
+    if concepts:
+        pairs.append(("recall-h", "heading", {"text": title, "role": "review"}))
+        for i, c in enumerate(concepts):
+            answer = c.gist or f"Look back at {c.name} in the week's material."
+            pairs.append((f"recall-{i}", "details",
+                          {"summary": f"Can you explain {c.name}?", "text": answer}))
+    slug = f"week-{num}-recap"
+    return Page(page_id=f"{slugify(course_title)}-{slug}", page_type="week_recap",
+                title=f"Week {num}: {title} — Recap" if num else f"{title} — Recap",
+                week_ref=f"week-{num}" if num else None, slug=slug,
+                blocks=_blocks(pairs), finalized=True)
+
+
 def build_module_overview(course_title: str, module: str, weeks, *, framing: str = "") -> Page:
     """A module overview: its weeks, each with a one-line theme (its enduring understanding).
     `weeks` is a list of (num, title, enduring_understanding)."""

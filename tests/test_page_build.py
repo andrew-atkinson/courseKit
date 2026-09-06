@@ -70,3 +70,10 @@ def test_overview_function_writes_a_page(tmp_path):
     r = pb.build_page_unit(u, None, "m", function="overview")
     assert r.finalized and r.output_dir.name == "week-3-overview"
     assert (r.output_dir / "page.json").exists()
+
+
+def test_recap_function_writes_a_page(tmp_path):
+    u = _unit(tmp_path)
+    r = pb.build_page_unit(u, None, "m", function="recap")            # deterministic, no model
+    assert r.finalized and r.output_dir.name == "week-3-recap"
+    assert (r.output_dir / "page.json").exists()
