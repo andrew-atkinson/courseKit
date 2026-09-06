@@ -127,11 +127,29 @@ So the shape a student sees is: the model's outline, then your curated links and
 Length is a function of what the page is *for*, not a dial you turn.
 Pick the function with `--function` (pages only):
 
-- **`teaching`** (the default) — the full taught week page. How much of the week it covers is grounded by the concept map (one section per concept).
-- **`glossary`** — a short "terms beside the video" review companion: the week's key terms + one-line definitions.
-- **`overview`** — a week "Start Here": orientation + the big idea + what you'll cover, assembled from the course data.
+| `--function` | What it is | Uses the model? | Lands in |
+|---|---|---|---|
+| `teaching` (default) | The full taught week page — one section per concept, grounded by the concept map. | ✓ | `pages/<week>/` |
+| `glossary` | A "terms beside the video" companion — the week's key terms + one-line definitions. | ✓ (extracts terms) | `pages/<week>-glossary/` |
+| `overview` | A week "Start Here" — orientation + the big idea + what you'll cover. | ✗ assembled from the concept map | `pages/<week>-overview/` |
+| `recap` | An after-the-week review — the big idea to carry forward, then a predict-then-reveal recall foldout per concept. | ✗ assembled from the concept map | `pages/<week>-recap/` |
 
-The functions are separate artifacts (they land beside each other in `pages/`), so a week can have all three.
+The functions are separate artifacts (they land beside each other in `pages/`), so a week can have all four.
+
+**`overview` and `recap` are assembled model-free** from the week's concept map (run `analyze` first so the map exists) — there's nothing for the model to write, so they generate instantly and **skip the post-run review** (no need for `--no-review`). `teaching` and `glossary` do use the model. Examples:
+
+```bash
+# the week's teaching page (the default) — uses the model
+uv run coursekit generate "/path/to/course" --pages --week 3
+
+# an after-the-week recap page — model-free, built from the concept map
+uv run coursekit generate "/path/to/course" --pages --function recap --week 3
+
+# a week "Start Here" overview — also model-free
+uv run coursekit generate "/path/to/course" --pages --function overview --week 3
+```
+
+Each renders to `pages/<week>-<function>/<slug>.html` (e.g. `pages/week-3-recap/week-3-recap.html`) alongside its `page.json`; re-render any of them model-free with `emit html` after a theme change.
 
 For a **teaching** page, *which* generator runs — a single monolithic pass or the decomposed per-concept passes — is the program's call, made by measured length (`--generator auto`, the default). Force one with `--generator monolithic|decompose`. Tune the thresholds a course routes on in `<course root>/.vtconfig/page.yaml`:
 
