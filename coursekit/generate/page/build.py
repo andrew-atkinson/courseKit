@@ -4,6 +4,7 @@ This is the single seam the CLI drives for pages. The user asks for a FUNCTION (
 for); the program decides the mechanism:
 
   overview  → deterministic assembly (overview.py) — orientation, no teaching arc
+  recap     → deterministic assembly (overview.py) — after-the-week recall, no teaching arc
   glossary  → the glossary companion (glossary.py) — terms beside the video
   teaching  → monolithic (the Generator seam via pipeline.run_unit) OR decompose (per-concept passes),
               chosen by route.choose_generator from measured length/concepts/spans, unless the caller
@@ -20,8 +21,11 @@ from coursekit.generate.base import RunResult
 from coursekit.generate.page import decompose, glossary as glossary_mod, route
 from coursekit.generate.page.concept_map import load_for_unit
 
-FUNCTIONS = ("teaching", "glossary", "overview")
+FUNCTIONS = ("teaching", "glossary", "overview", "recap")
 GENERATORS = ("auto", "monolithic", "decompose")
+# Model-FREE functions: assembled deterministically from the concept map, so there is no model output
+# to cold-read afterward — `generate` skips its post-run review for these (see cli).
+DETERMINISTIC_FUNCTIONS = ("overview", "recap")
 
 
 def _write_page(page, out_dir: Path, project_root) -> None:
@@ -68,13 +72,12 @@ def build_page_unit(unit, provider, model, *, function: str = "teaching", genera
         return RunResult(unit, finalized=not problems, output_dir=out,
                          counts={"blocks": len(pg.blocks)}, problems=problems)
 
-    if function == "overview":
-        from coursekit.generate.overview import build_week_overview
-        num = unit.week_num
-        page = build_week_overview(unit.course_title or "Course", num,
-                                   unit.week_label or unit.week_slug, unit.module or "",
-                                   load_for_unit(unit))
-        out = parent / f"{unit.week_slug}-overview"
+    if function in DETERMINISTIC_FUNCTIONS:
+        from coursekit.generate.overview import build_week_overview, build_week_recap
+        builder = build_week_overview if function == "overview" else build_week_recap
+        page = builder(unit.course_title or "Course", unit.week_num,
+                       unit.week_label or unit.week_slug, unit.module or "", load_for_unit(unit))
+        out = parent / f"{unit.week_slug}-{function}"
         _write_page(page, out, project_root)
         return RunResult(unit, finalized=True, output_dir=out, counts={"blocks": len(page.blocks)})
 

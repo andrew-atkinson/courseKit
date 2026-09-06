@@ -7,7 +7,7 @@ surface is self-describing and the couplings are structural rather than a footgu
 
     coursekit ingest   PATH [--raw]
     coursekit generate PATH [--quizzes | --pages] [--week N ...] [--weeks A-B]
-                            [--function teaching|glossary|overview] [--generator auto|monolithic|decompose]
+                            [--function teaching|glossary|overview|recap] [--generator auto|monolithic|decompose]
                             [--dry-run] [--max-iters N] [--output-root DIR] [--no-review]
     coursekit emit qti  PATH [--bundle]
     coursekit emit html PATH
@@ -420,7 +420,10 @@ def _cmd_generate(args) -> int:
                 reviews.append(r)
             if m:
                 metrics["quiz"] = m
-        if any(g.category == "page" for g in generators):
+        # Deterministic page functions (overview/recap) are assembled model-free — there is no model
+        # output to cold-read, so skip the page audit for them (no need to pass --no-review).
+        from coursekit.generate.page.build import DETERMINISTIC_FUNCTIONS
+        if any(g.category == "page" for g in generators) and args.function not in DETERMINISTIC_FUNCTIONS:
             r, m = _review_pages(args, provider)
             if r:
                 reviews.append(r)
@@ -763,9 +766,12 @@ def build_parser() -> argparse.ArgumentParser:
     pg.add_argument("--week", action="append", metavar="N",
                     help="a week to include, repeatable, e.g. --week 3 --week 5")
     pg.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
-    pg.add_argument("--function", choices=("teaching", "glossary", "overview"), default="teaching",
+    pg.add_argument("--function", choices=("teaching", "glossary", "overview", "recap"),
+                    default="teaching",
                     help="what a PAGE is FOR (pages only): teaching (default) | glossary (a terms "
-                         "companion) | overview (a week 'Start Here'). No effect on quizzes.")
+                         "companion) | overview (a week 'Start Here') | recap (an after-the-week "
+                         "recall). overview and recap are assembled model-free from the concept map. "
+                         "No effect on quizzes.")
     pg.add_argument("--generator", choices=("auto", "monolithic", "decompose"), default="auto",
                     help="which generator drives a TEACHING page (pages only): auto (default — the "
                          "program picks by measured length) | monolithic | decompose.")
