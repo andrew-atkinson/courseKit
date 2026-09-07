@@ -114,7 +114,10 @@ def test_shape_directive_from_concept_map():
     assert "for loop" in d and "map()" in d                # one group per concept
     assert "initialization, condition" in d                # KCs seed the variants
     assert "Structure lets one pattern govern many." in d  # enduring understanding shown (frames questions)
-    assert "Do NOT add a group for the enduring understanding" in d   # ASMT-1: no MC group for the EU
+    assert "Do NOT add an MC group for the enduring understanding" in d   # ASMT-1: no MC group for the EU
+    # The EU open-response question is NOT built in the main pass — it's the deterministic EU pass
+    # (coursekit/generate/quiz/eu.py). The shape directive never asks the model to add it.
+    assert "add_open_response_variant" not in d
 
 
 def test_shape_directive_default_lets_material_decide():

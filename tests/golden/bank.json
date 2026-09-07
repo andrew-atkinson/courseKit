@@ -483,6 +483,26 @@
           "feedback": null
         }
       }
+    },
+    "c8": {
+      "group_id": "c8",
+      "concept_title": "Enduring understanding",
+      "question_type": "open_response",
+      "variants": {
+        "A": {
+          "group_id": "c8",
+          "label": "A",
+          "question_text": "Apply the idea of repetition to a task from your own life you have not coded, and explain your design.",
+          "variant_summary": "EU transfer task",
+          "text_format": "plain",
+          "kind": "open_response",
+          "rubric_criteria": [
+            "identifies a genuine repetition",
+            "maps it to a loop correctly",
+            "justifies the design"
+          ]
+        }
+      }
     }
   },
   "finalized": true

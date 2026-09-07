@@ -500,6 +500,45 @@ def _num_item(v, run_id):
 </item>'''
 
 
+def _essay_body(v) -> str:
+    """The essay prompt as an escaped text/html body: the question, then the rubric criteria folded
+    in (a Canvas essay question has no structured rubric slot)."""
+    body = mattext(v.question_text, v.text_format)
+    crit = getattr(v, "rubric_criteria", None)
+    if crit:
+        items = "".join(f"<li>{c}</li>" for c in crit)
+        body += _xml(f"<p><strong>Your response will be assessed on:</strong></p><ul>{items}</ul>")
+    return body
+
+
+def _essay_item(v, run_id):
+    """essay_question (grounded from a real Canvas export): a response_str/render_fib field, manually
+    graded — the resprocessing carries only <other/>, so Canvas leaves it for the teacher to score."""
+    return f'''<item ident="{item_id(run_id, v.group_id, v.label)}" title="{attr(v.variant_summary)}">
+{_itemmeta("essay_question", [], run_id, v)}
+  <presentation>
+    <material>
+      <mattext texttype="text/html">{_essay_body(v)}</mattext>
+    </material>
+    <response_str ident="response1" rcardinality="Single" rce="Yes">
+      <render_fib>
+        <response_label ident="answer1" rshuffle="No"/>
+      </render_fib>
+    </response_str>
+  </presentation>
+  <resprocessing>
+    <outcomes>
+      <decvar maxvalue="100" minvalue="0" varname="SCORE" vartype="Decimal"/>
+    </outcomes>
+    <respcondition continue="No">
+      <conditionvar>
+        <other/>
+      </conditionvar>
+    </respcondition>
+  </resprocessing>
+</item>'''
+
+
 _ITEM_EMITTERS = {
     "multiple_choice": _mc_item,
     "true_false": _tf_item,
@@ -507,6 +546,7 @@ _ITEM_EMITTERS = {
     "multiple_answer": _ma_item,
     "matching": _match_item,
     "numerical": _num_item,
+    "open_response": _essay_item,
 }
 
 

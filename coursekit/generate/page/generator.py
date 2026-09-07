@@ -52,6 +52,9 @@ class PageGenerator:
     def is_finalized(self) -> bool:
         return page.is_finalized()
 
+    def postprocess(self, unit, provider, model, cfg, transcript) -> None:
+        return   # pages have no post-generation pass
+
     def nudge(self, *, stalled: bool) -> str:
         pg = page.get()
         n_blocks = len(pg.blocks)

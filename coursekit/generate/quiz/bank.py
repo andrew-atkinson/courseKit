@@ -22,7 +22,7 @@ from pydantic import (
 )
 
 QuestionType = Literal["multiple_choice", "multiple_answer", "true_false", "short_answer",
-                       "numerical", "matching"]
+                       "numerical", "matching", "open_response"]
 TextFormat = Literal["plain", "markdown", "html"]
 
 # A leading %n% in option text is read by GIFT as an answer weight and eaten. Our own
@@ -193,6 +193,14 @@ class TFVariant(BaseVariant):
     feedback_right: str | None = None
 
 
+# A rubric-style description of a good answer, not an answer a student would type — the tell that an
+# open-ended question was mis-recorded as short_answer (belongs in add_open_response_variant).
+_DESCRIBES_ANSWER = re.compile(
+    r"^(the response\b|the learner\b|the answer should\b|a (good|strong|correct|complete) answer\b|"
+    r"responses? that\b|(the )?students? (should|must|explains?|describes?|demonstrates?|understands?)\b)",
+    re.IGNORECASE)
+
+
 class SAVariant(BaseVariant):
     kind: Literal["short_answer"] = "short_answer"
     accepted_answers: list[str] = Field(min_length=1)
@@ -204,6 +212,15 @@ class SAVariant(BaseVariant):
         ans = [a.strip() for a in v]
         if any(not a for a in ans):
             raise ValueError("accepted answer cannot be empty")
+        # An accepted answer is the TEXT a student types (e.g. "four"), which Canvas matches exactly —
+        # not a description of a good answer. A rubric-style "the student explains…" means the question
+        # has no single correct answer and was mis-typed: it belongs in add_open_response_variant.
+        if any(_DESCRIBES_ANSWER.match(a) for a in ans):
+            raise ValueError(
+                "an accepted answer must be the exact text a student types (e.g. 'four'), not a "
+                "description of what a good answer contains. This question has no single correct "
+                "answer — record it with add_open_response_variant (a human-graded open response) "
+                "instead of short_answer")
         if len({a.casefold() for a in ans}) != len(ans):
             raise ValueError("accepted answers must be distinct")
         for a in ans:
@@ -257,8 +274,22 @@ class MatchVariant(BaseVariant):
         return v
 
 
+class OpenResponseVariant(BaseVariant):
+    kind: Literal["open_response"] = "open_response"
+    # An open-ended prompt (a transfer task for the week's enduring understanding), manually graded.
+    # `rubric_criteria` are what the human grader looks for; a Canvas essay question carries no
+    # STRUCTURED rubric, so the emitters fold them into the prompt text. The full rubric object is the
+    # standalone-assignment delivery (ASMT-4). No feedback / answer — nothing to auto-score.
+    rubric_criteria: list[str] = Field(default_factory=list)
+
+    @field_validator("rubric_criteria")
+    @classmethod
+    def _clean_criteria(cls, v: list[str]) -> list[str]:
+        return [c.strip() for c in v if c.strip()]
+
+
 Variant = Annotated[
-    MCVariant | MAVariant | TFVariant | SAVariant | NumVariant | MatchVariant,
+    MCVariant | MAVariant | TFVariant | SAVariant | NumVariant | MatchVariant | OpenResponseVariant,
     Field(discriminator="kind"),
 ]
 
@@ -269,6 +300,7 @@ _KIND_TO_TOOL = {
     "short_answer": "add_short_answer_variant",
     "numerical": "add_numerical_variant",
     "matching": "add_matching_variant",
+    "open_response": "add_open_response_variant",
 }
 
 
@@ -526,7 +558,8 @@ def build_variant(kind: str, **kwargs) -> Variant:
     """Construct and validate. Raises ValidationError, which tools.py renders for the model."""
     cls = {"multiple_choice": MCVariant, "multiple_answer": MAVariant,
            "true_false": TFVariant, "short_answer": SAVariant,
-           "numerical": NumVariant, "matching": MatchVariant}[kind]
+           "numerical": NumVariant, "matching": MatchVariant,
+           "open_response": OpenResponseVariant}[kind]
     return cls(**kwargs)
 
 

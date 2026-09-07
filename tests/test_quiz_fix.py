@@ -64,7 +64,8 @@ def test_fix_tool_specs_are_only_add_tools():
     names = {s["name"] for s in qfix.FIX_TOOL_SPECS}
     assert names == {"add_multiple_choice_variant", "add_multiple_answer_variant",
                      "add_true_false_variant", "add_short_answer_variant",
-                     "add_numerical_variant", "add_matching_variant"}
+                     "add_numerical_variant", "add_matching_variant",
+                     "add_open_response_variant"}
     assert "finalize_bank" not in names and "create_checklist" not in names
 
 
