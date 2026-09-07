@@ -599,3 +599,19 @@ def test_eu_pass_leaves_the_bank_unchanged_when_it_fails():
 
     assert not eu.generate_eu_question(_Boom(), "m", "material", "an enduring idea", None)
     assert "enduring_understanding" not in bank.get().groups   # the empty group is removed, not left
+
+
+def test_eu_pass_is_idempotent_a_rerun_replaces_the_question():
+    from coursekit.generate.quiz import bank, eu
+
+    def _prov(q):
+        return FakeClient(script=[[("add_open_response_variant",
+            {"group_id": "enduring_understanding", "variant_label": "A", "question_text": q,
+             "variant_summary": "EU task", "rubric_criteria": ["c1"]})]])
+
+    bank.init("run", None, title="t", source="week-3.md")
+    eu.generate_eu_question(_prov("First transfer task prompt here."), "m", "mat", "an EU", None)
+    eu.generate_eu_question(_prov("Second transfer task prompt here."), "m", "mat", "an EU", None)
+    g = bank.get().groups["enduring_understanding"]
+    assert list(g.variants) == ["A"]                                  # replaced, not duplicated
+    assert g.variants["A"].question_text == "Second transfer task prompt here."

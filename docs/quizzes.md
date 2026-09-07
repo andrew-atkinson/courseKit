@@ -12,6 +12,14 @@ Multiple choice can't test an _enduring understanding_ — a transferable, meani
 Set `eu_question: true` in the course's `.vtconfig/quiz.yaml` and each week's quiz gains **one open-response question**: a short transfer task asking the student to apply the week's enduring understanding to a new situation, with a few rubric criteria folded into the prompt.
 It exports as a Canvas essay question and is **graded by hand** (coursekit writes the task and the criteria, never grades the response); the automatic facticity check skips it, since it has no marked answer.
 A fuller version — a standalone Canvas assignment with a structured rubric — is on the roadmap.
+
+To generate **just** the enduring-understanding question — one focused model call, without regenerating the whole quiz — run it directly against a week that already has a concept map:
+
+```bash
+uv run python -m coursekit.generate.quiz.eu "/path/to/course" --week 3
+```
+
+It adds the question to that week's existing `bank.json` in place (or writes an EU-only bank if none exists), and re-running replaces the question rather than duplicating it.
 The model commits each question through a tool call — prose is scratch, so a revision overwrites rather than piling up.
 
 The canonical artifact is `bank.json`; the emitters (GIFT, QTI) read only it.
