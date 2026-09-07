@@ -569,3 +569,33 @@ def test_default_generator_is_quiz(tmp_path):
     unit = find_units(f)[0]
     res = run_unit(unit, FakeClient(), "fake-model")   # no generator passed
     assert res.n_groups == 1 and res.n_variants == 1
+
+
+# ------------------------------------------------- the deterministic EU pass (ASMT-3)
+
+def test_eu_pass_adds_an_open_response_group_the_model_cannot_mistype():
+    from coursekit.generate.quiz import bank, eu
+    bank.init("run", None, title="t", source="week-3.md")
+    provider = FakeClient(script=[[("add_open_response_variant",
+        {"group_id": "enduring_understanding", "variant_label": "A",
+         "question_text": "Apply the idea to a new situation and justify your design choices.",
+         "variant_summary": "EU transfer task",
+         "rubric_criteria": ["applies the idea correctly", "justifies the choice"]})]])
+    assert eu.generate_eu_question(provider, "m", "the week's material", "Structure governs many.", None)
+    g = bank.get().groups["enduring_understanding"]
+    assert g.question_type == "open_response"          # the PROGRAM fixed the type, not the model
+    v = g.variants["A"]
+    assert v.kind == "open_response" and v.rubric_criteria == ["applies the idea correctly",
+                                                               "justifies the choice"]
+
+
+def test_eu_pass_leaves_the_bank_unchanged_when_it_fails():
+    from coursekit.generate.quiz import bank, eu
+    bank.init("run", None, title="t", source="week-3.md")
+
+    class _Boom:
+        def chat_with_tools(self, **kw):
+            raise RuntimeError("boom")
+
+    assert not eu.generate_eu_question(_Boom(), "m", "material", "an enduring idea", None)
+    assert "enduring_understanding" not in bank.get().groups   # the empty group is removed, not left

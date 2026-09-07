@@ -188,6 +188,9 @@ def run_unit(unit: Unit, provider, model, generator: Generator | None = None, *,
     reply = loop(messages, provider, model, gen, max_iters=max_iters)
     (out / "reply.txt").write_text(reply, encoding="utf-8")
 
+    post = getattr(gen, "postprocess", None)   # optional seam; a generator may have no post-step
+    if post:
+        post(unit, provider, model, cfg, transcript)
     return gen.result(unit, out, reply)
 
 

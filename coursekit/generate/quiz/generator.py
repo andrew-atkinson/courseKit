@@ -51,6 +51,22 @@ class QuizGenerator:
             questions=int(q) if q else None,
         )
 
+    def postprocess(self, unit, provider, model, cfg, transcript) -> None:
+        """ASMT-3 (opt-in `eu_question: true`): add the enduring-understanding transfer task through
+        the DETERMINISTIC EU pass — the program fixes the type to open_response, the model writes only
+        the content — then re-finalize so it lands in bank.json/quiz.json/gift. Only runs on a bank the
+        main loop actually finalized; a failed pass leaves the bank untouched."""
+        if not cfg.value("eu_question") or not bank.is_finalized():
+            return
+        from coursekit.generate.page.concept_map import load_for_unit
+        from coursekit.generate.quiz import eu as eu_pass
+        cm = load_for_unit(unit)
+        eu = cm.enduring_understanding if cm is not None else ""
+        if not eu:
+            return   # nothing to build a transfer task from
+        if eu_pass.generate_eu_question(provider, model, transcript, eu, unit.course_root):
+            bank.finalize()   # same deterministic seed → re-writes cleanly with the EU group included
+
     def is_finalized(self) -> bool:
         return bank.is_finalized()
 

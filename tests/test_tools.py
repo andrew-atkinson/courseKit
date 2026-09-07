@@ -202,3 +202,19 @@ def test_replay_reconstructs_a_run_with_no_model(tmp_path):
     results = tools.replay(log)
     assert len(results) == 2
     assert bankmod.get().groups["c1"].variants["A"].correct_index == 0
+
+
+def test_open_response_variant_records_with_its_criteria():
+    # ASMT-3: the model records the EU transfer task through the dispatcher like any other variant.
+    _dispatch_one("create_question_group", json.dumps(
+        {"group_id": "eu", "concept_title": "Enduring understanding",
+         "question_type": "open_response"}))
+    out = _dispatch_one("add_open_response_variant", json.dumps(
+        {"group_id": "eu", "variant_label": "A",
+         "question_text": "Apply the idea to a new situation and justify your design.",
+         "variant_summary": "EU transfer task",
+         "rubric_criteria": ["applies it correctly", "justifies the choice"]}))
+    assert not out.startswith("ERROR")
+    v = bankmod.get().groups["eu"].variants["A"]
+    assert v.kind == "open_response"
+    assert v.rubric_criteria == ["applies it correctly", "justifies the choice"]

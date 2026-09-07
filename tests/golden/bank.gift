@@ -181,3 +181,9 @@ $CATEGORY: top/Quizbot/demo/c7 What loops are good for
     ~%50%Driving a value with a counter
     ~%50%Guaranteeing the sketch never crashes
 }
+
+$CATEGORY: top/Quizbot/demo/c8 Enduring understanding
+// Enduring understanding
+
+// [id:c8-A] [tag:c8] [tag:open_response]
+::c8-A EU transfer task::Apply the idea of repetition to a task from your own life you have not coded, and explain your design.  You will be assessed on\: identifies a genuine repetition; maps it to a loop correctly; justifies the design. {}

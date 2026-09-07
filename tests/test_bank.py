@@ -349,3 +349,15 @@ class TestMultipleAnswer:
         # GIFT would read a leading %50% as an answer weight and eat it.
         with pytest.raises(ValidationError, match="answer weight"):
             self._ma(options=["%50% of the time", "b", "c", "d"])
+
+
+def test_short_answer_rejects_a_rubric_description_as_an_answer():
+    # the observed ASMT-3 failure: an open-ended question mis-recorded as short_answer, with a
+    # "The student explains…" description stuffed into accepted_answers → steer to open_response.
+    with pytest.raises(ValidationError, match="open_response"):
+        SAVariant(group_id="c1", label="A", variant_summary="transfer task",
+                  question_text="Apply the idea to a new situation.",
+                  accepted_answers=["The student explains how loops automate the pattern."])
+    # a real short answer that merely starts with "the" is fine
+    SAVariant(group_id="c1", label="B", variant_summary="name the organelle",
+              question_text="Where is ATP made?", accepted_answers=["the mitochondria"])

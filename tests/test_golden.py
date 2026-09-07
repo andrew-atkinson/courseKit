@@ -1,6 +1,6 @@
 """Byte-compare a realistic bank against a checked-in GIFT file.
 
-tests/golden/bank.json is a run covering all five question types, hostile code text, and
+tests/golden/bank.json is a run covering every question type, hostile code text, and
 markdown options. Any change to the emitter that alters real output shows up here as a
 diff instead of as a surprise at import time.
 
@@ -45,7 +45,9 @@ def test_every_question_in_the_golden_file_detects_as_its_declared_type():
         # "// [id:c1-A] ..." -> group c1, variant A
         ident = block.split("[id:", 1)[1].split("]", 1)[0]
         gid, label = ident.rsplit("-", 1)
-        expected = b.groups[gid].variants[label].kind
+        kind = b.groups[gid].variants[label].kind
+        # our `open_response` emits as GIFT's `essay` type (Moodle's own name for it)
+        expected = {"open_response": "essay"}.get(kind, kind)
         assert gift.detect_gift_type(block) == expected, ident
         checked += 1
 

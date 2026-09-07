@@ -71,6 +71,11 @@ class Generator(Protocol):
         """A corrective user turn in the generator's own vocabulary, quoting true progress."""
         ...
 
+    def postprocess(self, unit: Unit, provider, model, cfg, transcript: str) -> None:
+        """Optional deterministic step AFTER the main loop finalizes — e.g. a focused second pass with
+        a restricted tool set. A generator with nothing to do returns immediately."""
+        ...
+
     def result(self, unit: Unit, out_dir: Path, reply: str) -> RunResult:
         """Summarise the finished (or unfinished) run."""
         ...

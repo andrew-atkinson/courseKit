@@ -4,7 +4,8 @@ true_false is inferred (no sample) but confirmed working on a live import."""
 import xml.etree.ElementTree as ET
 import pytest
 from coursekit.emit import qti
-from coursekit.generate.quiz.bank import MAVariant, MatchVariant, NumVariant, Pair, SAVariant, TFVariant
+from coursekit.generate.quiz.bank import (MAVariant, MatchVariant, NumVariant, OpenResponseVariant,
+                                           Pair, SAVariant, TFVariant)
 
 
 def liter(root, name):
@@ -199,3 +200,18 @@ def test_numerical_group_emits_as_a_bank():
         g.variants[lbl] = _num(answer=i + 1, tolerance=0.5, label=lbl)
     root = ET.fromstring(qti.emit_objectbank(g, "r"))
     assert len(liter(root, "item")) == 4
+
+
+# ----------------------------------------------------------- open response (essay)
+
+def test_open_response_emits_a_manually_graded_essay():
+    # grounded against reference/NEW-test-quiz: essay_question, response_str/render_fib, <other/>
+    v = OpenResponseVariant(group_id="eu", label="A", variant_summary="EU transfer task",
+                            question_text="Apply repetition to a new problem and justify your design.",
+                            rubric_criteria=["maps the problem to a loop", "justifies the choice"])
+    root = ET.fromstring(qti.emit_item(v, "r"))
+    assert qtype(root) == "essay_question"
+    assert liter(root, "render_fib") and liter(root, "response_str")   # a text-entry field
+    assert liter(root, "other") and not liter(root, "varequal")        # manually graded, no auto-score
+    body = liter(root, "mattext")[0].text
+    assert "assessed on" in body and "justifies the choice" in body    # rubric criteria folded in

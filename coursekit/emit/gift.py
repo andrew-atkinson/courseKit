@@ -219,6 +219,9 @@ def _answer_block(v) -> str:
         lines = [f"    ={_leaf(p.left, fmt)} -> {_leaf(p.right, fmt)}" for p in v.pairs]
         return "{\n" + "\n".join(lines) + "\n}"
 
+    if v.kind == "open_response":
+        return "{}"   # GIFT essay: an empty answer block — manually graded, no auto-score
+
     raise ValueError(f"cannot emit unknown kind {v.kind!r}")
 
 
@@ -226,11 +229,21 @@ def _fmt_number(x: float) -> str:
     return str(int(x)) if float(x).is_integer() else repr(float(x))
 
 
+def _stem(v) -> str:
+    """The rendered question stem. An open-response question folds its rubric criteria into the
+    stem (GIFT/essay carries no separate rubric); kept on one line so no blank line splits it."""
+    text = v.question_text
+    crit = getattr(v, "rubric_criteria", None)
+    if crit:
+        text = f"{text}  You will be assessed on: " + "; ".join(crit) + "."
+    return _leaf(text, v.text_format)
+
+
 def emit_variant(v, tags: list[str] | None = None) -> str:
     """One GIFT question: metadata comment, title, stem, answer block."""
     return "\n".join([
         _meta_comment(v, tags or []),
-        f"::{_title(v)}::{_leaf(v.question_text, v.text_format)} {_answer_block(v)}",
+        f"::{_title(v)}::{_stem(v)} {_answer_block(v)}",
     ])
 
 

@@ -33,8 +33,8 @@ def _shape_directive(concept_map, questions=None) -> str:
             out.append(f"  - {c.name}" + (f"  (aspects: {kcs})" if kcs else ""))
         if eu:
             out.append(f"\nThe week's enduring understanding — the transferable idea the questions "
-                       f"should keep pointing at, but NOT its own group (multiple choice can't test a "
-                       f"transferable understanding): {eu}")
+                       f"should keep pointing at, but NOT its own MC group (multiple choice can't test "
+                       f"a transferable understanding): {eu}")
         return out
 
     if questions and concepts:                     # a fixed count, still grounded in the map
@@ -42,21 +42,23 @@ def _shape_directive(concept_map, questions=None) -> str:
                  f"week's concepts, one group each:"] + _concept_lines()
         lines.append(f"\nIf {questions} is more than the concepts above, add a second group for the "
                      f"richest concepts; if fewer, cover the most important. Four variants per group.")
-        return "\n".join(lines)
-    if questions:
-        return (f"\n\n**How many groups.** Create EXACTLY {questions} question groups, one concept "
-                f"each — the {questions} most important ideas the lecture teaches.")
-    if concepts:
+        d = "\n".join(lines)
+    elif questions:
+        d = (f"\n\n**How many groups.** Create EXACTLY {questions} question groups, one concept "
+             f"each — the {questions} most important ideas the lecture teaches.")
+    elif concepts:
         lines = ["\n\n**How many groups — build the quiz to cover the week's concept map, not a fixed "
                  "number.** The concepts this week teaches, each its own group:"] + _concept_lines()
         lines.append("\nMake ONE group per concept above, its variants testing different aspects of "
                      "it. Where a concept's aspects clearly support more than one distinct question, "
-                     "add a second group for it. Do NOT add a group for the enduring understanding "
+                     "add a second group for it. Do NOT add an MC group for the enduring understanding "
                      "itself — it frames the questions, but multiple choice can't test a transferable "
                      "idea. You choose the total; let the concept map decide it, not a fixed count.")
-        return "\n".join(lines)
-    return ("\n\n**How many groups — let the material decide.** Make one group for each of the most "
-            "important ideas the lecture teaches (usually four to six), not a fixed count.")
+        d = "\n".join(lines)
+    else:
+        d = ("\n\n**How many groups — let the material decide.** Make one group for each of the most "
+             "important ideas the lecture teaches (usually four to six), not a fixed count.")
+    return d
 
 
 def _context_line(course_title, week_label, module) -> str:

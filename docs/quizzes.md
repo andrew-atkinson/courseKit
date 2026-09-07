@@ -1,10 +1,17 @@
 # Generating quizzes
 
-A quiz is **one question group per concept, × 4 variants** — the number of concepts follows the week's concept map (plus a group for its enduring understanding), rather than a fixed five.
+A quiz is **one question group per concept, × 4 variants** — the number of concepts follows the week's concept map, rather than a fixed five.
 Each concept becomes a Canvas _question group_ that draws one variant at random, so every student gets a different version of the same quiz.
 
 You can override the count at two levels: a `questions:` value in a week's `.vtconfig/concepts/week-N.yaml` fixes the number for **that week**, and `questions:` in the course's `.vtconfig/quiz.yaml` fixes it for **every** week — the per-week value wins.
 With neither set, the model chooses, guided by the concept map.
+
+### The enduring-understanding question (opt-in)
+
+Multiple choice can't test an _enduring understanding_ — a transferable, meaning-making idea — so it isn't made into a quiz group by default.
+Set `eu_question: true` in the course's `.vtconfig/quiz.yaml` and each week's quiz gains **one open-response question**: a short transfer task asking the student to apply the week's enduring understanding to a new situation, with a few rubric criteria folded into the prompt.
+It exports as a Canvas essay question and is **graded by hand** (coursekit writes the task and the criteria, never grades the response); the automatic facticity check skips it, since it has no marked answer.
+A fuller version — a standalone Canvas assignment with a structured rubric — is on the roadmap.
 The model commits each question through a tool call — prose is scratch, so a revision overwrites rather than piling up.
 
 The canonical artifact is `bank.json`; the emitters (GIFT, QTI) read only it.

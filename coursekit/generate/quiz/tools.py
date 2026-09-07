@@ -465,6 +465,46 @@ finalize_bank_json = {
 }
 
 
+def add_open_response_variant(group_id: str, variant_label: str, question_text: str,
+                              variant_summary: str, rubric_criteria: list[str] | None = None,
+                              text_format: str = "plain") -> str:
+    v = bank.build_variant("open_response", group_id=group_id, label=variant_label,
+                           question_text=question_text, variant_summary=variant_summary,
+                           rubric_criteria=rubric_criteria or [], text_format=text_format)
+    return bank.put_variant(v)
+
+
+add_open_response_variant_json = {
+    "name": "add_open_response_variant",
+    "description": ("Record ONE open-response (essay) question — an open-ended prompt the student "
+                    "writes an answer to, graded by a human, not auto-scored. Use this ONLY for the "
+                    "enduring-understanding transfer task when the brief asks for it. Calling this "
+                    "again with the same group_id and variant_label REPLACES the previous version."),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "group_id": _GROUP_ID,
+            "variant_label": _LABEL,
+            "question_text": {"type": "string",
+                              "description": ("The open-ended prompt — a task asking the student to "
+                                              "apply the idea to a NEW situation and explain their "
+                                              "thinking")},
+            "variant_summary": _SUMMARY,
+            "rubric_criteria": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": ("3-4 short criteria a grader looks for, e.g. ['applies the concept "
+                                "correctly', 'justifies the choice']. Shown to the student as what "
+                                "the response is assessed on."),
+            },
+            "text_format": _TEXT_FORMAT,
+        },
+        "required": ["group_id", "variant_label", "question_text", "variant_summary"],
+        "additionalProperties": False,
+    },
+}
+
+
 # ------------------------------------------------------------- dispatch
 
 TOOL_REGISTRY: dict[str, Callable[..., str]] = {
@@ -477,6 +517,7 @@ TOOL_REGISTRY: dict[str, Callable[..., str]] = {
     "add_short_answer_variant": add_short_answer_variant,
     "add_numerical_variant": add_numerical_variant,
     "add_matching_variant": add_matching_variant,
+    "add_open_response_variant": add_open_response_variant,
     "get_bank_report": get_bank_report,
     "finalize_bank": finalize_bank,
 }
@@ -491,6 +532,7 @@ _SCHEMAS = {
     "add_short_answer_variant": add_short_answer_variant_json,
     "add_numerical_variant": add_numerical_variant_json,
     "add_matching_variant": add_matching_variant_json,
+    "add_open_response_variant": add_open_response_variant_json,
     "get_bank_report": get_bank_report_json,
     "finalize_bank": finalize_bank_json,
 }
