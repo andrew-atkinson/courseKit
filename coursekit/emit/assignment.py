@@ -42,23 +42,74 @@ def assignment_html(a: Assignment) -> str:
             f"{render_instructions(a)}\n</body>\n</html>\n")
 
 
+def rubric_ident(a: Assignment) -> str:
+    return cc.gid(a.assignment_id, "rubric")
+
+
 def assignment_settings_xml(a: Assignment) -> str:
     """`assignment_settings.xml` — the Canvas settings (grounded field set; the many boolean flags take
-    the export's defaults). points_possible + submission_types + the group ref are what vary."""
+    the export's defaults). points_possible + submission_types + the group ref are what vary; a
+    structured rubric attaches via `rubric_identifierref` and sets the point total."""
+    rubric_block = ""
+    if a.rubric:
+        rubric_block = (f"  <rubric_identifierref>{rubric_ident(a)}</rubric_identifierref>\n"
+                        f"  <rubric_use_for_grading>true</rubric_use_for_grading>\n"
+                        f"  <rubric_hide_points>false</rubric_hide_points>\n"
+                        f"  <rubric_hide_score_total>false</rubric_hide_score_total>\n")
     return (f'<?xml version="1.0" encoding="UTF-8"?>\n'
             f'<assignment identifier="{assignment_ident(a)}" {CC_NS} '
             f'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n'
             f"  <title>{cc._xml(a.title)}</title>\n"
             f"  <assignment_group_identifierref>{group_ident(a.group_title)}"
             f"</assignment_group_identifierref>\n"
+            f"{rubric_block}"
             f"  <workflow_state>unpublished</workflow_state>\n"
-            f"  <points_possible>{a.points:.1f}</points_possible>\n"
+            f"  <points_possible>{a.effective_points:.1f}</points_possible>\n"
             f"  <grading_type>points</grading_type>\n"
             f"  <submission_types>{a.submission_type}</submission_types>\n"
             f"  <position>1</position>\n"
             f"  <peer_reviews>false</peer_reviews>\n"
             f"  <omit_from_final_grade>false</omit_from_final_grade>\n"
             f"</assignment>\n")
+
+
+def _rubric_xml(a: Assignment) -> str:
+    """One `<rubric>` for course_settings/rubrics.xml — criteria × rating-levels × points, grounded
+    from the ARGS260 export. Criterion/rating ids are deterministic so a re-emit is stable."""
+    r = a.rubric
+    crits = []
+    for i, c in enumerate(r.criteria):
+        cid = f"{rubric_ident(a)}_c{i}"
+        ratings = "\n".join(
+            f"          <rating>\n"
+            f"            <description>{cc._xml(rt.description)}</description>\n"
+            f"            <points>{rt.points:.1f}</points>\n"
+            f"            <criterion_id>{cid}</criterion_id>\n"
+            f"            <id>{cid}_r{j}</id>\n          </rating>"
+            for j, rt in enumerate(c.ratings))
+        crits.append(
+            f"      <criterion>\n"
+            f"        <criterion_id>{cid}</criterion_id>\n"
+            f"        <points>{c.points:.1f}</points>\n"
+            f"        <description>{cc._xml(c.description)}</description>\n"
+            f"        <long_description>{cc._xml(c.long_description)}</long_description>\n"
+            f"        <ratings>\n{ratings}\n        </ratings>\n      </criterion>")
+    return (f'  <rubric identifier="{rubric_ident(a)}">\n'
+            f"    <read_only>false</read_only>\n"
+            f"    <title>{cc._xml(r.title)}</title>\n"
+            f"    <reusable>false</reusable>\n    <public>false</public>\n"
+            f"    <points_possible>{r.points_possible:.1f}</points_possible>\n"
+            f"    <hide_score_total>false</hide_score_total>\n"
+            f"    <free_form_criterion_comments>false</free_form_criterion_comments>\n"
+            f"    <criteria>\n" + "\n".join(crits) + "\n    </criteria>\n  </rubric>")
+
+
+def rubrics_xml(assignments: list[Assignment]) -> str:
+    """`course_settings/rubrics.xml` — one `<rubric>` per assignment that carries one."""
+    rubrics = "\n".join(_rubric_xml(a) for a in assignments if a.rubric)
+    return (f'<?xml version="1.0" encoding="UTF-8"?>\n'
+            f'<rubrics {CC_NS} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n'
+            f"{rubrics}\n</rubrics>\n")
 
 
 def assignment_groups_xml(group_titles) -> str:
@@ -85,23 +136,31 @@ def emit_manifest(assignments: list[Assignment], course_title: str) -> str:
         f'      <file href="{assignment_ident(a)}/assignment_settings.xml"/>\n    </resource>'
         for a in assignments)
     mod = cc.gid(course_title, "assignments-module")
+    # course_settings bundles under ONE resource (canvas_export.txt marker + the settings files),
+    # matching how the page cartridge and real Canvas exports wire it.
+    settings_files = ('      <file href="course_settings/canvas_export.txt"/>\n'
+                      '      <file href="course_settings/assignment_groups.xml"/>\n')
+    if any(a.rubric for a in assignments):
+        settings_files += '      <file href="course_settings/rubrics.xml"/>\n'
     return (f'<?xml version="1.0" encoding="UTF-8"?>\n<manifest identifier="{cc.gid(course_title, "manifest")}" '
             f"{IMS_NS}>\n  <organizations>\n    <organization identifier=\"org\" structure=\"rooted-hierarchy\">\n"
             f'      <item identifier="root">\n        <item identifier="{mod}">\n'
             f"          <title>Assignments</title>\n{items}\n        </item>\n      </item>\n"
             f"    </organization>\n  </organizations>\n  <resources>\n{resources}\n"
-            f'    <resource identifier="{cc.gid(course_title, "asg-groups")}" '
+            f'    <resource identifier="{cc.course_ident(course_title)}" '
             f'type="associatedcontent/imscc_xmlv1p1/learning-application-resource" '
-            f'href="course_settings/assignment_groups.xml">\n'
-            f'      <file href="course_settings/assignment_groups.xml"/>\n    </resource>\n'
+            f'href="course_settings/canvas_export.txt">\n{settings_files}    </resource>\n'
             f"  </resources>\n</manifest>\n")
 
 
 def package_files(assignments: list[Assignment], course_title: str) -> dict[str, str]:
     """Every archive path → its text content. Deterministic, so a re-emit is byte-stable."""
     files = {"imsmanifest.xml": emit_manifest(assignments, course_title),
+             "course_settings/canvas_export.txt": cc.CANVAS_EXPORT_MARKER,
              "course_settings/assignment_groups.xml":
                  assignment_groups_xml(sorted({a.group_title for a in assignments}))}
+    if any(a.rubric for a in assignments):
+        files["course_settings/rubrics.xml"] = rubrics_xml(assignments)
     for a in assignments:
         d = assignment_ident(a)
         files[f"{d}/{a.slug}.html"] = assignment_html(a)

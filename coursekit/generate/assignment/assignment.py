@@ -21,6 +21,36 @@ from pydantic import BaseModel, ConfigDict, Field
 SubmissionType = Literal["online_text_entry", "online_upload", "on_paper", "none"]
 
 
+class RubricRating(BaseModel):
+    """One performance LEVEL of a criterion — e.g. 'Excellent analysis' worth 35 points."""
+    model_config = ConfigDict(extra="forbid")
+    description: str = Field(min_length=1)
+    points: float = Field(ge=0)
+
+
+class RubricCriterion(BaseModel):
+    """One row of the rubric — what's judged, and the levels it can score."""
+    model_config = ConfigDict(extra="forbid")
+    description: str = Field(min_length=1)              # the criterion, e.g. "Written analysis"
+    long_description: str = ""
+    ratings: list[RubricRating] = Field(min_length=1)  # levels, highest → lowest
+
+    @property
+    def points(self) -> float:
+        return max(r.points for r in self.ratings)     # the criterion's max = its top level
+
+
+class Rubric(BaseModel):
+    """A structured Canvas rubric — criteria × levels × points (grounded from the ARGS260 export)."""
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=1)
+    criteria: list[RubricCriterion] = Field(min_length=1)
+
+    @property
+    def points_possible(self) -> float:
+        return sum(c.points for c in self.criteria)
+
+
 class Assignment(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -29,16 +59,22 @@ class Assignment(BaseModel):
     week_ref: str | None = None
     slug: str = "assignment"
     submission_type: SubmissionType = "online_text_entry"
-    points: float = Field(default=10.0, ge=0)          # configurable; STRC-3 makes points first-class
+    points: float = Field(default=10.0, ge=0)          # used only when no structured rubric is attached
     overview: str = ""                                 # why it matters / context (optional)
     task: str = Field(min_length=1)                    # what the student does
     deliverable: str = ""                              # what to hand in (optional)
-    rubric_criteria: list[str] = Field(default_factory=list)   # flat v1; structured rubric = ASMT-7
+    rubric_criteria: list[str] = Field(default_factory=list)   # flat, in the instructions (no rubric)
+    rubric: Rubric | None = None                       # structured Canvas rubric (ASMT-7); overrides points
 
     @property
     def group_title(self) -> str:
         """The Canvas assignment group this lands in. One neutral group for now."""
         return "Assignments"
+
+    @property
+    def effective_points(self) -> float:
+        """A structured rubric sets the total (Canvas ties them); else the plain `points`."""
+        return self.rubric.points_possible if self.rubric else self.points
 
 
 def _esc(s: str) -> str:
