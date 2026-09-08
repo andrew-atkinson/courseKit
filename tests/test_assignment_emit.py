@@ -5,7 +5,19 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 from coursekit.emit import assignment as ae
-from coursekit.generate.assignment.assignment import Assignment, render_instructions
+from coursekit.generate.assignment.assignment import (Assignment, Rubric, RubricCriterion,
+                                                      RubricRating, render_instructions)
+
+
+def _rubric():
+    return Rubric(title="Project Rubric", criteria=[
+        RubricCriterion(description="Analysis", long_description="depth of the written analysis",
+                        ratings=[RubricRating(description="Excellent", points=35),
+                                 RubricRating(description="Good", points=25),
+                                 RubricRating(description="No marks", points=0)]),
+        RubricCriterion(description="Craft",
+                        ratings=[RubricRating(description="Strong", points=40),
+                                 RubricRating(description="Weak", points=10)])])
 
 
 def _asg(**kw):
@@ -72,3 +84,35 @@ def test_write_imscc_is_a_valid_zip(tmp_path):
 def test_reemit_is_byte_stable():
     a = _asg()
     assert ae.package_files([a], "C") == ae.package_files([a], "C")   # deterministic ids
+
+
+# ---------------------------------------------------- structured rubric (ASMT-7)
+
+def test_rubric_totals_from_criteria_and_levels():
+    r = _rubric()
+    assert r.points_possible == 75.0            # 35 + 40 (each criterion's top level)
+    assert r.criteria[0].points == 35.0
+
+
+def test_rubric_xml_carries_criteria_and_levels():
+    root = ET.fromstring(ae.rubrics_xml([_asg(rubric=_rubric())]))
+    assert len(liter(root, "criterion")) == 2
+    assert len(liter(root, "rating")) == 5      # 3 + 2 performance levels
+    assert liter(root, "points_possible")[0].text == "75.0"
+
+
+def test_assignment_attaches_rubric_and_derives_points():
+    a = _asg(rubric=_rubric(), points=10)       # the plain points=10 is ignored when a rubric is set
+    root = ET.fromstring(ae.assignment_settings_xml(a))
+    assert liter(root, "rubric_identifierref")[0].text == ae.rubric_ident(a)
+    assert liter(root, "rubric_use_for_grading")[0].text == "true"
+    assert liter(root, "points_possible")[0].text == "75.0"   # the rubric total, not 10
+
+
+def test_package_includes_rubrics_and_bundled_course_settings():
+    files = ae.package_files([_asg(rubric=_rubric())], "Creative Coding")
+    assert "course_settings/rubrics.xml" in files
+    assert "course_settings/canvas_export.txt" in files       # bundled, like the page cartridge
+    for arc, data in files.items():
+        if arc.endswith((".xml", ".html")):
+            ET.fromstring(data)
