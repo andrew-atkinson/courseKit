@@ -12,6 +12,8 @@ uv.lock
 # Track the markdown docs/guides; keep the heavy Canvas exports + samples out of git.
 docs/*
 !docs/*.md
+# the tracked capabilities overview (heavy Canvas-export html stays ignored)
+!docs/overview.html
 input/
 output/
 reference/
