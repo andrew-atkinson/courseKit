@@ -55,9 +55,10 @@ class CartridgeSource(Protocol):
 def _default_sources() -> list:
     """The registered content types. Add a source here (one line) to include a new content type in
     the course cartridge — the assembler needs no other change."""
+    from coursekit.emit.sources.assignments import AssignmentSource
     from coursekit.emit.sources.pages import PagesSource
     from coursekit.emit.sources.quizzes import QuizzesSource
-    return [PagesSource(), QuizzesSource()]
+    return [PagesSource(), QuizzesSource(), AssignmentSource()]
 
 
 # ------------------------------------------------------------- module grouping
@@ -143,9 +144,10 @@ def _organizations(modules, course_title: str) -> str:
             + '\n      </item>\n    </organization>\n  </organizations>')
 
 
-def _manifest(items: list[CartridgeItem], modules, course_title: str) -> str:
+def _manifest(items: list[CartridgeItem], modules, course_title: str, extra_settings=()) -> str:
     """The Common Cartridge manifest: course metadata, the module tree, the course_settings resource
-    (the Canvas-importer trigger), and every item's resource block(s)."""
+    (the Canvas-importer trigger, carrying any extra settings files a source contributes), and every
+    item's resource block(s)."""
     manifest_id = cc.gid(*[it.resource_id for it in items], "course-manifest")
     resources = "\n".join(it.resource_xml for it in items)
     return (f'<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -159,7 +161,7 @@ def _manifest(items: list[CartridgeItem], modules, course_title: str) -> str:
             f'  </metadata>\n'
             f'{_organizations(modules, course_title)}\n'
             f'  <resources>\n'
-            f'{cc._course_settings_resource(course_title)}\n'
+            f'{cc._course_settings_resource(course_title, sorted(extra_settings))}\n'
             f'{resources}\n'
             f'  </resources>\n</manifest>\n')
 
@@ -210,8 +212,11 @@ def write_course_imscc(path, out_path=None, title=None, sources=None) -> Path | 
     """
     srcs = _default_sources() if sources is None else sources
     items: list[CartridgeItem] = []
+    settings: dict = {}          # course-level files a source contributes (e.g. rubrics.xml)
     for s in srcs:
         items.extend(s.collect(path))
+        if hasattr(s, "course_settings"):
+            settings.update(s.course_settings())
     if not items:
         return None
 
@@ -219,8 +224,9 @@ def write_course_imscc(path, out_path=None, title=None, sources=None) -> Path | 
     modules = _modules(items, path, course_title)
 
     files = package_files(items, course_title)  # raises on a file collision — before any I/O
+    files.update(settings)
     files["course_settings/module_meta.xml"] = _module_meta(modules, course_title)
-    files["imsmanifest.xml"] = _manifest(items, modules, course_title)
+    files["imsmanifest.xml"] = _manifest(items, modules, course_title, extra_settings=settings.keys())
 
     p = Path(path)
     if out_path is None:

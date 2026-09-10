@@ -11,7 +11,6 @@ a real rubric-bearing export to ground its CC format (this repo has an assignmen
 rubric attached).
 """
 
-import html
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -61,7 +60,8 @@ class Assignment(BaseModel):
     submission_type: SubmissionType = "online_text_entry"
     points: float = Field(default=10.0, ge=0)          # used only when no structured rubric is attached
     overview: str = ""                                 # why it matters / context (optional)
-    task: str = Field(min_length=1)                    # what the student does
+    task: str = Field(min_length=1)                    # what the student does (intro prose)
+    steps: list[str] = Field(default_factory=list)     # the task's requirements, as a numbered list
     deliverable: str = ""                              # what to hand in (optional)
     rubric_criteria: list[str] = Field(default_factory=list)   # flat, in the instructions (no rubric)
     rubric: Rubric | None = None                       # structured Canvas rubric (ASMT-7); overrides points
@@ -77,22 +77,6 @@ class Assignment(BaseModel):
         return self.rubric.points_possible if self.rubric else self.points
 
 
-def _esc(s: str) -> str:
-    return html.escape(s, quote=False)
-
-
-def render_instructions(a: Assignment) -> str:
-    """The assignment's instructions as Canvas-safe HTML (h3/p/ul — all sanitizer-allowed). The flat
-    rubric criteria render as a 'How you'll be assessed' list until the structured rubric (ASMT-7)."""
-    parts = []
-    if a.overview.strip():
-        parts.append(f"<p>{_esc(a.overview.strip())}</p>")
-    parts.append("<h3>Your task</h3>")
-    parts.append(f"<p>{_esc(a.task.strip())}</p>")
-    if a.deliverable.strip():
-        parts.append("<h3>What to submit</h3>")
-        parts.append(f"<p>{_esc(a.deliverable.strip())}</p>")
-    if a.rubric_criteria:
-        parts.append("<h3>How you'll be assessed</h3>")
-        parts.append("<ul>" + "".join(f"<li>{_esc(c)}</li>" for c in a.rubric_criteria) + "</ul>")
-    return "\n".join(parts)
+# Instructions are RENDERED in emit/assignment.py: the fields become a Page of typed blocks and go
+# through the page renderer (themed, inline-Markdown, Canvas-safe) — the same design system as a page.
+# The IR stays pure data; nothing here renders HTML.

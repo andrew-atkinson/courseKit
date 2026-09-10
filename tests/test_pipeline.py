@@ -615,3 +615,24 @@ def test_eu_pass_is_idempotent_a_rerun_replaces_the_question():
     g = bank.get().groups["enduring_understanding"]
     assert list(g.variants) == ["A"]                                  # replaced, not duplicated
     assert g.variants["A"].question_text == "Second transfer task prompt here."
+
+
+# ------------------------------------------------- assignment generation (ASMT-4)
+
+def test_build_assignment_drafts_a_brief_and_rubric_via_the_loop(tmp_path):
+    import types
+    from coursekit.generate.assignment import build as ab
+    (tmp_path / "week-3.md").write_text("loops and iteration", encoding="utf-8")
+    unit = types.SimpleNamespace(course_slug="c", week_slug="week-3",
+                                 transcript_path=tmp_path / "week-3.md", course_root=tmp_path)
+    provider = FakeClient(script=[
+        [("set_assignment", {"title": "Apply loops",
+                             "task": "Make a grid of shapes using loops and map(); explain your design."})],
+        [("add_rubric_criterion", {"description": "Technique",
+                                   "levels": [{"description": "Strong", "points": 20},
+                                              {"description": "Weak", "points": 5}]})],
+        [("finalize_assignment", {})],
+    ])
+    a, problems = ab.build_assignment(unit, provider, "m", tmp_path / "out", material="loops material")
+    assert not problems and a is not None and a.rubric is not None
+    assert a.title == "Apply loops" and (tmp_path / "out" / "assignment.json").exists()

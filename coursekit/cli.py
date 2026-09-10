@@ -362,11 +362,46 @@ def _cmd_generate_targeted(args) -> int:
     return 0 if res.finalized else 1
 
 
+def _run_assignments(args) -> int:
+    """Draft one assignment per selected week → `assignments/<week>/assignment.json` (its own mode,
+    not the quiz/page seam). Scope defaults to the week; `--scope` names a wider brief."""
+    from coursekit.discover import find_units
+    from coursekit.generate.assignment import build as ab
+    from coursekit.pipeline import _week_matches
+
+    weeks = _parse_weeks(args)
+    units = find_units(args.path, output_root=args.output_root, subdir="assignments")
+    if weeks:
+        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
+    if not units:
+        print(f"No weeks found under {args.path}.")
+        return 1
+    if args.dry_run:
+        print("Would draft assignments for:")
+        for u in units:
+            print(f"  {u.week_slug} -> {u.output_dir}")
+        return 0
+
+    provider = _build_provider()
+    model = os.getenv("MODEL_NAME") or courseconfig.load(
+        args.path, config_name="assignment.yaml").value("model")
+    ok = True
+    for u in units:
+        a, problems = ab.build_assignment(u, provider, model, u.output_dir, scope=args.scope)
+        pts = f", {a.effective_points:.0f} pts" if a else ""
+        print(f"[{'OK' if not problems else 'INCOMPLETE'}] assignment {u.week_slug}{pts} "
+              f"-> {u.output_dir}")
+        ok = ok and not problems
+    return 0 if ok else 1
+
+
 def _cmd_generate(args) -> int:
     if getattr(args, "source", None):
         return _cmd_generate_targeted(args)
     if not args.path:
         raise SystemExit("no PATH given and TRANSCRIPTION is not set")
+    if getattr(args, "assignments", False):
+        return _run_assignments(args)
     weeks = _parse_weeks(args)
     generators = _select_generators(args)
     provider = None if args.dry_run else _build_provider()
@@ -498,6 +533,16 @@ def _cmd_emit_cc(args) -> int:
         print(f"No page.json found under {args.path}")
         return 1
     print(f"Canvas Common Cartridge:\n  [OK]   {out}")
+    return 0
+
+
+def _cmd_emit_assignments(args) -> int:
+    from coursekit.emit import assignment as ae
+    out = ae.emit_from_path(args.path)
+    if out is None:
+        print(f"No assignment.json found under {args.path}")
+        return 1
+    print(f"Canvas assignments cartridge:\n  [OK]   {out}")
     return 0
 
 
@@ -763,6 +808,10 @@ def build_parser() -> argparse.ArgumentParser:
     which = pg.add_mutually_exclusive_group()
     which.add_argument("--quizzes", action="store_true", help="only quizzes (default: both)")
     which.add_argument("--pages", action="store_true", help="only pages (default: both)")
+    which.add_argument("--assignments", action="store_true",
+                       help="draft assignments (brief + rubric) instead of quizzes/pages")
+    pg.add_argument("--scope", default="this week",
+                    help="assignments only: what the assignment covers (default: 'this week')")
     pg.add_argument("--week", action="append", metavar="N",
                     help="a week to include, repeatable, e.g. --week 3 --week 5")
     pg.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
@@ -793,7 +842,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # emit — canonical JSON → LMS packages (model-free)
     pe = sub.add_parser("emit", help="canonical JSON → LMS packages (model-free)")
-    esub = pe.add_subparsers(dest="target", required=True, metavar="{qti,html,cc}")
+    esub = pe.add_subparsers(dest="target", required=True, metavar="{qti,html,cc,course,assignments}")
 
     eq = esub.add_parser("qti", help="Canvas quiz .zip from every bank.json under PATH")
     eq.add_argument("path", help="a course, or its quizzes/ tree")
@@ -813,6 +862,10 @@ def build_parser() -> argparse.ArgumentParser:
                           help="ONE Canvas .imscc of the WHOLE course — pages AND quizzes, in week modules")
     eco.add_argument("path", help="the course root (its pages/ and quizzes/ trees)")
     eco.set_defaults(func=_cmd_emit_course)
+
+    ea = esub.add_parser("assignments", help="ONE Canvas .imscc of all assignment.json under PATH")
+    ea.add_argument("path", help="a course, or its assignments/ tree")
+    ea.set_defaults(func=_cmd_emit_assignments)
 
     # evaluate — cold-read quality review of ALREADY-generated quizzes and pages (uses the model)
     pv = sub.add_parser("evaluate",

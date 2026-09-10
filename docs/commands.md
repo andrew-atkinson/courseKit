@@ -52,6 +52,7 @@ It's descriptive: it maps what exists and shows unassigned files rather than dro
 | `coursekit generate PATH --output-root DIR`             | Write elsewhere instead of with the course.                                                                                             | ✓        |
 | `coursekit generate PATH --max-iters N`                 | Cap model turns per week (default 80).                                                                                                  | ✓        |
 | `coursekit generate PATH --no-review`                   | Skip the cold-read quiz review a `generate` runs by default.                                                                            | ✓        |
+| `coursekit generate PATH --assignments`                 | Draft one **assignment** (brief + rubric) per week → `assignments/<week>/`. `--scope "…"` names what it covers (default "this week").   | ✓        |
 
 **`PATH` vs `--source`.** `PATH` is a course directory or a `week-*.md` file, and it is **optional** — omitted, it falls back to `$TRANSCRIPTION`. Given a `PATH`, `generate` processes the whole course (every week, or the ones `--week` selects). Given `--source DOC` it quizzes that ONE document à la carte, and **`PATH` is ignored** — point `--source` at any supported file anywhere, even outside a course (output lands beside the doc, or in its course when it sits under one).
 
@@ -64,6 +65,7 @@ Whole-week generation ends with a cold-read review by default (`--no-review` ski
 | `coursekit emit html PATH`         | Re-render pages from `page.json`.                                                 | x        |
 | `coursekit emit cc PATH`           | One Canvas `.imscc` of all pages.                                                 | x        |
 | `coursekit emit course PATH`       | One Canvas `.imscc` of the whole course — pages **and** quizzes, in week modules. | x        |
+| `coursekit emit assignments PATH`  | One Canvas `.imscc` of all assignments (brief + rubric) under PATH.               | x        |
 
 | Review Command                     | What it does                                                                                                            | Uses LLM |
 |------------------------------------|-------------------------------------------------------------------------------------------------------------------------|----------|
