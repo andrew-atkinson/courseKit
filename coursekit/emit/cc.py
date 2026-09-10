@@ -143,16 +143,18 @@ def page_resource(page) -> str:
             f'    </resource>')
 
 
-def _course_settings_resource(course_title: str) -> str:
+def _course_settings_resource(course_title: str, extra_files=()) -> str:
     """The `learning-application-resource` that declares the course_settings bundle. Its href is the
     canvas_export.txt marker (Canvas keys the flip to Pages off that path); the <file> children are
-    the settings files we actually ship."""
+    the settings files we actually ship. `extra_files` are additional course_settings paths a content
+    type contributes (e.g. assignments' rubrics.xml / assignment_groups.xml)."""
+    extra = "".join(f'      <file href="{h}"/>\n' for h in extra_files)
     return (f'    <resource identifier="{course_ident(course_title)}" '
             f'type="associatedcontent/imscc_xmlv1p1/learning-application-resource" '
             f'href="course_settings/canvas_export.txt">\n'
             f'      <file href="course_settings/canvas_export.txt"/>\n'
             f'      <file href="course_settings/module_meta.xml"/>\n'
-            f'    </resource>')
+            f'{extra}    </resource>')
 
 
 # ------------------------------------------------------------- module placement

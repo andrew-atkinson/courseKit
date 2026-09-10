@@ -268,3 +268,13 @@ def test_propose_model_flag_routes_to_the_model_engine(tmp_path, monkeypatch):
                                                 dry_run=False, force=False))
     assert rc == 0 and seen["deep"] is True                      # --deep threaded through
     assert (root / ".vtconfig" / "structure.coursekit.yaml").is_file()
+
+
+def test_generate_assignments_mode_routes_with_scope():
+    args = _parse("generate", "/course", "--assignments", "--scope", "weeks 3-5")
+    assert args.func is cli._cmd_generate and args.assignments and args.scope == "weeks 3-5"
+
+
+def test_emit_assignments_routes_to_its_handler():
+    args = _parse("emit", "assignments", "/course")
+    assert args.func is cli._cmd_emit_assignments and args.path == "/course"

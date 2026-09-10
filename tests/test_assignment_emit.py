@@ -1,12 +1,11 @@
-"""Canvas Assignment emitter (ASMT-4) — grounded against reference/arph201's assignment_settings.xml.
+"""Canvas Assignment emitter (ASMT-4) — grounded against the real ARGS260 Canvas export.
 Offline: build an Assignment, emit, and check the CC shape parses and carries the grounded fields."""
 
 import xml.etree.ElementTree as ET
 import zipfile
 
 from coursekit.emit import assignment as ae
-from coursekit.generate.assignment.assignment import (Assignment, Rubric, RubricCriterion,
-                                                      RubricRating, render_instructions)
+from coursekit.generate.assignment.assignment import Assignment, Rubric, RubricCriterion, RubricRating
 
 
 def _rubric():
@@ -34,10 +33,11 @@ def liter(root, name):
     return [e for e in root.iter() if e.tag.rsplit("}", 1)[-1] == name]
 
 
-def test_instructions_are_canvas_safe_html_with_the_parts():
-    html = render_instructions(_asg())
-    assert "<h3>Your task</h3>" in html and "What to submit" in html
-    assert "How you'll be assessed" in html and "<li>applies the idea correctly</li>" in html
+def test_instructions_render_themed_html_with_the_parts():
+    html = ae.assignment_html(_asg())
+    assert "Your task" in html and "What to submit" in html
+    assert "be assessed" in html and "applies the idea correctly" in html   # ("you'll" → escaped &#39;)
+    assert "style=" in html   # themed via the page design system, not plain HTML
 
 
 def test_settings_xml_carries_the_grounded_fields():
@@ -54,36 +54,45 @@ def test_html_body_escapes_and_wraps():
     assert liter(root, "title")[0].text == "Assignment: Loops & <fun>"   # parsed back to the original
 
 
-def test_every_package_file_is_well_formed_xml_or_html():
-    for arc, data in ae.package_files([_asg()], "Creative Coding").items():
+def _pkg(course_dir, *assignments):
+    """Write assignment.json files under a course dir, emit the cartridge, return (out, files-dict).
+    Goes through the SHARED assembler (emit_from_path) — the real, importable structure."""
+    for i, a in enumerate(assignments or (_asg(),)):
+        d = course_dir / "assignments" / f"a{i}"
+        d.mkdir(parents=True)
+        (d / "assignment.json").write_text(a.model_dump_json(), encoding="utf-8")
+    out = ae.emit_from_path(course_dir)
+    with zipfile.ZipFile(out) as z:
+        return out, {n: z.read(n).decode("utf-8") for n in z.namelist()}
+
+
+def test_cartridge_files_are_well_formed_and_a_valid_zip(tmp_path):
+    out, files = _pkg(tmp_path, _asg(rubric=_rubric()))
+    assert out.suffix == ".imscc"
+    for arc, data in files.items():
         if arc.endswith((".xml", ".html")):
             ET.fromstring(data)   # raises on malformed
 
 
-def test_manifest_references_resolve_and_type_is_the_grounded_one():
-    a = _asg()
-    files = ae.package_files([a], "Creative Coding")
+def test_cartridge_has_module_meta_and_resolvable_refs(tmp_path):
+    _out, files = _pkg(tmp_path, _asg(rubric=_rubric()))
+    assert "course_settings/module_meta.xml" in files          # the module placement (was MISSING before)
+    assert "course_settings/rubrics.xml" in files
     manifest = ET.fromstring(files["imsmanifest.xml"])
-    res = liter(manifest, "resource")
-    assert any(r.get("type") == "associatedcontent/imscc_xmlv1p1/learning-application-resource"
-               for r in res)
-    # every resource href exists in the package
-    for r in res:
+    for r in liter(manifest, "resource"):
         if r.get("href"):
-            assert r.get("href") in files
+            assert r.get("href") in files                      # every resource href is a real file
+    assert any(r.get("type") == "associatedcontent/imscc_xmlv1p1/learning-application-resource"
+               for r in liter(manifest, "resource"))
+    # the course_settings resource lists the extra settings files
+    assert "course_settings/rubrics.xml" in files["imsmanifest.xml"]
 
 
-def test_write_imscc_is_a_valid_zip(tmp_path):
-    out = ae.write_imscc([_asg()], "Creative Coding", tmp_path / "assignments")
-    assert out.suffix == ".imscc"
-    with zipfile.ZipFile(out) as z:
-        assert z.testzip() is None
-        assert "imsmanifest.xml" in z.namelist()
-
-
-def test_reemit_is_byte_stable():
-    a = _asg()
-    assert ae.package_files([a], "C") == ae.package_files([a], "C")   # deterministic ids
+def test_cartridge_is_byte_stable(tmp_path_factory):
+    a = _asg(rubric=_rubric())
+    _o1, f1 = _pkg(tmp_path_factory.mktemp("one"), a)
+    _o2, f2 = _pkg(tmp_path_factory.mktemp("two"), a)
+    assert f1 == f2   # deterministic ids from content, not path
 
 
 # ---------------------------------------------------- structured rubric (ASMT-7)
@@ -109,10 +118,26 @@ def test_assignment_attaches_rubric_and_derives_points():
     assert liter(root, "points_possible")[0].text == "75.0"   # the rubric total, not 10
 
 
-def test_package_includes_rubrics_and_bundled_course_settings():
-    files = ae.package_files([_asg(rubric=_rubric())], "Creative Coding")
-    assert "course_settings/rubrics.xml" in files
-    assert "course_settings/canvas_export.txt" in files       # bundled, like the page cartridge
-    for arc, data in files.items():
-        if arc.endswith((".xml", ".html")):
-            ET.fromstring(data)
+def test_emit_from_path_discovers_and_packages(tmp_path):
+    import zipfile
+    d = tmp_path / "assignments" / "week-3"
+    d.mkdir(parents=True)
+    (d / "assignment.json").write_text(_asg(rubric=_rubric()).model_dump_json(), encoding="utf-8")
+    out = ae.emit_from_path(tmp_path)
+    assert out is not None and out.suffix == ".imscc"
+    with zipfile.ZipFile(out) as z:
+        names = z.namelist()
+        assert "imsmanifest.xml" in names and "course_settings/rubrics.xml" in names
+
+
+def test_emit_from_path_none_when_empty(tmp_path):
+    assert ae.emit_from_path(tmp_path) is None
+
+
+def test_instructions_render_inline_markdown_and_steps():
+    a = Assignment(assignment_id="w", title="T", task="Use `map()` and be **bold**.",
+                   steps=["**One:** do `x`.", "Two."])
+    html = ae.assignment_html(a)
+    assert "<code" in html and "map()" in html and "<strong>bold</strong>" in html   # inline md renders
+    assert "Two." in html                                        # steps rendered (themed bullets)
+    assert "`map()`" not in html and "**bold**" not in html      # no literal markdown shipped

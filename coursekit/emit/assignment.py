@@ -1,25 +1,21 @@
-"""Canvas Assignment emitter — the assignment IR → a Common Cartridge `.imscc`.
+"""Canvas Assignment resource XML — the per-assignment CC parts (settings, instructions HTML, rubric).
 
-Grounded from a real Canvas export (reference/arph201 … `assignment_settings.xml`), not the spec: an
-assignment is a `learning-application-resource` whose dir holds the instructions HTML + an
-`assignment_settings.xml` (`<assignment xmlns=…cccv1p0>`), with a `course_settings/assignment_groups.xml`
-and a module item wiring it into the manifest. Reuses cc.py's id/escaping/packaging helpers so the
-package shape matches the page cartridge.
-
-NOT here yet: the structured Canvas rubric object (ASMT-7) — this export carries no rubric, so its CC
-format isn't grounded. Criteria live in the instructions for now (see assignment.render_instructions).
+Grounded from the real ARGS260 Canvas export (its assignments + `course_settings/rubrics.xml`, verified
+against an upload-with-rubric assignment): an assignment is a `learning-application-resource` whose dir
+holds the instructions HTML + an `assignment_settings.xml` (`<assignment xmlns=…cccv1p0>`); a structured
+rubric lives in `course_settings/rubrics.xml` and is attached via `<rubric_identifierref>`. The emitted
+fields are a valid subset of the export's (Canvas defaults the rest). The MANIFEST/module wiring is NOT here — `emit/sources/
+assignments.py` turns these parts into cartridge items so the shared assembler (`cartridge.py`) places
+an assignment in a week module exactly like a page or quiz. `emit_from_path` routes a standalone
+`emit assignments` through that same assembler.
 """
 
-import zipfile
 from pathlib import Path
 
-from coursekit.emit import cc          # reuse gid / _xml / _attr / packaging
-from coursekit.generate.assignment.assignment import Assignment, render_instructions
+from coursekit.emit import cc          # reuse gid / _xml / _attr
+from coursekit.generate.assignment.assignment import Assignment
 
 CC_NS = 'xmlns="http://canvas.instructure.com/xsd/cccv1p0"'
-IMS_NS = ('xmlns="http://www.imsglobal.org/xsd/imsccv1p1/imscp_v1p1" '
-          'xmlns:lom="http://ltsc.ieee.org/xsd/imsccv1p1/LOM/resource" '
-          'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"')
 
 
 def assignment_ident(a: Assignment) -> str:
@@ -30,16 +26,40 @@ def group_ident(group_title: str) -> str:
     return cc.gid(group_title, "assignment_group")
 
 
-def _href(a: Assignment) -> str:
-    return f"{assignment_ident(a)}/{a.slug}.html"
+def _assignment_page(a: Assignment):
+    """The assignment's instructions as a PAGE of typed blocks — so it renders through the page
+    design system (theme type/spacing/headings, styled code, `_md_inline`) exactly like a course page.
+    No Markdown parsing: the structure is explicit (paragraphs, a bullets block for steps)."""
+    from coursekit.generate.page.page import Page, build_block
+    pairs = []
+    if a.overview.strip():
+        pairs.append(("intro", "paragraph", {"text": a.overview.strip()}))
+    pairs.append(("task-h", "heading", {"text": "Your task", "role": "concept"}))
+    pairs.append(("task", "paragraph", {"text": a.task.strip()}))
+    steps = [s.strip() for s in a.steps if s.strip()]
+    if steps:
+        pairs.append(("steps", "bullets", {"items": steps}))
+    if a.deliverable.strip():
+        pairs.append(("submit-h", "heading", {"text": "What to submit", "role": "practice"}))
+        pairs.append(("submit", "paragraph", {"text": a.deliverable.strip()}))
+    if a.rubric_criteria and not a.rubric:      # flat criteria in-text only when no structured rubric
+        pairs.append(("assess-h", "heading", {"text": "How you'll be assessed", "role": "summary"}))
+        pairs.append(("assess", "bullets", {"items": a.rubric_criteria}))
+    blocks = {bid: build_block(k, block_id=bid, **f) for bid, k, f in pairs}
+    return Page(page_id=a.assignment_id, title=a.title, page_type="assignment",
+                week_ref=a.week_ref, slug=a.slug, blocks=blocks, finalized=True)
 
 
-def assignment_html(a: Assignment) -> str:
-    """The instructions body — a standalone HTML doc, matching the export's shape."""
+def assignment_html(a: Assignment, style=None) -> str:
+    """The instructions as a standalone HTML doc, rendered through the page renderer with the course
+    THEME (like a page). `style` is a resolved theme; None falls back to the default identity."""
+    from coursekit.generate.page.renderer import render_body
+    from coursekit.generate.page.style import load_style
+    body = render_body(_assignment_page(a), style=style or load_style(None))
     return (f"<html>\n<head>\n"
             f'<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n'
             f"<title>Assignment: {cc._xml(a.title)}</title>\n</head>\n<body>\n"
-            f"{render_instructions(a)}\n</body>\n</html>\n")
+            f"{body}\n</body>\n</html>\n")
 
 
 def rubric_ident(a: Assignment) -> str:
@@ -67,6 +87,7 @@ def assignment_settings_xml(a: Assignment) -> str:
             f"  <points_possible>{a.effective_points:.1f}</points_possible>\n"
             f"  <grading_type>points</grading_type>\n"
             f"  <submission_types>{a.submission_type}</submission_types>\n"
+            f"  <allowed_extensions></allowed_extensions>\n"   # empty = any file (matches the export)
             f"  <position>1</position>\n"
             f"  <peer_reviews>false</peer_reviews>\n"
             f"  <omit_from_final_grade>false</omit_from_final_grade>\n"
@@ -123,57 +144,15 @@ def assignment_groups_xml(group_titles) -> str:
             f"{groups}\n</assignmentGroups>\n")
 
 
-def emit_manifest(assignments: list[Assignment], course_title: str) -> str:
-    items = "\n".join(
-        f'          <item identifier="{cc.gid(a.assignment_id, "item")}" '
-        f'identifierref="{assignment_ident(a)}">\n'
-        f"            <title>{cc._xml(a.title)}</title>\n          </item>"
-        for a in assignments)
-    resources = "\n".join(
-        f'    <resource identifier="{assignment_ident(a)}" '
-        f'type="associatedcontent/imscc_xmlv1p1/learning-application-resource" href="{_href(a)}">\n'
-        f'      <file href="{_href(a)}"/>\n'
-        f'      <file href="{assignment_ident(a)}/assignment_settings.xml"/>\n    </resource>'
-        for a in assignments)
-    mod = cc.gid(course_title, "assignments-module")
-    # course_settings bundles under ONE resource (canvas_export.txt marker + the settings files),
-    # matching how the page cartridge and real Canvas exports wire it.
-    settings_files = ('      <file href="course_settings/canvas_export.txt"/>\n'
-                      '      <file href="course_settings/assignment_groups.xml"/>\n')
-    if any(a.rubric for a in assignments):
-        settings_files += '      <file href="course_settings/rubrics.xml"/>\n'
-    return (f'<?xml version="1.0" encoding="UTF-8"?>\n<manifest identifier="{cc.gid(course_title, "manifest")}" '
-            f"{IMS_NS}>\n  <organizations>\n    <organization identifier=\"org\" structure=\"rooted-hierarchy\">\n"
-            f'      <item identifier="root">\n        <item identifier="{mod}">\n'
-            f"          <title>Assignments</title>\n{items}\n        </item>\n      </item>\n"
-            f"    </organization>\n  </organizations>\n  <resources>\n{resources}\n"
-            f'    <resource identifier="{cc.course_ident(course_title)}" '
-            f'type="associatedcontent/imscc_xmlv1p1/learning-application-resource" '
-            f'href="course_settings/canvas_export.txt">\n{settings_files}    </resource>\n'
-            f"  </resources>\n</manifest>\n")
+def emit_from_path(path, out_path=None) -> Path | None:
+    """Package every `assignment.json` under `path` into ONE `.imscc` (model-free), through the shared
+    cartridge assembler with ONLY the assignment source — so a standalone `emit assignments` gets the
+    SAME module/manifest/course_settings structure the whole-course cartridge does (that is what makes
+    it importable). Returns the written path, or None when there are none."""
+    from coursekit.emit import cartridge
+    from coursekit.emit.sources.assignments import AssignmentSource
 
-
-def package_files(assignments: list[Assignment], course_title: str) -> dict[str, str]:
-    """Every archive path → its text content. Deterministic, so a re-emit is byte-stable."""
-    files = {"imsmanifest.xml": emit_manifest(assignments, course_title),
-             "course_settings/canvas_export.txt": cc.CANVAS_EXPORT_MARKER,
-             "course_settings/assignment_groups.xml":
-                 assignment_groups_xml(sorted({a.group_title for a in assignments}))}
-    if any(a.rubric for a in assignments):
-        files["course_settings/rubrics.xml"] = rubrics_xml(assignments)
-    for a in assignments:
-        d = assignment_ident(a)
-        files[f"{d}/{a.slug}.html"] = assignment_html(a)
-        files[f"{d}/assignment_settings.xml"] = assignment_settings_xml(a)
-    return files
-
-
-def write_imscc(assignments: list[Assignment], course_title: str, out_path) -> Path:
-    out_path = Path(out_path)
-    if out_path.suffix != ".imscc":
-        out_path = out_path.with_suffix(".imscc")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
-        for arc, data in package_files(assignments, course_title).items():
-            z.writestr(arc, data)
-    return out_path
+    p = Path(path)
+    default_out = (p if p.is_dir() else p.parent) / "assignments.imscc"
+    return cartridge.write_course_imscc(path, out_path=out_path or default_out,
+                                        sources=[AssignmentSource()])
