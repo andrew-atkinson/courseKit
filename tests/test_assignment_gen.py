@@ -15,7 +15,7 @@ def _fresh(tmp_path):
 
 def test_tools_build_a_valid_assignment_with_a_rubric(tmp_path):
     ab.reset(assignment_id="c-w3", slug="week-3-assignment", week_ref="week-3",
-             default_points=10, out_dir=tmp_path)
+             default_points=30, out_dir=tmp_path)
     assert ab.set_assignment("Apply loops", "Make a grid of shapes using loops and map().",
                              overview="Connects the week to practice.",
                              deliverable="a p5.js sketch").startswith("OK")
@@ -27,8 +27,32 @@ def test_tools_build_a_valid_assignment_with_a_rubric(tmp_path):
 
     a = ab.get()
     assert isinstance(a, Assignment) and a.rubric is not None
-    assert a.effective_points == 30.0                    # 20 + 10 (each criterion's top level)
+    # the total is the DETERMINISTIC configured 30, split by the model's implied weights (20:10 = 2:1)
+    assert a.effective_points == 30.0
+    assert a.rubric.resolved_points() == [20.0, 10.0]
     assert (tmp_path / "assignment.json").exists()
+
+
+def test_total_is_deterministic_not_the_models_level_sum(tmp_path):
+    """The bug fix: the configured total wins; the model's level numbers only set the split."""
+    ab.reset(assignment_id="c", slug="a", week_ref="w", default_points=100, out_dir=tmp_path)
+    ab.set_assignment("T", "Apply the idea to a new case and explain your reasoning.")
+    ab.add_rubric_criterion("A", [{"description": "hi", "points": 999}, {"description": "lo", "points": 0}])
+    ab.add_rubric_criterion("B", [{"description": "hi", "points": 999}, {"description": "lo", "points": 0}])
+    assert ab.finalize_assignment().startswith("OK")
+    a = ab.get()
+    assert a.effective_points == 100.0                       # not 999+999
+    assert a.rubric.resolved_points() == [50.0, 50.0]        # equal implied weights → even split
+
+
+def test_faculty_weight_overrides_the_split(tmp_path):
+    ab.reset(assignment_id="c", slug="a", week_ref="w", default_points=100, out_dir=tmp_path)
+    ab.set_assignment("T", "Apply the idea to a new case and explain your reasoning.")
+    ab.add_rubric_criterion("A", [{"description": "hi", "points": 4}], weight=3)
+    ab.add_rubric_criterion("B", [{"description": "hi", "points": 4}], weight=1)
+    ab.finalize_assignment()
+    a = ab.get()
+    assert a.rubric.resolved_points() == [75.0, 25.0]        # weights 3:1 of 100, exact
 
 
 def test_a_bad_level_becomes_a_correctable_error_through_the_dispatcher():
