@@ -25,9 +25,12 @@ Markdown (headings, block quotes, tables) — the instructions are rendered from
 
 2. `add_rubric_criterion` — call 3-4 times, one per thing you'll judge. Each has:
    - `description`: the criterion (e.g. "Depth of analysis", "Technical execution").
-   - `levels`: 3-5 performance levels, HIGHEST points first (e.g. Excellent → Good → Fair → Missing),
-     each with a short `description` and `points`. Make the points across criteria add up to a sensible
-     total for an assignment of this size.
+   - `weight` (optional): this criterion's relative importance vs the others (e.g. 2 = twice as
+     important). Omit it and the top level's value is used as the weight.
+   - `levels`: 3-5 performance levels, HIGHEST first (e.g. Excellent → Good → Fair → Missing), each with
+     a short `description` and `points`. The `points` are RELATIVE — the shape of partial credit within
+     the criterion (e.g. 4 / 3 / 2 / 0). Do NOT try to make them add up to a grade total: the instructor
+     sets the assignment's total points, and coursekit rescales your criteria to it by their weights.
 
 3. `finalize_assignment` — last, once the brief and criteria are in.
 

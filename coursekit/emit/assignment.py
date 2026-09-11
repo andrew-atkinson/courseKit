@@ -99,19 +99,19 @@ def _rubric_xml(a: Assignment) -> str:
     from the ARGS260 export. Criterion/rating ids are deterministic so a re-emit is stable."""
     r = a.rubric
     crits = []
-    for i, c in enumerate(r.criteria):
+    for i, (c, (cpoints, levels)) in enumerate(zip(r.criteria, r.resolved())):
         cid = f"{rubric_ident(a)}_c{i}"
         ratings = "\n".join(
             f"          <rating>\n"
-            f"            <description>{cc._xml(rt.description)}</description>\n"
-            f"            <points>{rt.points:.1f}</points>\n"
+            f"            <description>{cc._xml(desc)}</description>\n"
+            f"            <points>{pts:.1f}</points>\n"
             f"            <criterion_id>{cid}</criterion_id>\n"
             f"            <id>{cid}_r{j}</id>\n          </rating>"
-            for j, rt in enumerate(c.ratings))
+            for j, (desc, pts) in enumerate(levels))
         crits.append(
             f"      <criterion>\n"
             f"        <criterion_id>{cid}</criterion_id>\n"
-            f"        <points>{c.points:.1f}</points>\n"
+            f"        <points>{cpoints:.1f}</points>\n"
             f"        <description>{cc._xml(c.description)}</description>\n"
             f"        <long_description>{cc._xml(c.long_description)}</long_description>\n"
             f"        <ratings>\n{ratings}\n        </ratings>\n      </criterion>")

@@ -41,9 +41,12 @@ def _build() -> Assignment | str:
     if not b:
         return "ERROR: call set_assignment first (title + task)."
     criteria = [RubricCriterion(description=c["description"], long_description=c.get("long_description", ""),
+                                weight=c.get("weight"),
                                 ratings=[RubricRating(**lv) for lv in c["levels"]])
                 for c in _state["criteria"]]
-    rubric = Rubric(title=f"{b['title']} — Rubric", criteria=criteria) if criteria else None
+    # points_total is the DETERMINISTIC, faculty-set grade total (STRC-3) — not the model's level sum
+    rubric = (Rubric(title=f"{b['title']} — Rubric", points_total=_state["default_points"],
+                     criteria=criteria) if criteria else None)
     try:
         return Assignment(assignment_id=_state["assignment_id"], title=b["title"], slug=_state["slug"],
                           week_ref=_state["week_ref"], submission_type=b["submission_type"],
@@ -67,12 +70,13 @@ def set_assignment(title: str, task: str, overview: str = "", deliverable: str =
     return f"OK brief set: {title!r} ({submission_type}). Now add rubric criteria."
 
 
-def add_rubric_criterion(description: str, levels: list, long_description: str = "") -> str:
+def add_rubric_criterion(description: str, levels: list, long_description: str = "",
+                         weight: float | None = None) -> str:
     # validate now so a bad criterion is a correctable error, not a finalize-time surprise
-    RubricCriterion(description=description, long_description=long_description,
+    RubricCriterion(description=description, long_description=long_description, weight=weight,
                     ratings=[RubricRating(**lv) for lv in levels])
     _state["criteria"].append({"description": description, "long_description": long_description,
-                               "levels": levels})
+                               "weight": weight, "levels": levels})
     return f"OK criterion {len(_state['criteria'])}: {description!r} ({len(levels)} levels)."
 
 
@@ -114,12 +118,19 @@ TOOL_SPECS = [
                              "description": "how students submit"}},
          "required": ["title", "task"], "additionalProperties": False}},
     {"name": "add_rubric_criterion",
-     "description": "Add ONE rubric row: what's judged + its performance levels (highest points first).",
+     "description": ("Add ONE rubric row: what's judged + its performance levels (highest first). You do "
+                     "NOT set the grade total — the instructor sets that; you set each criterion's "
+                     "relative IMPORTANCE and its levels."),
      "parameters": {"type": "object", "properties": {
          "description": {"type": "string", "description": "the criterion, e.g. 'Analysis'"},
          "long_description": {"type": "string", "description": "a fuller sentence (optional)"},
+         "weight": {"type": "number",
+                    "description": ("this criterion's relative importance vs the others (e.g. 2 = twice "
+                                    "as important). Optional — omit and the top level's value is used.")},
          "levels": {"type": "array", "items": _LEVEL_ITEM,
-                    "description": "3-5 levels high→low, e.g. [{description:'Excellent',points:20}, …]"}},
+                    "description": ("3-5 levels high→low. The numbers are RELATIVE (the shape of partial "
+                                    "credit), e.g. [{description:'Excellent',points:4},{...'Good',points:3},"
+                                    "{...'Missing',points:0}] — they are rescaled to the instructor's total.")}},
          "required": ["description", "levels"], "additionalProperties": False}},
     {"name": "finalize_assignment",
      "description": "Write the assignment out. Call last, after the brief and 3-4 criteria.",

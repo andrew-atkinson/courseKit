@@ -32,22 +32,60 @@ class RubricCriterion(BaseModel):
     model_config = ConfigDict(extra="forbid")
     description: str = Field(min_length=1)              # the criterion, e.g. "Written analysis"
     long_description: str = ""
+    weight: float | None = Field(default=None, gt=0)   # relative importance; None ⇒ use the top level
     ratings: list[RubricRating] = Field(min_length=1)  # levels, highest → lowest
 
     @property
     def points(self) -> float:
-        return max(r.points for r in self.ratings)     # the criterion's max = its top level
+        return max(r.points for r in self.ratings)     # the top level (the model's authored/relative value)
+
+    @property
+    def effective_weight(self) -> float:
+        """Faculty-declared weight, else the model's top level as its implied weight (STRC-3)."""
+        return self.weight if self.weight is not None else self.points
 
 
 class Rubric(BaseModel):
-    """A structured Canvas rubric — criteria × levels × points (grounded from the ARGS260 export)."""
+    """A structured Canvas rubric — criteria × levels × points (grounded from the ARGS260 export).
+
+    Point VALUES are user-guided with model-derived defaults (STRC-3): when `points_total` is set the
+    total is deterministic (faculty-declared, not the model's invented sum) and each criterion's points
+    are DERIVED = total × weight / Σweights, so editing a `weight` or the total and re-emitting re-derives
+    with no model. `points_total=None` is the legacy path — each criterion's top level is its points.
+    """
     model_config = ConfigDict(extra="forbid")
     title: str = Field(min_length=1)
+    points_total: float | None = Field(default=None, gt=0)   # authoritative total; None ⇒ legacy (sum of tops)
     criteria: list[RubricCriterion] = Field(min_length=1)
+
+    def resolved_points(self) -> list[float]:
+        """Absolute points per criterion. Deterministic from (points_total, weights); the rounding
+        remainder goes to the largest criterion so the criteria sum EXACTLY to the total."""
+        if self.points_total is None:
+            return [c.points for c in self.criteria]             # legacy: top level is the value
+        ws = [c.effective_weight for c in self.criteria]
+        tot = sum(ws) or 1.0
+        raw = [self.points_total * w / tot for w in ws]
+        pts = [round(x, 1) for x in raw]
+        diff = round(self.points_total - sum(pts), 1)
+        if diff:
+            i = max(range(len(raw)), key=raw.__getitem__)        # remainder → the heaviest criterion
+            pts[i] = round(pts[i] + diff, 1)
+        return pts
+
+    def resolved(self) -> list[tuple[float, list[tuple[str, float]]]]:
+        """(criterion_points, [(level_desc, level_points)]) fully scaled to absolute — the emitter reads
+        this. A criterion's levels keep the model's SHAPE (top→bottom ratios), scaled to its points."""
+        out = []
+        for c, P in zip(self.criteria, self.resolved_points()):
+            top = c.points or 1.0
+            out.append((P, [(r.description, P if r.points == top else round(P * r.points / top, 1))
+                            for r in c.ratings]))
+        return out
 
     @property
     def points_possible(self) -> float:
-        return sum(c.points for c in self.criteria)
+        return self.points_total if self.points_total is not None else sum(self.resolved_points())
 
 
 class Assignment(BaseModel):

@@ -134,6 +134,26 @@ def test_emit_from_path_none_when_empty(tmp_path):
     assert ae.emit_from_path(tmp_path) is None
 
 
+def test_derived_rubric_scales_to_total_and_sums_exactly():
+    # three equal weights of 100 → 33.3/33.3/33.4 (remainder to one), summing EXACTLY to the total
+    r = Rubric(title="R", points_total=100, criteria=[
+        RubricCriterion(description=n, ratings=[RubricRating(description="hi", points=1),
+                                                RubricRating(description="lo", points=0)])
+        for n in ("A", "B", "C")])
+    pts = r.resolved_points()
+    assert sum(pts) == 100.0 and set(pts) == {33.3, 33.4}
+    root = ET.fromstring(ae.rubrics_xml([_asg(rubric=r)]))
+    assert liter(root, "points_possible")[0].text == "100.0"
+    # a criterion's top level equals the criterion's derived points (partial-credit shape preserved)
+    tops = [float(liter(c, "points")[0].text) for c in liter(root, "criterion")]
+    assert sorted(tops) == sorted(pts)
+
+
+def test_legacy_rubric_without_total_is_unchanged():
+    r = _rubric()                                    # no points_total → top level is the value
+    assert r.points_possible == 75.0 and r.resolved_points() == [35.0, 40.0]
+
+
 def test_instructions_render_inline_markdown_and_steps():
     a = Assignment(assignment_id="w", title="T", task="Use `map()` and be **bold**.",
                    steps=["**One:** do `x`.", "Two."])
