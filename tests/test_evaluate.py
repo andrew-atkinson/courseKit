@@ -119,3 +119,19 @@ def test_evaluate_course_finds_targeted_quizzes_via_source_md(tmp_path):
                                           provider=_FakeCritic("OUTOFSCOPE"), model="m")
     assert findings and review is not None and review.exists()
     assert review == course / "quizzes" / "quiz-review.md"
+
+
+def test_evaluate_course_skips_an_empty_source_without_looping(tmp_path):
+    # An empty source.md means nothing to evaluate AGAINST — evaluate must skip it, NOT call the critic
+    # once per variant (the reported bug: 16 questions all flagged "material is empty").
+    course = tmp_path / "course"
+    (course / ".vtconfig").mkdir(parents=True)
+    qd = course / "quizzes" / "week-4-scanned-pdf"
+    qd.mkdir(parents=True)
+    (qd / "bank.json").write_text(_bank().model_dump_json(), encoding="utf-8")
+    (qd / "source.md").write_text("   \n\n", encoding="utf-8")     # extracted empty (image-only PDF)
+
+    critic = _FakeCritic("OUTOFSCOPE")
+    findings, review = ev.evaluate_course(course, weeks=["4"], provider=critic, model="m")
+    assert findings == [] and review is None      # nothing reviewed → no findings, no review file
+    assert critic.calls == 0                       # the critic was never called — quit, not loop

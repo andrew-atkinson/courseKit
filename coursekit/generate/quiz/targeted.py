@@ -57,6 +57,12 @@ def generate_targeted_quiz(source, provider, model, *, output_root=None, max_ite
         raise SystemExit(f"unsupported source '{source.name}' — need one of "
                          f"{', '.join(sorted(SUPPORTED_SUFFIXES))}")
     text = extract_text(source)
+    if not text.strip():
+        raise SystemExit(
+            f"extracted no text from '{source.name}' — nothing to quiz. If it's a scanned/image PDF it "
+            f"has no text layer; OCR it first, or supply a text-based source (.md/.txt/.docx/.pptx). "
+            f"(Generating anyway would produce questions from the model's own knowledge, not your "
+            f"material — an ungrounded quiz.)")
 
     cfg = courseconfig.load(source, config_name="quiz.yaml")     # domain.md / voice / quiz.yaml from here
     root = cfg.root

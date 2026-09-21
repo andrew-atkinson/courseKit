@@ -67,6 +67,22 @@ def test_missing_source_is_rejected(tmp_path):
         targeted.generate_targeted_quiz(tmp_path / "nope.md", None, "m")
 
 
+def test_text_empty_source_is_refused_before_the_model_runs(tmp_path, monkeypatch):
+    # A source that extracts to NO text (e.g. a scanned/image PDF) must fail loud — not silently
+    # generate an ungrounded quiz from the model's own knowledge. A whitespace-only .md extracts empty.
+    root, _ = _course(tmp_path)
+    empty = root / "week-3" / "readings" / "Scanned.md"
+    empty.write_text("   \n\n\t\n", encoding="utf-8")
+    called = []
+    import coursekit.pipeline as pl
+    monkeypatch.setattr(pl, "run_unit", lambda *a, **k: called.append(1))
+
+    with pytest.raises(SystemExit):
+        targeted.generate_targeted_quiz(empty, None, "m")
+    assert not called                                        # the model was never reached
+    assert not (root / "quizzes").exists()                   # and no source.md / bank.json was written
+
+
 def test_cli_targeted_handler_runs_end_to_end(monkeypatch, tmp_path):
     # Exercise the CLI handler body (not just arg parsing) — the layer where a `Path` NameError hid.
     import types

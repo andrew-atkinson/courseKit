@@ -207,11 +207,19 @@ def evaluate_course(path, *, weeks=None, provider, model, out_path=None,
 
     findings: list[Finding] = []
     for slug, bj, tpath, proot in _iter_quiz_banks(path, weeks):
+        material = tpath.read_text(encoding="utf-8")
+        if not material.strip():
+            # An empty source means nothing to review AGAINST — every question would flag "material is
+            # empty". Skip loudly instead of running the critic once per variant (the reported bug).
+            if progress:
+                progress(f"skipping {slug} — its source ({tpath.name}) is empty; nothing to evaluate "
+                         f"against. Re-generate from a source with extractable text.")
+            continue
         bank = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
         n = sum(len(g.variants) for g in bank.groups.values())
         if progress:
             progress(f"cold-reading {slug} — {n} question(s)…")
-        findings += evaluate_bank(bank, tpath.read_text(encoding="utf-8"), provider, model,
+        findings += evaluate_bank(bank, material, provider, model,
                                   week=slug, project_root=proot, reads=reads, progress=progress)
 
     if not findings:
