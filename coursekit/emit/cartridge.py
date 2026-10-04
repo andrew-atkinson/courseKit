@@ -61,6 +61,27 @@ def _default_sources() -> list:
     return [PagesSource(), QuizzesSource(), AssignmentSource()]
 
 
+# ------------------------------------------------------------- grading groups (STRC-2)
+
+def _grading_settings(path, items: list[CartridgeItem], course_title: str) -> dict:
+    """The course-level grading files. With a DECLARED scheme: emit every declared group (with its
+    weight) + `course_settings.xml` carrying `group_weighting_scheme=percent` when any weight is set.
+    With NO scheme (DERIVE default): the single `"Assignments"` group at weight 0 when any assignment is
+    present — byte-identical to the pre-STRC-2 behavior; no `course_settings.xml`."""
+    from coursekit.coursestructure import CourseStructure
+    from coursekit.emit import assignment as ae
+
+    scheme = CourseStructure.load(path).grading()
+    out: dict = {}
+    if scheme.has_scheme():
+        out["course_settings/assignment_groups.xml"] = ae.assignment_groups_xml(scheme.group_list())
+        if scheme.weighted():
+            out["course_settings/course_settings.xml"] = cc.course_settings_xml(course_title, weighted=True)
+    elif any(it.content_type == "Assignment" for it in items):
+        out["course_settings/assignment_groups.xml"] = ae.assignment_groups_xml([("Assignments", 0.0)])
+    return out
+
+
 # ------------------------------------------------------------- module grouping
 
 def _week_sort(k: str | None):
@@ -221,6 +242,7 @@ def write_course_imscc(path, out_path=None, title=None, sources=None) -> Path | 
         return None
 
     course_title = title or cc._course_title(path)
+    settings.update(_grading_settings(path, items, course_title))   # assignment_groups.xml (+ weights)
     modules = _modules(items, path, course_title)
 
     files = package_files(items, course_title)  # raises on a file collision — before any I/O

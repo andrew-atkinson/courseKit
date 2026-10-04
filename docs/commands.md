@@ -28,11 +28,14 @@ A document that names no week is skipped once any week-numbered content is prese
 | `coursekit propose PATH`                | Scan the course tree → **declare** its structure (weeks + typed sources) into `.vtconfig/structure.coursekit.yaml`, and surface any files it couldn't key.         | x        |
 | `coursekit propose PATH --model`        | Group with a local **model** instead of filename heuristics — for trees that don't encode weeks in names/folders. Validated so it can only group files that exist. | ✓        |
 | `coursekit propose PATH --model --deep` | Also give the model a short content peek of each file (slower; better on topic-named piles).                                                                       | ✓        |
+| `coursekit propose PATH --grading`      | Draft a **grading-groups** block (assignment groups + weight placeholders) from the generated artifacts into the same overlay — STRC-2. Spans assignments + graded quizzes. | x        |
 | `coursekit propose PATH --dry-run`      | Print the proposal without writing the overlay.                                                                                                                    | x        |
 | `coursekit propose PATH --force`        | Redraft an existing overlay (discards manual edits).                                                                                                               | x        |
 
 `propose` writes coursekit's **own** overlay file — never `context.yaml` — which the tools then read as authoritative (a week doc can be named anything; sources carry a `kind`).
 It's descriptive: it maps what exists and shows unassigned files rather than dropping them; you edit the overlay freely afterward.
+
+**Grading groups + weighting (`--grading`, STRC-2).** The drafted `grading:` block declares named assignment **groups** with a percentage `weight` and a `placement` map (by content kind — `assignment`/`quiz` — or a specific item slug). The weights start as **equal placeholders you set** to your real scheme. `emit course` then emits weighted `assignment_groups.xml`, places each assignment and graded quiz in its group, and writes the `group_weighting_scheme=percent` flag so Canvas applies the weights. No `grading:` block ⇒ today's behavior (one unweighted "Assignments" group). This is the gradebook **category** weight (Projects 40% / Quizzes 20%), distinct from a rubric's within-assignment criterion weights.
 
 | Analyze Commands                   | What it does                                                                                                                              | Uses LLM |
 |------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|----------|

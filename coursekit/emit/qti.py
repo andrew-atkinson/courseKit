@@ -664,11 +664,13 @@ def _description(bank, quiz: dict, points: float) -> str:
     return _xml(html_body)
 
 
-def emit_assessment_meta(bank, quiz: dict) -> str:
-    """Canvas quiz settings. Safe defaults; the assignment block omits assignment_group so a
-    minimal import lands in the default group (to confirm against the Canvas sample)."""
+def emit_assessment_meta(bank, quiz: dict, *, assignment_group_id: str | None = None) -> str:
+    """Canvas quiz settings. A graded quiz IS an assignment under the hood; when `assignment_group_id`
+    is given (STRC-2) it lands in that gradebook group, else the import's default group."""
     run_id = bank.run_id
     points = _points_possible(quiz)
+    group_ref = (f"\n    <assignment_group_identifierref>{assignment_group_id}"
+                 f"</assignment_group_identifierref>" if assignment_group_id else "")
     return f'''<?xml version="1.0"?>
 <quiz {META_NS} identifier="{quiz_ident(run_id)}">
   <title>{_xml(quiz.get("title", "Quiz"))}</title>
@@ -685,7 +687,7 @@ def emit_assessment_meta(bank, quiz: dict) -> str:
   <assignment identifier="{item_id(run_id, "assignment")}">
     <title>{_xml(quiz.get("title", "Quiz"))}</title>
     <workflow_state>unpublished</workflow_state>
-    <quiz_identifierref>{quiz_ident(run_id)}</quiz_identifierref>
+    <quiz_identifierref>{quiz_ident(run_id)}</quiz_identifierref>{group_ref}
     <points_possible>{points:.1f}</points_possible>
     <grading_type>points</grading_type>
     <submission_types>online_quiz</submission_types>

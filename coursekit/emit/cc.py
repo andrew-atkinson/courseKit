@@ -143,6 +143,18 @@ def page_resource(page) -> str:
             f'    </resource>')
 
 
+def course_settings_xml(course_title: str, *, weighted: bool) -> str:
+    """`course_settings/course_settings.xml` — minimal course-level settings (grounded from the real
+    export). We emit it only to carry `<group_weighting_scheme>` so declared assignment-group WEIGHTS
+    actually apply (`percent`); without this flag Canvas ignores the weights (STRC-2)."""
+    scheme = "percent" if weighted else "equal"
+    return (f'<?xml version="1.0" encoding="UTF-8"?>\n'
+            f'<course identifier="{course_ident(course_title)}" {CANVAS_NS}>\n'
+            f"  <title>{_xml(course_title)}</title>\n"
+            f"  <group_weighting_scheme>{scheme}</group_weighting_scheme>\n"
+            f"</course>\n")
+
+
 def _course_settings_resource(course_title: str, extra_files=()) -> str:
     """The `learning-application-resource` that declares the course_settings bundle. Its href is the
     canvas_export.txt marker (Canvas keys the flip to Pages off that path); the <file> children are

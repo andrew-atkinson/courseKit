@@ -40,12 +40,16 @@ class AssignmentSource:
 
     def collect(self, course_path) -> list[CartridgeItem]:
         from coursekit.courseconfig import find_root
+        from coursekit.coursestructure import CourseStructure
         from coursekit.generate.page.style import load_style
         self._loaded = _load(course_path)
-        style = load_style(find_root(Path(course_path)))   # the course theme, so assignments match pages
+        root = find_root(Path(course_path))
+        style = load_style(root)                            # the course theme, so assignments match pages
+        scheme = CourseStructure.load(course_path).grading()   # declared grading groups (STRC-2)
         items = []
         for a, f in self._loaded:
             aid = ae.assignment_ident(a)
+            group = scheme.group_for("assignment", slug=a.slug) or a.group_title   # declared → default
             items.append(CartridgeItem(
                 week_key=week_key(a.week_ref) if a.week_ref else None,
                 content_type="Assignment",
@@ -54,19 +58,17 @@ class AssignmentSource:
                 item_id=cc.gid(a.assignment_id, "item"),
                 resource_xml=_resource(a),
                 files={f"{aid}/{a.slug}.html": ae.assignment_html(a, style=style),
-                       f"{aid}/assignment_settings.xml": ae.assignment_settings_xml(a)},
+                       f"{aid}/assignment_settings.xml": ae.assignment_settings_xml(a, group_title=group)},
                 rank=2,   # assignments after pages(0) / quizzes(1) in a week's module
                 source=f,
             ))
         return items
 
     def course_settings(self) -> dict:
-        """The course-level files: the assignment groups, and the rubrics when any assignment has one."""
+        """Course-level files this source contributes: the rubrics when any assignment has one. The
+        assignment GROUPS file is emitted by the assembler (`cartridge.py`) from the declared scheme, so
+        it spans quizzes too and exists even with no assignments (STRC-2)."""
         assignments = [a for a, _ in self._loaded]
-        if not assignments:
-            return {}
-        out = {"course_settings/assignment_groups.xml":
-               ae.assignment_groups_xml(sorted({a.group_title for a in assignments}))}
-        if any(a.rubric for a in assignments):
-            out["course_settings/rubrics.xml"] = ae.rubrics_xml(assignments)
-        return out
+        if assignments and any(a.rubric for a in assignments):
+            return {"course_settings/rubrics.xml": ae.rubrics_xml(assignments)}
+        return {}

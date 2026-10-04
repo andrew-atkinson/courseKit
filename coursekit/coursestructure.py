@@ -17,7 +17,7 @@ This is a READER only; the proposer that WRITES a draft manifest is a later phas
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from coursekit import courseconfig
@@ -62,6 +62,49 @@ class Source:
         return Path(root) / p
 
 
+@dataclass(frozen=True)
+class GradingScheme:
+    """Declared grading organization (STRC-2): named assignment GROUPS with a percentage `weight`, and
+    a `placement` map keying a content-kind (`assignment`/`quiz`) or an item slug to a group name. Empty
+    when nothing is declared — callers then fall back to today's single-"Assignments"-group behavior."""
+
+    groups: tuple[tuple[str, float], ...] = ()   # (name, weight%), in declared order
+    placement: dict = field(default_factory=dict)  # kind ("assignment"/"quiz") OR item slug -> group name
+
+    def has_scheme(self) -> bool:
+        return bool(self.groups)
+
+    def weighted(self) -> bool:
+        """True if any group carries a non-zero weight — the signal to emit `group_weighting_scheme`."""
+        return any(w > 0 for _, w in self.groups)
+
+    def group_list(self) -> list:
+        return list(self.groups)
+
+    def group_for(self, kind: str, slug: str | None = None) -> str | None:
+        """Resolve an item's group: an item-slug override wins, else the content-kind default, else None
+        (caller falls back). `kind` is coursekit's friendly key — 'assignment' or 'quiz'."""
+        if slug and slug in self.placement:
+            return self.placement[slug]
+        return self.placement.get(kind)
+
+
+def _parse_grading(raw) -> GradingScheme:
+    """Coerce the overlay's `grading:` block into a GradingScheme; anything malformed degrades to empty."""
+    if not isinstance(raw, dict):
+        return GradingScheme()
+    groups = []
+    for g in raw.get("groups") or []:
+        if isinstance(g, dict) and g.get("name"):
+            try:
+                w = float(g.get("weight", 0) or 0)
+            except (TypeError, ValueError):
+                w = 0.0
+            groups.append((str(g["name"]), w))
+    placement = {str(k): str(v) for k, v in (raw.get("placement") or {}).items() if v}
+    return GradingScheme(tuple(groups), placement)
+
+
 def _as_source(raw, *, default_kind: str | None = None, default_role: str = "content") -> Source | None:
     """Coerce one declared entry (a dict) into a Source, or None when it names no path. Accepts both
     coursekit's `path` and the transcriber's `filename` key."""
@@ -77,13 +120,18 @@ def _as_source(raw, *, default_kind: str | None = None, default_role: str = "con
     return Source(path=path, title=str(title), kind=str(kind), role=str(role))
 
 
-def _read_overlay_weeks(cfg: courseconfig.CourseConfig) -> dict:
-    """coursekit's own overlay weeks (`.vtconfig/structure.coursekit.yaml`), or {}. Same graceful
+def _read_overlay(cfg: courseconfig.CourseConfig) -> dict:
+    """coursekit's whole overlay (`.vtconfig/structure.coursekit.yaml`), or {}. Same graceful
     degradation as every other yaml read — a missing/partial/bad file yields {}."""
     if cfg.root is None:
         return {}
     data = courseconfig._read_yaml(cfg.root / courseconfig.VTCONFIG_DIR_NAME / OVERLAY_NAME)
-    weeks = data.get("weeks")
+    return data if isinstance(data, dict) else {}
+
+
+def _read_overlay_weeks(cfg: courseconfig.CourseConfig) -> dict:
+    """Just the overlay's `weeks` mapping, or {}."""
+    weeks = _read_overlay(cfg).get("weeks")
     return weeks if isinstance(weeks, dict) else {}
 
 
@@ -139,6 +187,11 @@ class CourseStructure:
             if k is not None and isinstance(entry, dict):
                 out.append((k, entry))
         return sorted(out, key=lambda kv: _week_sort(kv[0]))
+
+    def grading(self) -> GradingScheme:
+        """The declared grading scheme (STRC-2) from the overlay's `grading:` block, or an empty scheme
+        (caller falls back to today's single-"Assignments"-group behavior)."""
+        return _parse_grading(_read_overlay(self._cfg).get("grading"))
 
     def has_declared_structure(self) -> bool:
         """True when at least one week declares coursekit's own `doc` or `sources` — the signal to
