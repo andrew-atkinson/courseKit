@@ -160,6 +160,8 @@ def _cmd_propose(args) -> int:
     no model. Prints the proposed weeks + the files it could not key, then writes the overlay unless
     --dry-run. coursekit writes only its own `.vtconfig/structure.coursekit.yaml`, never context.yaml."""
     from coursekit.ingest import propose as proposer
+    if getattr(args, "grading", False):
+        return _cmd_propose_grading(args)
     if getattr(args, "model", False):
         model = os.getenv("MODEL_NAME") or courseconfig.load(args.path, config_name="quiz.yaml").value("model")
         if not model:
@@ -193,6 +195,28 @@ def _cmd_propose(args) -> int:
         return 0
     dest = proposer.write_overlay(prop, force=args.force)
     print(f"\nWrote {dest}\nEdit it freely; generate reads it as authoritative.")
+    return 0
+
+
+def _cmd_propose_grading(args) -> int:
+    """`propose --grading`: draft a `grading:` block (assignment groups + a placement map) from the
+    generated artifacts present, with EQUAL-WEIGHT placeholders the faculty then set. Offline."""
+    from coursekit.ingest import propose_grading as pg
+    grading = pg.propose_grading(args.path)
+    if not grading:
+        print("No graded artifacts found (assignments/ or quizzes/) — generate some first, then re-run.")
+        return 1
+    print("Proposed grading groups (EQUAL placeholders — set the real weights):")
+    for g in grading["groups"]:
+        print(f"  {g['name']:<16} weight {g['weight']}%")
+    print("Placement:")
+    for kind, grp in grading["placement"].items():
+        print(f"  {kind:<12} → {grp}")
+    if args.dry_run:
+        print("\n(dry run — nothing written)")
+        return 0
+    dest = pg.write_grading(args.path, grading, force=args.force)
+    print(f"\nWrote {dest}\nSet the weights to your real grading scheme; `emit course` reads them.")
     return 0
 
 
@@ -785,6 +809,9 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--deep", action="store_true",
                     help="with --model, give the model a short content peek of each file (slower, "
                          "better on topic-named piles)")
+    pp.add_argument("--grading", action="store_true",
+                    help="instead of weeks: draft a grading-groups block (assignment groups + weights "
+                         "placeholders) from the generated artifacts — STRC-2 (offline)")
     pp.add_argument("--dry-run", action="store_true", help="print the proposal without writing the overlay")
     pp.add_argument("--force", action="store_true", help="redraft an existing overlay (discards manual edits)")
     pp.set_defaults(func=_cmd_propose)

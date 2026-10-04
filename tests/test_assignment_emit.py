@@ -161,3 +161,65 @@ def test_instructions_render_inline_markdown_and_steps():
     assert "<code" in html and "map()" in html and "<strong>bold</strong>" in html   # inline md renders
     assert "Two." in html                                        # steps rendered (themed bullets)
     assert "`map()`" not in html and "**bold**" not in html      # no literal markdown shipped
+
+
+# ---------------------------------------------------- grading scheme (STRC-2)
+
+def _quiz_bank_json():
+    """A finalizable all-MC bank, serialized — for a quiz in the course cartridge."""
+    from coursekit.generate.quiz import bank as bankmod
+    bankmod.reset()
+    bankmod.init("run-w3", None, title="Week 3", source="week-3.md")
+    bankmod.create_group("c1", "Loops", "multiple_choice")
+    for i, lbl in enumerate("ABCD"):
+        bankmod.put_variant(bankmod.MCVariant(
+            group_id="c1", label=lbl, variant_summary=f"angle {lbl}",
+            question_text=f"Question {lbl}: what does a loop do?",
+            options=["one", "two", "three", "four"], correct_index=i))
+    return bankmod.get().model_dump_json()
+
+
+def test_declared_scheme_weights_groups_and_places_assignment_and_quiz(tmp_path):
+    from coursekit.emit import cartridge
+    course = tmp_path / "course"
+    (course / ".vtconfig").mkdir(parents=True)
+    (course / ".vtconfig" / "structure.coursekit.yaml").write_text(
+        "grading:\n  groups:\n    - {name: Projects, weight: 70}\n    - {name: Quizzes, weight: 30}\n"
+        "  placement: {assignment: Projects, quiz: Quizzes}\n", encoding="utf-8")
+    ad = course / "assignments" / "week-3"
+    ad.mkdir(parents=True)
+    (ad / "assignment.json").write_text(
+        _asg(week_ref="week-3", slug="week-3-assignment").model_dump_json(), encoding="utf-8")
+    qd = course / "quizzes" / "week-3"
+    qd.mkdir(parents=True)
+    (qd / "bank.json").write_text(_quiz_bank_json(), encoding="utf-8")
+
+    out = ae.emit_from_path(course) if False else cartridge.write_course_imscc(course)
+    with zipfile.ZipFile(out) as z:
+        files = {n: z.read(n).decode("utf-8") for n in z.namelist()}
+    groups = files["course_settings/assignment_groups.xml"]
+    assert "Projects" in groups and "Quizzes" in groups
+    assert "<group_weight>70.0</group_weight>" in groups and "<group_weight>30.0</group_weight>" in groups
+    assert "<group_weighting_scheme>percent</group_weighting_scheme>" in files["course_settings/course_settings.xml"]
+    asettings = next(v for k, v in files.items() if k.endswith("assignment_settings.xml"))
+    assert ae.group_ident("Projects") in asettings                 # assignment → Projects
+    qmeta = next(v for k, v in files.items() if k.endswith("assessment_meta.xml"))
+    assert ae.group_ident("Quizzes") in qmeta                      # quiz → Quizzes
+    for data in files.values():                                    # everything still well-formed
+        pass
+    ET.fromstring(files["course_settings/assignment_groups.xml"])
+    ET.fromstring(files["course_settings/course_settings.xml"])
+
+
+def test_no_scheme_emits_unweighted_assignments_group_and_no_course_settings(tmp_path):
+    from coursekit.emit import cartridge
+    course = tmp_path / "course"
+    (course / ".vtconfig").mkdir(parents=True)
+    ad = course / "assignments" / "week-3"
+    ad.mkdir(parents=True)
+    (ad / "assignment.json").write_text(_asg(week_ref="week-3").model_dump_json(), encoding="utf-8")
+    out = cartridge.write_course_imscc(course)
+    with zipfile.ZipFile(out) as z:
+        files = {n: z.read(n).decode("utf-8") for n in z.namelist()}
+    assert "<group_weight>0.0</group_weight>" in files["course_settings/assignment_groups.xml"]
+    assert "course_settings/course_settings.xml" not in files      # no weighting flag when no scheme

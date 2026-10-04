@@ -248,6 +248,27 @@ def test_propose_model_and_deep_parse():
     assert args.func is cli._cmd_propose and args.model and args.deep
 
 
+def test_propose_grading_parses_and_routes():
+    args = _parse("propose", "/course", "--grading")
+    assert args.func is cli._cmd_propose and args.grading
+
+
+def test_propose_grading_handler_writes_a_grading_block(tmp_path, capsys):
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    (root / "assignments" / "week-3").mkdir(parents=True)
+    (root / "assignments" / "week-3" / "assignment.json").write_text("{}", encoding="utf-8")
+    (root / "quizzes" / "week-3").mkdir(parents=True)
+    (root / "quizzes" / "week-3" / "bank.json").write_text("{}", encoding="utf-8")
+
+    import types
+    rc = cli._cmd_propose(types.SimpleNamespace(path=str(root), grading=True, dry_run=False, force=False))
+    assert rc == 0
+    text = (root / ".vtconfig" / "structure.coursekit.yaml").read_text()
+    assert "grading:" in text and "Assignments" in text and "Quizzes" in text
+    assert "placeholder" in capsys.readouterr().out.lower()
+
+
 def test_propose_model_flag_routes_to_the_model_engine(tmp_path, monkeypatch):
     root = tmp_path / "course"
     (root / ".vtconfig").mkdir(parents=True)

@@ -63,14 +63,19 @@ class QuizzesSource:
     content_type = "Quizzes::Quiz"
 
     def collect(self, course_path) -> list[CartridgeItem]:
+        from coursekit.coursestructure import CourseStructure
+        from coursekit.emit.assignment import group_ident
         entries, skipped = qti._load_banks(course_path)   # (bank, quiz, bank_json); guards run here
         for bj, reason in skipped:                          # a broken week is warned + omitted, not fatal
             print(f"  ⚠ skipped quiz {bj.parent.name}: {reason}")
+        scheme = CourseStructure.load(course_path).grading()   # declared grading groups (STRC-2)
         items = []
         for bank, quiz, bj in entries:
             qid = qti.quiz_ident(bank.run_id)
             meta_id = qti.iid(bank.run_id, "meta")
             title = quiz.get("title") or bank.title or "Quiz"
+            group = scheme.group_for("quiz", slug=bj.parent.name)   # declared group, else default (None)
+            gref = group_ident(group) if group else None
             items.append(CartridgeItem(
                 week_key=week_key(bj.parent.name),
                 content_type="Quizzes::Quiz",
@@ -80,7 +85,7 @@ class QuizzesSource:
                 resource_xml=_quiz_resources(qid, meta_id),
                 files={
                     f"{qid}/assessment_qti.xml": _assessment_stub(qid, title),
-                    f"{qid}/assessment_meta.xml": qti.emit_assessment_meta(bank, quiz),
+                    f"{qid}/assessment_meta.xml": qti.emit_assessment_meta(bank, quiz, assignment_group_id=gref),
                     f"non_cc_assessments/{qid}.xml.qti": qti.emit_assessment(bank, quiz),
                 },
                 rank=1,   # quizzes after pages in a week's module

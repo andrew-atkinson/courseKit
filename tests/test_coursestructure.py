@@ -5,7 +5,7 @@ typed `sources:` list, and its absence degrades to empty (callers then fall back
 from pathlib import Path
 
 from coursekit import courseconfig
-from coursekit.coursestructure import CourseStructure, Source
+from coursekit.coursestructure import CourseStructure, GradingScheme, Source, _parse_grading
 
 
 def _struct(context: dict, root: Path | None = None) -> CourseStructure:
@@ -158,3 +158,39 @@ def test_overlay_only_week_appears(tmp_path):
     s = CourseStructure.load(root)
     assert [n for n, _ in s.iter_weeks()] == ["4"]
     assert s.has_declared_structure()
+
+
+# ------------------------------------------------------- grading scheme (STRC-2)
+
+def test_parse_grading_reads_groups_weights_and_placement():
+    g = _parse_grading({"groups": [{"name": "Projects", "weight": 50},
+                                    {"name": "Quizzes", "weight": 20}],
+                        "placement": {"assignment": "Projects", "quiz": "Quizzes"}})
+    assert g.has_scheme() and g.weighted()
+    assert g.group_list() == [("Projects", 50.0), ("Quizzes", 20.0)]
+    assert g.group_for("assignment") == "Projects" and g.group_for("quiz") == "Quizzes"
+    assert g.group_for("discussion") is None                 # undeclared kind → caller falls back
+
+
+def test_grading_item_slug_override_beats_kind_default():
+    g = _parse_grading({"groups": [{"name": "Projects", "weight": 60}, {"name": "Labs", "weight": 40}],
+                        "placement": {"assignment": "Projects", "week-3-lab": "Labs"}})
+    assert g.group_for("assignment", slug="week-3-lab") == "Labs"      # slug wins
+    assert g.group_for("assignment", slug="week-2-essay") == "Projects"  # falls to kind default
+
+
+def test_grading_unweighted_and_malformed_degrade():
+    assert _parse_grading({"groups": [{"name": "All", "weight": 0}]}).weighted() is False
+    assert _parse_grading(None) == GradingScheme()           # malformed → empty, no raise
+    assert _parse_grading({"groups": "nonsense"}).has_scheme() is False
+
+
+def test_grading_reads_from_the_overlay_file(tmp_path):
+    root = _course_with_files(tmp_path, context_yaml="course_title: C\n",
+                              overlay_yaml=('weeks: {"week 1": {}}\n'
+                                            'grading:\n  groups:\n    - {name: Projects, weight: 70}\n'
+                                            '    - {name: Quizzes, weight: 30}\n'
+                                            '  placement: {assignment: Projects, quiz: Quizzes}\n'))
+    g = CourseStructure.load(root).grading()
+    assert g.weighted() and g.group_for("quiz") == "Quizzes"
+    assert [n for n, _ in g.groups] == ["Projects", "Quizzes"]

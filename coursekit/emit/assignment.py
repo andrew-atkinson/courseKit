@@ -66,10 +66,12 @@ def rubric_ident(a: Assignment) -> str:
     return cc.gid(a.assignment_id, "rubric")
 
 
-def assignment_settings_xml(a: Assignment) -> str:
+def assignment_settings_xml(a: Assignment, *, group_title: str | None = None) -> str:
     """`assignment_settings.xml` — the Canvas settings (grounded field set; the many boolean flags take
     the export's defaults). points_possible + submission_types + the group ref are what vary; a
-    structured rubric attaches via `rubric_identifierref` and sets the point total."""
+    structured rubric attaches via `rubric_identifierref` and sets the point total. `group_title` is the
+    resolved assignment group (STRC-2); None falls back to the assignment's default group."""
+    group = group_title or a.group_title
     rubric_block = ""
     if a.rubric:
         rubric_block = (f"  <rubric_identifierref>{rubric_ident(a)}</rubric_identifierref>\n"
@@ -80,7 +82,7 @@ def assignment_settings_xml(a: Assignment) -> str:
             f'<assignment identifier="{assignment_ident(a)}" {CC_NS} '
             f'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n'
             f"  <title>{cc._xml(a.title)}</title>\n"
-            f"  <assignment_group_identifierref>{group_ident(a.group_title)}"
+            f"  <assignment_group_identifierref>{group_ident(group)}"
             f"</assignment_group_identifierref>\n"
             f"{rubric_block}"
             f"  <workflow_state>unpublished</workflow_state>\n"
@@ -133,15 +135,20 @@ def rubrics_xml(assignments: list[Assignment]) -> str:
             f"{rubrics}\n</rubrics>\n")
 
 
-def assignment_groups_xml(group_titles) -> str:
-    groups = "\n".join(
-        f'  <assignmentGroup identifier="{group_ident(t)}">\n'
-        f"    <title>{cc._xml(t)}</title>\n    <position>{i + 1}</position>\n"
-        f"    <group_weight>0.0</group_weight>\n  </assignmentGroup>"
-        for i, t in enumerate(group_titles))
+def assignment_groups_xml(groups) -> str:
+    """`course_settings/assignment_groups.xml` — the gradebook buckets. `groups` is an ordered iterable
+    of `(name, weight)` (weight a percentage; 0.0 = unweighted, today's default). A bare string entry is
+    treated as weight 0 for back-compat."""
+    def _pair(g):
+        return (g, 0.0) if isinstance(g, str) else (g[0], float(g[1]))
+    body = "\n".join(
+        f'  <assignmentGroup identifier="{group_ident(name)}">\n'
+        f"    <title>{cc._xml(name)}</title>\n    <position>{i + 1}</position>\n"
+        f"    <group_weight>{weight:.1f}</group_weight>\n  </assignmentGroup>"
+        for i, (name, weight) in enumerate(_pair(g) for g in groups))
     return (f'<?xml version="1.0" encoding="UTF-8"?>\n'
             f'<assignmentGroups {CC_NS} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n'
-            f"{groups}\n</assignmentGroups>\n")
+            f"{body}\n</assignmentGroups>\n")
 
 
 def emit_from_path(path, out_path=None) -> Path | None:
