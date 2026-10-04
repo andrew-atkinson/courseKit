@@ -309,12 +309,23 @@ def test_malformed_iframe_snippet_is_dropped(fresh):
     assert "broken" not in body   # nothing usable, so nothing emitted
 
 
-def test_columns_render_multiline_code_as_pre_not_collapsed_li(fresh):
-    # A column carrying multi-line code must keep its line breaks (a bulleted <li> collapses them,
-    # merging `// comment` into the next line and breaking the code).
+def test_columns_render_code_as_pre_and_prose_as_rows_not_bullets(fresh):
+    # Per-item (RICH-1): a multi-line item is CODE → a <pre> that keeps its line breaks + indent; a
+    # plain item is a prose ROW, never a bulleted <li> (bullets read poorly for comparisons).
     body = render_body(_page_with(dict(kind="columns", block_id="c", columns=[
         {"title": "Loop", "items": ["// comment\nfor (let i = 0; i < 3; i++) {\n  print(i);\n}"]},
-        {"title": "Notes", "items": ["a short bullet"]},
+        {"title": "Notes", "items": ["a short point", "another point"]},
     ])))
-    assert "<pre" in body and "<br" in body and "// comment" in body   # code column: pre + preserved breaks
-    assert "<li" in body and "a short bullet" in body                   # text column: still bulleted
+    assert "<pre" in body and "<br" in body and "// comment" in body   # code item: pre + preserved breaks
+    assert "a short point" in body and "another point" in body         # prose items present…
+    assert "<li" not in body and "<ul" not in body                     # …as clean rows, NOT bullets
+
+
+def test_columns_mix_code_and_prose_in_one_column(fresh):
+    # A single column may carry both; each item is decided on its own (robust to mixed content).
+    body = render_body(_page_with(dict(kind="columns", block_id="c", columns=[
+        {"title": "A", "items": ["intro point", "x = 1\ny = 2"]},
+        {"title": "B", "items": ["just prose"]},
+    ])))
+    assert "<pre" in body and "x = 1<br>y = 2" in body                  # the multi-line item → code
+    assert "intro point" in body and "<li" not in body                 # the prose item → a row, not a bullet
