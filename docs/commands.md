@@ -25,6 +25,7 @@ A document that names no week is skipped once any week-numbered content is prese
 
 | Structure Commands                      | What it does                                                                                                                                                       | Uses LLM |
 |-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `coursekit census PATH`                 | **Inventory** the whole course — declared materials + the week source doc + generated artifacts (pages/quizzes/assignments/concept-maps) per week, plus **presence gaps** — into `census.json` (IR) + `census.md` (report). Offline. | x        |
 | `coursekit propose PATH`                | Scan the course tree → **declare** its structure (weeks + typed sources) into `.vtconfig/structure.coursekit.yaml`, and surface any files it couldn't key.         | x        |
 | `coursekit propose PATH --model`        | Group with a local **model** instead of filename heuristics — for trees that don't encode weeks in names/folders. Validated so it can only group files that exist. | ✓        |
 | `coursekit propose PATH --model --deep` | Also give the model a short content peek of each file (slower; better on topic-named piles).                                                                       | ✓        |
