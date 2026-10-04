@@ -220,6 +220,20 @@ def _cmd_propose_grading(args) -> int:
     return 0
 
 
+def _cmd_census(args) -> int:
+    """Walk the course and write census.json (IR) + census.md (report) — a deterministic, offline
+    inventory of materials + generated artifacts, with the presence gaps (FLOW-9). No model."""
+    from coursekit import census as cen
+    c, jp, mp = cen.write_census(args.path)
+    t = c.totals
+    print(f"Census: {t['weeks']} weeks · {t['pages']} pages · {t['quizzes']} quizzes · "
+          f"{t['assignments']} assignments")
+    n_gaps = sum(len(w.gaps) for w in c.weeks) + len(c.gaps)
+    print(f"{n_gaps} gap(s) found." if n_gaps else "No gaps found.")
+    print(f"\nWrote {jp}\n      {mp}")
+    return 0
+
+
 def _cmd_ingest(args) -> int:
     """Turn documents (PDF/pptx/txt/md) under PATH into output/week-N.md, then stop. Local-first:
     with --raw it never calls the model; otherwise it reshapes each doc with the local model."""
@@ -790,6 +804,13 @@ def build_parser() -> argparse.ArgumentParser:
         prog="coursekit", description="Generate Canvas artifacts from course material.")
     sub = parser.add_subparsers(dest="command", required=True,
                                 metavar="{ingest,analyze,generate,emit}")
+
+    # census — inventory the whole course (materials + generated artifacts + presence gaps), offline
+    pc = sub.add_parser("census",
+                        help="inventory the course — materials + generated artifacts + presence gaps "
+                             "→ census.json + census.md (offline, no model)")
+    pc.add_argument("path", help="the course root (or any directory under it)")
+    pc.set_defaults(func=_cmd_census)
 
     # ingest — documents → week text
     pi = sub.add_parser("ingest", help="documents (PDF/docx/odt/pptx/txt/md) → output/week-N.md")
