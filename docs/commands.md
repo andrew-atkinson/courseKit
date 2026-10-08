@@ -30,6 +30,7 @@ A document that names no week is skipped once any week-numbered content is prese
 | `coursekit propose PATH --model`        | Group with a local **model** instead of filename heuristics — for trees that don't encode weeks in names/folders. Validated so it can only group files that exist. | ✓        |
 | `coursekit propose PATH --model --deep` | Also give the model a short content peek of each file (slower; better on topic-named piles).                                                                       | ✓        |
 | `coursekit propose PATH --grading`      | Draft a **grading-groups** block (assignment groups + weight placeholders) from the generated artifacts into the same overlay — STRC-2. Spans assignments + graded quizzes. | x        |
+| `coursekit propose PATH --expectations` | Draft an **expectations** block (what each scope SHOULD contain) from the course's own signals — modal induction + concept-map rules (EU → an EU assessment, dense week → a glossary). FLOW-9 Layer A. | x        |
 | `coursekit propose PATH --dry-run`      | Print the proposal without writing the overlay.                                                                                                                    | x        |
 | `coursekit propose PATH --force`        | Redraft an existing overlay (discards manual edits).                                                                                                               | x        |
 
