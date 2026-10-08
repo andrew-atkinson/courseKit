@@ -194,3 +194,40 @@ def test_grading_reads_from_the_overlay_file(tmp_path):
     g = CourseStructure.load(root).grading()
     assert g.weighted() and g.group_for("quiz") == "Quizzes"
     assert [n for n, _ in g.groups] == ["Projects", "Quizzes"]
+
+
+# ------------------------------------------------------- expectations (FLOW-9 Phase 1.5)
+
+from coursekit.coursestructure import ExpectationScheme, _parse_expect   # noqa: E402
+
+
+def test_parse_expect_buckets_defaults_by_scope():
+    e = _parse_expect({"defaults": [
+        {"scope": "week", "artifact": "page", "count": 1},
+        {"scope": "week", "artifact": "quiz", "count": 1},
+        {"scope": "module", "artifact": "assignment", "count": 1}]})
+    assert e.has_scheme()
+    assert e.week == {"page": 1, "quiz": 1}
+    assert e.module == {"assignment": 1}
+    assert e.for_week("3") == {"page": 1, "quiz": 1}
+
+
+def test_for_week_override_precedence_and_zero_drops():
+    e = _parse_expect({"defaults": [{"scope": "week", "artifact": "quiz", "count": 1},
+                                    {"scope": "week", "artifact": "page", "count": 1}],
+                       "overrides": {"week": {"11": {"quiz": 0}}}})      # studio week, no quiz expected
+    assert e.for_week("11") == {"page": 1}                               # quiz dropped by the 0 override
+    assert e.for_week("3") == {"page": 1, "quiz": 1}                     # other weeks unaffected
+
+
+def test_for_module_merges_overrides():
+    e = _parse_expect({"defaults": [{"scope": "module", "artifact": "assignment", "count": 1}],
+                       "overrides": {"module": {"Module 5 – Final Project": {"assignment": 1}}}})
+    assert e.for_module("Module 5 – Final Project") == {"assignment": 1}
+
+
+def test_parse_expect_degrades_on_malformed():
+    assert _parse_expect(None) == ExpectationScheme()
+    assert not _parse_expect({"defaults": "nonsense"}).has_scheme()
+    # a rule missing scope/artifact is skipped, not fatal
+    assert _parse_expect({"defaults": [{"artifact": "page"}, {"scope": "week"}]}).week == {}

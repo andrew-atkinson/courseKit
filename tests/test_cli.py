@@ -253,6 +253,29 @@ def test_propose_grading_parses_and_routes():
     assert args.func is cli._cmd_propose and args.grading
 
 
+def test_propose_expectations_parses_and_routes():
+    args = _parse("propose", "/course", "--expectations")
+    assert args.func is cli._cmd_propose and args.expectations
+
+
+def test_propose_expectations_handler_writes_an_expect_block(tmp_path, capsys):
+    import json
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    for wk in ("week-1", "week-2"):
+        pd = root / "pages" / wk; pd.mkdir(parents=True)
+        (pd / "page.json").write_text(json.dumps({"week_ref": wk}), encoding="utf-8")
+        qd = root / "quizzes" / wk; qd.mkdir(parents=True)
+        (qd / "bank.json").write_text("{}", encoding="utf-8")
+
+    import types
+    rc = cli._cmd_propose(types.SimpleNamespace(path=str(root), expectations=True, dry_run=False, force=False))
+    assert rc == 0
+    text = (root / ".vtconfig" / "structure.coursekit.yaml").read_text()
+    assert "expect:" in text and "page" in text and "quiz" in text
+    assert "DRAFT" in capsys.readouterr().out.upper() or "draft" in text.lower()
+
+
 def test_propose_grading_handler_writes_a_grading_block(tmp_path, capsys):
     root = tmp_path / "course"
     (root / ".vtconfig").mkdir(parents=True)

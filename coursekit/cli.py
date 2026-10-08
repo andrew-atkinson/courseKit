@@ -162,6 +162,8 @@ def _cmd_propose(args) -> int:
     from coursekit.ingest import propose as proposer
     if getattr(args, "grading", False):
         return _cmd_propose_grading(args)
+    if getattr(args, "expectations", False):
+        return _cmd_propose_expectations(args)
     if getattr(args, "model", False):
         model = os.getenv("MODEL_NAME") or courseconfig.load(args.path, config_name="quiz.yaml").value("model")
         if not model:
@@ -231,6 +233,32 @@ def _cmd_census(args) -> int:
     n_gaps = sum(len(w.gaps) for w in c.weeks) + len(c.gaps)
     print(f"{n_gaps} gap(s) found." if n_gaps else "No gaps found.")
     print(f"\nWrote {jp}\n      {mp}")
+    return 0
+
+
+def _cmd_propose_expectations(args) -> int:
+    """`propose --expectations`: draft an `expect:` block (what each scope SHOULD contain) from the
+    course's own signals — L0 modal induction + L1-deterministic concept-map rules. Offline (FLOW-9)."""
+    from coursekit.ingest import propose_expectations as pe
+    expect, notes = pe.propose_expectations(args.path)
+    if not expect.get("defaults") and not expect.get("overrides"):
+        print("No expectations could be induced (no generated artifacts / concept maps yet).")
+        return 1
+    print("Proposed expectations (a DRAFT — edit freely):")
+    for r in expect.get("defaults", []):
+        print(f"  each {r['scope']}: {r['count']} {r['artifact']}")
+    for wk, spec in (expect.get("overrides", {}).get("week", {})).items():
+        for art, ct in spec.items():
+            print(f"  week {wk}: {ct} {art}")
+    if notes:
+        print("Rationale / decisions:")
+        for note in notes:
+            print(f"  - {note}")
+    if args.dry_run:
+        print("\n(dry run — nothing written)")
+        return 0
+    dest = pe.write_expectations(args.path, expect, notes, force=args.force)
+    print(f"\nWrote {dest}\nEdit it to your real intent; the census reads it to report gaps.")
     return 0
 
 
@@ -833,6 +861,9 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--grading", action="store_true",
                     help="instead of weeks: draft a grading-groups block (assignment groups + weights "
                          "placeholders) from the generated artifacts — STRC-2 (offline)")
+    pp.add_argument("--expectations", action="store_true",
+                    help="instead of weeks: draft an expectations block (what each scope SHOULD contain) "
+                         "from the course's own signals — FLOW-9 Layer A (offline)")
     pp.add_argument("--dry-run", action="store_true", help="print the proposal without writing the overlay")
     pp.add_argument("--force", action="store_true", help="redraft an existing overlay (discards manual edits)")
     pp.set_defaults(func=_cmd_propose)

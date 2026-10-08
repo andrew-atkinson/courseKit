@@ -105,6 +105,61 @@ def _parse_grading(raw) -> GradingScheme:
     return GradingScheme(tuple(groups), placement)
 
 
+@dataclass(frozen=True)
+class ExpectationScheme:
+    """Declared EXPECTATIONS (FLOW-9 Phase 1.5, Layer A): what each scope SHOULD contain, as scoped
+    artifact counts. `week`/`module`/`course` are the default rules (artifact -> count); the `*_overrides`
+    refine a specific week number or module name (a count of 0 means "not expected here"). Artifacts are
+    COARSE (page/quiz/assignment/concept-map) with an optional `:subtype` (e.g. `quiz:eu`, `page:glossary`).
+    Layer B reads this to infer gaps; empty when nothing is declared."""
+
+    week: dict = field(default_factory=dict)              # artifact -> count, every week
+    module: dict = field(default_factory=dict)            # artifact -> count, every module
+    course: dict = field(default_factory=dict)            # artifact -> count, the whole course
+    week_overrides: dict = field(default_factory=dict)    # week_num -> {artifact -> count}
+    module_overrides: dict = field(default_factory=dict)  # module name -> {artifact -> count}
+
+    def has_scheme(self) -> bool:
+        return bool(self.week or self.module or self.course)
+
+    def for_week(self, week_num: str) -> dict:
+        """The week-scoped expected counts for one week: the week defaults, refined by that week's
+        overrides (an override count of 0 drops the expectation)."""
+        merged = {**self.week, **self.week_overrides.get(str(week_num), {})}
+        return {a: c for a, c in merged.items() if c}
+
+    def for_module(self, module_name: str) -> dict:
+        merged = {**self.module, **self.module_overrides.get(str(module_name), {})}
+        return {a: c for a, c in merged.items() if c}
+
+
+def _parse_expect(raw) -> ExpectationScheme:
+    """Coerce the overlay's `expect:` block into an ExpectationScheme; anything malformed degrades to
+    empty. Shape: `{defaults: [{scope, artifact, count}], overrides: {week:{n:{art:ct}}, module:{…}}}`."""
+    if not isinstance(raw, dict):
+        return ExpectationScheme()
+    buckets = {"week": {}, "module": {}, "course": {}}
+    for rule in raw.get("defaults") or []:
+        if not (isinstance(rule, dict) and rule.get("scope") in buckets and rule.get("artifact")):
+            continue
+        try:
+            buckets[rule["scope"]][str(rule["artifact"])] = int(rule.get("count", 1))
+        except (TypeError, ValueError):
+            continue
+    ov = raw.get("overrides") or {}
+
+    def _ovmap(section) -> dict:
+        out = {}
+        for key, spec in (ov.get(section) or {}).items():
+            if isinstance(spec, dict):
+                out[str(key)] = {str(a): int(c) for a, c in spec.items()
+                                 if isinstance(c, int) or (isinstance(c, str) and c.isdigit())}
+        return out
+
+    return ExpectationScheme(week=buckets["week"], module=buckets["module"], course=buckets["course"],
+                             week_overrides=_ovmap("week"), module_overrides=_ovmap("module"))
+
+
 def _as_source(raw, *, default_kind: str | None = None, default_role: str = "content") -> Source | None:
     """Coerce one declared entry (a dict) into a Source, or None when it names no path. Accepts both
     coursekit's `path` and the transcriber's `filename` key."""
@@ -192,6 +247,10 @@ class CourseStructure:
         """The declared grading scheme (STRC-2) from the overlay's `grading:` block, or an empty scheme
         (caller falls back to today's single-"Assignments"-group behavior)."""
         return _parse_grading(_read_overlay(self._cfg).get("grading"))
+
+    def expectations(self) -> ExpectationScheme:
+        """The declared expectations (FLOW-9 Phase 1.5) from the overlay's `expect:` block, or empty."""
+        return _parse_expect(_read_overlay(self._cfg).get("expect"))
 
     def has_declared_structure(self) -> bool:
         """True when at least one week declares coursekit's own `doc` or `sources` — the signal to
