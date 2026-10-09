@@ -226,3 +226,93 @@ def test_build_is_deterministic(tmp_path):
     a = cen.build_census(root).model_dump_json(indent=2)
     b = cen.build_census(root).model_dump_json(indent=2)
     assert a == b                                            # byte-identical across runs
+
+
+# ============================================================ Layer B — gap inference vs expectations
+
+def _overlay(root, yaml_text):
+    (root / ".vtconfig").mkdir(parents=True, exist_ok=True)
+    (root / ".vtconfig" / "structure.coursekit.yaml").write_text(yaml_text, encoding="utf-8")
+
+
+def _ctx(root, yaml_text):
+    (root / ".vtconfig").mkdir(parents=True, exist_ok=True)
+    (root / ".vtconfig" / "context.yaml").write_text(yaml_text, encoding="utf-8")
+
+
+def _quiz(root, wk, *, eu=False):
+    d = root / "quizzes" / wk; d.mkdir(parents=True)
+    groups = {"g1": {"question_type": "open_response" if eu else "multiple_choice"}}
+    (d / "bank.json").write_text(json.dumps({"groups": groups}), encoding="utf-8")
+
+
+def _page(root, wk, *, ptype="week_intro"):
+    d = root / "pages" / (wk if ptype == "week_intro" else f"{wk}-{ptype}")
+    d.mkdir(parents=True)
+    (d / "page.json").write_text(json.dumps({"week_ref": wk, "page_type": ptype}), encoding="utf-8")
+
+
+def test_layerB_week_eu_expectation_gap_and_met(tmp_path):
+    root = tmp_path / "c"
+    _overlay(root, "expect:\n  defaults:\n    - {scope: week, artifact: quiz, count: 1}\n"
+                   "    - {scope: week, artifact: 'quiz:eu', count: 1}\n")
+    _quiz(root, "week-1", eu=False)      # a plain quiz — EU missing
+    _quiz(root, "week-2", eu=True)       # an EU quiz — met
+    c = cen.build_census(root)
+    g1 = next(w for w in c.weeks if w.week == "1").gaps
+    g2 = next(w for w in c.weeks if w.week == "2").gaps
+    assert any("expected 1 quiz:eu, has 0" in g for g in g1)
+    assert not any("quiz:eu" in g for g in g2)           # week 2 satisfies it
+    assert not any("but" in g for g in g1 + g2)          # expectation supersedes the modal phrasing
+
+
+def test_layerB_subtype_glossary_detected(tmp_path):
+    root = tmp_path / "c"
+    _overlay(root, "expect:\n  defaults:\n    - {scope: week, artifact: 'page:glossary', count: 1}\n")
+    _page(root, "week-1", ptype="glossary")
+    _page(root, "week-2", ptype="week_intro")            # a teaching page, not a glossary
+    c = cen.build_census(root)
+    assert not any("page:glossary" in g for w in c.weeks if w.week == "1" for g in w.gaps)
+    assert any("expected 1 page:glossary, has 0" in g
+               for w in c.weeks if w.week == "2" for g in w.gaps)
+
+
+def test_layerB_denominator_widens_to_declared_empty_weeks(tmp_path):
+    root = tmp_path / "c"
+    _ctx(root, 'course_title: C\nweeks:\n  "week 1": {title: Intro}\n')   # declared, no artifacts
+    _overlay(root, "expect:\n  defaults:\n    - {scope: week, artifact: page, count: 1}\n")
+    c = cen.build_census(root)
+    wk1 = next(w for w in c.weeks if w.week == "1")
+    assert not wk1.is_real()                              # empty declared week — hidden from the grid…
+    assert any("expected 1 page, has 0" in g for g in wk1.gaps)   # …but it IS a gap now (widened)
+
+
+def test_layerB_module_scope_satisfied_by_any_week_in_the_module(tmp_path):
+    root = tmp_path / "c"
+    _ctx(root, 'course_title: C\nweeks:\n  "week 1": {title: A, module: M1}\n'
+               '  "week 2": {title: B, module: M1}\n  "week 3": {title: C, module: M2}\n')
+    _overlay(root, "expect:\n  defaults:\n    - {scope: module, artifact: assignment, count: 1}\n")
+    d = root / "assignments" / "week-1"; d.mkdir(parents=True)
+    (d / "assignment.json").write_text(json.dumps({"week_ref": "week-1"}), encoding="utf-8")
+    c = cen.build_census(root)
+    assert not any('M1' in g for g in c.gaps)             # M1 has its assignment (in week 1)
+    assert any('module "M2": expected 1 assignment, has 0' in g for g in c.gaps)
+
+
+def test_layerB_course_scope_gap(tmp_path):
+    root = tmp_path / "c"
+    _ctx(root, 'course_title: C\nweeks:\n  "week 1": {title: A}\n')
+    _overlay(root, "expect:\n  defaults:\n    - {scope: course, artifact: assignment, count: 1}\n")
+    _quiz(root, "week-1")
+    c = cen.build_census(root)
+    assert any("course: expected 1 assignment, has 0" in g for g in c.gaps)
+
+
+def test_layerB_scheme_present_suppresses_modal_gaps(tmp_path):
+    root = tmp_path / "c"
+    _overlay(root, "expect:\n  defaults:\n    - {scope: week, artifact: page, count: 1}\n")
+    _page(root, "week-1"); _page(root, "week-2"); _quiz(root, "week-3")   # wk3 has no page
+    c = cen.build_census(root)
+    allgaps = [g for w in c.weeks for g in w.gaps]
+    assert any("expected 1 page, has 0" in g for g in allgaps)   # wk3 flagged by expectation…
+    assert not any("but" in g for g in allgaps)                  # …never by the modal phrasing
