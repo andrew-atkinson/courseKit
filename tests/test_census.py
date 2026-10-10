@@ -54,23 +54,25 @@ def test_inventory_counts(tmp_path):
 def test_sense1_declared_but_nothing_generated(tmp_path):
     c = cen.build_census(_course(tmp_path))
     wk4 = next(w for w in c.weeks if w.week == "4")
-    assert any("nothing generated" in g for g in wk4.gaps)
-    # and a week that produced nothing is NOT also spammed with per-type modal gaps
-    assert not any("no quiz" in g for g in wk4.gaps)
+    assert wk4.nothing_generated                          # material, no artifacts
+    # the report states it once, rather than also spamming per-type modal lines for that week
+    md = cen.render_report(c)
+    assert "Week 4: Data** — has material but nothing generated yet" in md
+    assert not any(l.startswith("- **Week 4") and "no quiz" in l for l in md.splitlines())
 
 
 def test_sense3_modal_outlier(tmp_path):
     c = cen.build_census(_course(tmp_path))
+    assert c.expectation_basis == "modal"
+    assert c.modal_norm == {"page": 3, "quiz": 2} and c.generating_weeks == 3   # the norm, as data
     wk3 = next(w for w in c.weeks if w.week == "3")
-    assert any("no quiz" in g for g in wk3.gaps)       # 2/3 real-generating weeks have a quiz; wk3 doesn't
-    assert not any("no page" in g for g in wk3.gaps)   # pages are universal → no page gap
+    assert wk3.gaps == {"quiz": cen.Shortfall(has=0, expects=1)}   # quiz missing; page present → no page gap
 
 
 def test_grading_group_with_no_items_is_flagged(tmp_path):
     c = cen.build_census(_course(tmp_path))
     assert c.grading_groups == ["Assignments", "Quizzes"]
-    assert any("Assignments" in g for g in c.gaps)     # declared but no assignment items exist
-    assert not any("Quizzes" in g for g in c.gaps)     # Quizzes has items
+    assert c.unused_grading_groups == ["Assignments"]   # no assignment items exist; Quizzes has items
 
 
 def test_coverage_line_surfaces_a_sparse_type_even_when_no_gaps(tmp_path):
@@ -188,7 +190,7 @@ def test_single_generating_week_has_no_modal_noise(tmp_path):
     root = tmp_path / "c"; (root / ".vtconfig").mkdir(parents=True)
     d = root / "pages" / "week-1"; d.mkdir(parents=True)
     (d / "page.json").write_text(json.dumps({"week_ref": "week-1"}), encoding="utf-8")
-    assert cen.build_census(root).weeks[0].gaps == []
+    assert cen.build_census(root).weeks[0].gaps == {}
 
 
 def test_grading_slug_override_marks_group_used(tmp_path):
@@ -201,7 +203,7 @@ def test_grading_slug_override_marks_group_used(tmp_path):
     d = root / "quizzes" / "week-3-barrett"; d.mkdir(parents=True)
     (d / "bank.json").write_text("{}", encoding="utf-8")
     c = cen.build_census(root)
-    assert c.grading_groups == ["Projects"] and not any("Projects" in g for g in c.gaps)
+    assert c.grading_groups == ["Projects"] and c.unused_grading_groups == []
 
 
 def test_declared_but_empty_week_is_excluded_from_the_grid(tmp_path):
@@ -259,11 +261,12 @@ def test_layerB_week_eu_expectation_gap_and_met(tmp_path):
     _quiz(root, "week-1", eu=False)      # a plain quiz — EU missing
     _quiz(root, "week-2", eu=True)       # an EU quiz — met
     c = cen.build_census(root)
-    g1 = next(w for w in c.weeks if w.week == "1").gaps
-    g2 = next(w for w in c.weeks if w.week == "2").gaps
-    assert any("expected 1 quiz:eu, has 0" in g for g in g1)
-    assert not any("quiz:eu" in g for g in g2)           # week 2 satisfies it
-    assert not any("but" in g for g in g1 + g2)          # expectation supersedes the modal phrasing
+    assert c.expectation_basis == "declared"
+    wk1, wk2 = (next(w for w in c.weeks if w.week == n) for n in ("1", "2"))
+    assert wk1.expected == {"quiz": 1, "quiz:eu": 1}
+    assert wk1.gaps == {"quiz:eu": cen.Shortfall(has=0, expects=1)}
+    assert wk2.gaps == {}                                # week 2 satisfies it
+    assert c.modal_norm == {}                            # a declared expectation supersedes the modal norm
 
 
 def test_layerB_subtype_glossary_detected(tmp_path):
@@ -272,9 +275,9 @@ def test_layerB_subtype_glossary_detected(tmp_path):
     _page(root, "week-1", ptype="glossary")
     _page(root, "week-2", ptype="week_intro")            # a teaching page, not a glossary
     c = cen.build_census(root)
-    assert not any("page:glossary" in g for w in c.weeks if w.week == "1" for g in w.gaps)
-    assert any("expected 1 page:glossary, has 0" in g
-               for w in c.weeks if w.week == "2" for g in w.gaps)
+    wk1, wk2 = (next(w for w in c.weeks if w.week == n) for n in ("1", "2"))
+    assert wk1.gaps == {}
+    assert wk2.gaps == {"page:glossary": cen.Shortfall(has=0, expects=1)}
 
 
 def test_layerB_denominator_widens_to_declared_empty_weeks(tmp_path):
@@ -284,7 +287,7 @@ def test_layerB_denominator_widens_to_declared_empty_weeks(tmp_path):
     c = cen.build_census(root)
     wk1 = next(w for w in c.weeks if w.week == "1")
     assert not wk1.is_real()                              # empty declared week — hidden from the grid…
-    assert any("expected 1 page, has 0" in g for g in wk1.gaps)   # …but it IS a gap now (widened)
+    assert wk1.gaps == {"page": cen.Shortfall(has=0, expects=1)}   # …but it IS a gap now (widened)
 
 
 def test_layerB_module_scope_satisfied_by_any_week_in_the_module(tmp_path):
@@ -295,8 +298,9 @@ def test_layerB_module_scope_satisfied_by_any_week_in_the_module(tmp_path):
     d = root / "assignments" / "week-1"; d.mkdir(parents=True)
     (d / "assignment.json").write_text(json.dumps({"week_ref": "week-1"}), encoding="utf-8")
     c = cen.build_census(root)
-    assert not any('M1' in g for g in c.gaps)             # M1 has its assignment (in week 1)
-    assert any('module "M2": expected 1 assignment, has 0' in g for g in c.gaps)
+    mods = {m.name: m for m in c.modules}
+    assert mods["M1"].gaps == {} and mods["M1"].actual["assignment"] == 1   # met in week 1
+    assert mods["M2"].gaps == {"assignment": cen.Shortfall(has=0, expects=1)}
 
 
 def test_layerB_course_scope_gap(tmp_path):
@@ -305,7 +309,8 @@ def test_layerB_course_scope_gap(tmp_path):
     _overlay(root, "expect:\n  defaults:\n    - {scope: course, artifact: assignment, count: 1}\n")
     _quiz(root, "week-1")
     c = cen.build_census(root)
-    assert any("course: expected 1 assignment, has 0" in g for g in c.gaps)
+    assert c.course.gaps == {"assignment": cen.Shortfall(has=0, expects=1)}
+    assert c.course.actual["quiz"] == 1
 
 
 def test_layerB_scheme_present_suppresses_modal_gaps(tmp_path):
@@ -313,6 +318,44 @@ def test_layerB_scheme_present_suppresses_modal_gaps(tmp_path):
     _overlay(root, "expect:\n  defaults:\n    - {scope: week, artifact: page, count: 1}\n")
     _page(root, "week-1"); _page(root, "week-2"); _quiz(root, "week-3")   # wk3 has no page
     c = cen.build_census(root)
-    allgaps = [g for w in c.weeks for g in w.gaps]
-    assert any("expected 1 page, has 0" in g for g in allgaps)   # wk3 flagged by expectation…
-    assert not any("but" in g for g in allgaps)                  # …never by the modal phrasing
+    wk3 = next(w for w in c.weeks if w.week == "3")
+    assert wk3.gaps == {"page": cen.Shortfall(has=0, expects=1)}     # flagged by the declared expectation…
+    assert c.expectation_basis == "declared" and c.modal_norm == {}   # …and the modal norm never ran
+
+
+def test_gaps_round_trip_as_data_in_census_json(tmp_path):
+    root = tmp_path / "c"
+    _overlay(root, "expect:\n  defaults:\n    - {scope: week, artifact: 'quiz:eu', count: 1}\n")
+    _quiz(root, "week-1")
+    c = cen.build_census(root)
+    raw = json.loads(c.model_dump_json())
+    assert raw["weeks"][0]["gaps"] == {"quiz:eu": {"has": 0, "expects": 1}}   # data, not prose
+    assert raw["weeks"][0]["expected"] == {"quiz:eu": 1}
+    assert cen.Census.model_validate_json(c.model_dump_json()) == c          # the IR round-trips
+
+
+def test_gap_count_and_declared_report_lines(tmp_path):
+    root = tmp_path / "c"
+    _overlay(root, "expect:\n  defaults:\n    - {scope: week, artifact: 'quiz:eu', count: 1}\n"
+                   "    - {scope: course, artifact: assignment, count: 1}\n"
+                   "grading:\n  groups: [{name: Projects, weight: 100}]\n  placement: {assignment: Projects}\n")
+    _quiz(root, "week-1")
+    c = cen.build_census(root)
+    assert c.gap_count == 3                              # week quiz:eu + course assignment + unused group
+    md = cen.render_report(c)
+    assert "quiz:eu: has 0, expects 1" in md
+    assert "**Course** — assignment: has 0, expects 1" in md
+    assert '**Grading** — group "Projects" declared but no items are placed in it' in md
+
+
+def test_report_says_concept_map_while_the_data_key_stays_hyphenated(tmp_path):
+    root = tmp_path / "c"
+    (root / ".vtconfig" / "concepts").mkdir(parents=True)
+    for wk in ("week-1", "week-2", "week-3"):
+        _page(root, wk)
+    for wk in ("week-1", "week-2"):                                  # concept maps on 2 of 3 weeks
+        (root / ".vtconfig" / "concepts" / f"{wk}.yaml").write_text("week: x\n", encoding="utf-8")
+    c = cen.build_census(root)
+    wk3 = next(w for w in c.weeks if w.week == "3")
+    assert "concept-map" in wk3.gaps                                 # data key unchanged
+    assert "no concept map (but 2/3 weeks have one)" in cen.render_report(c)   # report wording

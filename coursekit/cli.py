@@ -230,7 +230,7 @@ def _cmd_census(args) -> int:
     t = c.totals
     print(f"Census: {t['weeks']} weeks · {t['pages']} pages · {t['quizzes']} quizzes · "
           f"{t['assignments']} assignments")
-    n_gaps = sum(len(w.gaps) for w in c.weeks) + len(c.gaps)
+    n_gaps = c.gap_count
     print(f"{n_gaps} gap(s) found." if n_gaps else "No gaps found.")
     print(f"\nWrote {jp}\n      {mp}")
     return 0

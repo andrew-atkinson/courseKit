@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -32,6 +33,18 @@ class Material(BaseModel):
     title: str
 
 
+class Shortfall(BaseModel):
+    """One unmet expectation: the scope `has` fewer of an artifact than it `expects`."""
+    model_config = ConfigDict(extra="forbid")
+    has: int
+    expects: int
+
+
+def _shortfalls(actual: dict, expected: dict) -> dict:
+    return {a: Shortfall(has=actual.get(a, 0), expects=n)
+            for a, n in expected.items() if actual.get(a, 0) < n}
+
+
 class WeekCensus(BaseModel):
     model_config = ConfigDict(extra="forbid")
     week: str                                   # the bare week number, e.g. "3"
@@ -41,8 +54,9 @@ class WeekCensus(BaseModel):
     quizzes: int = 0
     assignments: int = 0
     concept_map: bool = False
-    actual: dict = Field(default_factory=dict)      # artifact[:subtype] -> count (coarse + subtypes) — Layer B
-    gaps: list[str] = Field(default_factory=list)   # human-readable presence gaps for this week
+    actual: dict[str, int] = Field(default_factory=dict)     # artifact[:subtype] -> count present
+    expected: dict[str, int] = Field(default_factory=dict)   # artifact[:subtype] -> count this week should have
+    gaps: dict[str, Shortfall] = Field(default_factory=dict)  # shortfalls only: artifact -> {has, expects}
 
     def has_any_artifact(self) -> bool:
         return bool(self.pages or self.quizzes or self.assignments or self.concept_map)
@@ -51,13 +65,42 @@ class WeekCensus(BaseModel):
         """A week worth reporting: it has declared material or at least one artifact."""
         return bool(self.materials) or self.has_any_artifact()
 
+    @property
+    def nothing_generated(self) -> bool:
+        """Material is present but no artifact was generated from it (Phase-1 sense 1)."""
+        return bool(self.materials) and not self.has_any_artifact()
+
+
+class ScopeCensus(BaseModel):
+    """A module or the whole course measured against a declared module/course rule (Layer B)."""
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    actual: dict[str, int] = Field(default_factory=dict)
+    expected: dict[str, int] = Field(default_factory=dict)
+    gaps: dict[str, Shortfall] = Field(default_factory=dict)
+
 
 class Census(BaseModel):
     model_config = ConfigDict(extra="forbid")
     course_title: str | None = None
     weeks: list[WeekCensus] = Field(default_factory=list)
-    grading_groups: list[str] = Field(default_factory=list)   # declared group names (STRC-2)
-    gaps: list[str] = Field(default_factory=list)             # course-level gaps (grading, etc.)
+    # where each week's `expected` came from: a DECLARED `expect:` block, or the course's own MODAL pattern
+    expectation_basis: Literal["declared", "modal"] = "modal"
+    modal_norm: dict[str, int] = Field(default_factory=dict)  # modal basis: artifact -> generating weeks with it
+    generating_weeks: int = 0                                  # modal basis: the norm's denominator
+    modules: list[ScopeCensus] = Field(default_factory=list)  # declared module rules, one entry per module
+    course: ScopeCensus | None = None                          # declared course rules
+    grading_groups: list[str] = Field(default_factory=list)          # declared group names (STRC-2)
+    unused_grading_groups: list[str] = Field(default_factory=list)   # declared groups with no items placed
+
+    @property
+    def gap_count(self) -> int:
+        """Every unmet expectation, plus each modal-basis week that has material but produced nothing
+        and carries no per-type shortfall (an empty norm can't name what's missing)."""
+        weeks = sum(len(w.gaps) or (1 if self.expectation_basis == "modal" and w.nothing_generated else 0)
+                    for w in self.weeks)
+        scopes = sum(len(m.gaps) for m in self.modules) + (len(self.course.gaps) if self.course else 0)
+        return weeks + scopes + len(self.unused_grading_groups)
 
     @property
     def totals(self) -> dict:
@@ -171,36 +214,33 @@ def _compute_gaps(census: Census, struct, placed: list[tuple[str, str]]) -> None
     _grading_gaps(census, struct, placed)
 
 
-def _modal_gaps(census: Census) -> None:
-    """Phase-1 presence gaps when no expectation is declared: sense 1 (declared-but-nothing-generated)
-    + sense 3 (off the course's own modal pattern)."""
-    real = [w for w in census.weeks if w.is_real()]
-    for w in real:
-        if w.materials and not w.has_any_artifact():
-            w.gaps.append("has material but nothing generated yet")
+_COARSE = ("page", "quiz", "assignment", "concept-map")
 
+
+def _modal_gaps(census: Census) -> None:
+    """Phase-1 presence gaps when no expectation is declared: each REAL week is expected to carry the
+    course's own MODAL types — those a strict majority of GENERATING weeks have (the denominator excludes
+    nothing-generated weeks so a 2-of-3 norm reads correctly). The norm is stored as data."""
+    census.expectation_basis = "modal"
+    real = [w for w in census.weeks if w.is_real()]
     generating = [w for w in real if w.has_any_artifact()]
     n = len(generating)
-    have = {"page": [w for w in generating if w.pages], "quiz": [w for w in generating if w.quizzes],
-            "assignment": [w for w in generating if w.assignments],
-            "concept map": [w for w in generating if w.concept_map]}
-    for typ, present in have.items():
-        if len(present) * 2 > n:
-            present_weeks = {w.week for w in present}
-            for w in generating:
-                if w.week not in present_weeks:
-                    w.gaps.append(f"no {typ} (but {len(present)}/{n} weeks have one)")
+    counts = {a: sum(1 for w in generating if w.actual.get(a)) for a in _COARSE}
+    census.generating_weeks = n
+    census.modal_norm = {a: c for a, c in counts.items() if c * 2 > n}
+    for w in real:
+        w.expected = {a: 1 for a in census.modal_norm}
+        w.gaps = _shortfalls(w.actual, w.expected)
 
 
 def _expectation_gaps(census: Census, struct, exp) -> None:
-    """Layer B — declared `expected − actual`, per scope. WEEK rules are checked on every known week
-    (incl. a declared-but-empty one — the denominator widens, so it becomes a real gap); MODULE rules are
-    satisfied by ≥1 matching artifact in ANY week of the module; COURSE rules over the whole course."""
+    """Layer B — declared `expected − actual`, per scope. WEEK rules apply to every known week (incl. a
+    declared-but-empty one — the denominator widens, so it becomes a real gap); MODULE rules are met by
+    matching artifacts in ANY week of the module; COURSE rules over the whole course."""
+    census.expectation_basis = "declared"
     for w in census.weeks:
-        for art, need in exp.for_week(w.week).items():
-            have = w.actual.get(art, 0)
-            if have < need:
-                w.gaps.append(f"expected {need} {art}, has {have}")
+        w.expected = exp.for_week(w.week)
+        w.gaps = _shortfalls(w.actual, w.expected)
 
     if exp.module or exp.module_overrides:
         mods: dict = {}
@@ -209,15 +249,23 @@ def _expectation_gaps(census: Census, struct, exp) -> None:
             if m:
                 mods.setdefault(m, []).append(w)
         for mod, members in mods.items():
-            for art, need in exp.for_module(mod).items():
-                have = sum(x.actual.get(art, 0) for x in members)
-                if have < need:
-                    census.gaps.append(f'module "{mod}": expected {need} {art}, has {have}')
+            actual = _sum_actual(members)
+            expected = exp.for_module(mod)
+            census.modules.append(ScopeCensus(name=mod, actual=actual, expected=expected,
+                                              gaps=_shortfalls(actual, expected)))
 
-    for art, need in exp.course.items():
-        have = sum(w.actual.get(art, 0) for w in census.weeks)
-        if have < need:
-            census.gaps.append(f"course: expected {need} {art}, has {have}")
+    if exp.course:
+        actual = _sum_actual(census.weeks)
+        census.course = ScopeCensus(name="course", actual=actual, expected=dict(exp.course),
+                                    gaps=_shortfalls(actual, exp.course))
+
+
+def _sum_actual(weeks) -> dict:
+    out: dict = {}
+    for w in weeks:
+        for a, c in w.actual.items():
+            out[a] = out.get(a, 0) + c
+    return out
 
 
 def _grading_gaps(census: Census, struct, placed: list[tuple[str, str]]) -> None:
@@ -227,9 +275,7 @@ def _grading_gaps(census: Census, struct, placed: list[tuple[str, str]]) -> None
     census.grading_groups = [name for name, _ in scheme.group_list()]
     if scheme.has_scheme():
         used = {scheme.group_for(kind, slug=slug) for kind, slug in placed}
-        for name in census.grading_groups:
-            if name not in used:
-                census.gaps.append(f'grading group "{name}" declared but no items are placed in it')
+        census.unused_grading_groups = [n for n in census.grading_groups if n not in used]
 
 
 # --------------------------------------------------------------------- report (thin emitter on the IR)
@@ -257,16 +303,36 @@ def render_report(census: Census) -> str:
         lines.append(f"| {w.label} | {len(w.materials) or '—'} | {_cell(w.pages)} | "
                      f"{_cell(w.quizzes)} | {_cell(w.assignments)} | {cm} |")
 
-    gaps = [(w.label, g) for w in census.weeks for g in w.gaps]
-    lines += ["", "## Gaps", ""]
-    if not gaps and not census.gaps:
-        lines.append("No gaps found.")
-    else:
-        for label, g in gaps:
-            lines.append(f"- **{label}** — {g}")
-        for g in census.gaps:                            # course-level: grading + module/course expectations
-            lines.append(f"- {g}")
+    lines += ["", "## Gaps", ""] + (_gap_lines(census) or ["No gaps found."])
     return "\n".join(lines) + "\n"
+
+
+_LABEL = {"concept-map": "concept map"}   # display wording only — the data key stays `concept-map`
+
+
+def _gap_lines(census: Census) -> list[str]:
+    """The human-readable gap list, rendered from the structured gap data (never stored as prose)."""
+    out = []
+    modal = census.expectation_basis == "modal"
+    for w in census.weeks:
+        if modal and w.nothing_generated:
+            out.append(f"- **{w.label}** — has material but nothing generated yet")
+            continue
+        for art, s in w.gaps.items():
+            if modal:
+                out.append(f"- **{w.label}** — no {_LABEL.get(art, art)} (but {census.modal_norm[art]}/"
+                           f"{census.generating_weeks} weeks have one)")
+            else:
+                out.append(f"- **{w.label}** — {_LABEL.get(art, art)}: has {s.has}, expects {s.expects}")
+    for m in census.modules:
+        for art, s in m.gaps.items():
+            out.append(f'- **Module "{m.name}"** — {_LABEL.get(art, art)}: has {s.has}, expects {s.expects}')
+    if census.course:
+        for art, s in census.course.gaps.items():
+            out.append(f"- **Course** — {_LABEL.get(art, art)}: has {s.has}, expects {s.expects}")
+    for name in census.unused_grading_groups:
+        out.append(f'- **Grading** — group "{name}" declared but no items are placed in it')
+    return out
 
 
 def write_census(course_path, *, out_dir=None) -> tuple[Census, Path, Path]:
