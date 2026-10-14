@@ -94,9 +94,10 @@ def build_messages(transcript: str, *, course_title: str | None = None,
     here rather than stored in the files, so the prompt files stay clean readable Markdown.
     """
     system = prompts.load(QUIZ_CATEGORY, system_prompt, project_root=project_root)
+    prompts.require(system, "transcript")   # an override must not silently drop the material
     task = prompts.load(QUIZ_CATEGORY, task_prompt, project_root=project_root)
 
-    body = system.body.format(
+    body = system.render(
         context_line=_context_line(course_title, week_label, module),
         transcript=transcript,
     )

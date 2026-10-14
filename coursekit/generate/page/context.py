@@ -65,9 +65,10 @@ def build_messages(transcript: str, *, course_title: str | None = None,
     `concept_map` is present, its concepts become an explicit teaching checklist that grounds the
     page's length and sections (one section per concept)."""
     system = prompts.load(PAGE_CATEGORY, system_prompt, project_root=project_root)
+    prompts.require(system, "transcript")   # an override must not silently drop the material
     task = prompts.load(PAGE_CATEGORY, task_prompt, project_root=project_root)
 
-    body = system.body.format(
+    body = system.render(
         context_line=_context_line(course_title, week_label, module),
         transcript=transcript,
         palette=catalog.render_palette("page"),

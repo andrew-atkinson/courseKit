@@ -24,12 +24,16 @@ Bodies may contain `{placeholders}` filled by the caller — kept explicit rathe
 here, because a missing placeholder should be the caller's error, not a silent empty string.
 """
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 # Shipped defaults live beside the repo root, matching the transcriber's layout.
 _SHIPPED = Path(__file__).resolve().parent.parent / "prompts"
 _OVERRIDE_SUBDIR = Path(".vtconfig") / "prompts"
+
+
+_PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
 
 class PromptNotFound(LookupError):
@@ -45,8 +49,29 @@ class Prompt:
     path: Path
 
     def render(self, **values) -> str:
-        """Substitute {placeholders}. Raises KeyError naming any that are missing."""
-        return self.body.format(**values) if values else self.body
+        """Fill the named `{placeholders}` given in `values`, in ONE pass over the template (inserted
+        text is never re-scanned). Every other brace is left exactly as written — a course's prompt
+        override may contain example code (`for (...) { }`, `f"{i}"`, `{{ }}`). Deliberately NOT
+        `str.format`, which parses every brace and crashes on literal ones. A placeholder no caller
+        fills stays visible in the text rather than raising (it can't be told apart from code)."""
+        if not values:
+            return self.body
+        return _PLACEHOLDER.sub(
+            lambda m: str(values[m.group(1)]) if m.group(1) in values else m.group(0), self.body)
+
+
+def require(prompt: Prompt, *names: str) -> None:
+    """Refuse a prompt whose template lacks a placeholder the caller fills with essential content —
+    e.g. a course override of system.md that dropped `{transcript}` would otherwise send the model no
+    course material at all, silently. A user-config error, so it exits with an actionable message
+    (coursekit's convention) before any model call."""
+    missing = [n for n in names if "{" + n + "}" not in prompt.body]
+    if missing:
+        tags = ", ".join("{" + n + "}" for n in missing)
+        raise SystemExit(
+            f"prompt {prompt.path} has no {tags} placeholder, so that content would never reach the "
+            f"model. Add {tags} where it belongs — the shipped prompts in prompts/{prompt.category}/ "
+            f"show the expected placement.")
 
 
 def _split_frontmatter(text: str) -> tuple[dict, str]:
