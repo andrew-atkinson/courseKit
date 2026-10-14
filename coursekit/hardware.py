@@ -75,7 +75,8 @@ def loaded_model_keys() -> set[str]:
 def check_fit(model_key: str) -> tuple[bool | None, str]:
     """(verdict, message). verdict True/False/None; None means we could not determine fit."""
     # An already-loaded model needs no new allocation — the free-RAM budget doesn't apply.
-    if model_key in loaded_model_keys():
+    loaded = loaded_model_keys()
+    if model_key in loaded:
         return True, f"'{model_key}' is already loaded in LM Studio"
 
     match = next((m for m in list_lm_models() if m.get("modelKey") == model_key), None)
@@ -89,9 +90,14 @@ def check_fit(model_key: str) -> tuple[bool | None, str]:
     size_gb = match.get("sizeBytes", 0) / (1024 ** 3)
     budget = available * SAFETY_FACTOR
     if size_gb > budget:
+        # Facts only, plus what's resident — this message serves BOTH the pre-run advisory (which adds
+        # its own "often loads anyway" framing) and the explanation of a real load failure. Over budget
+        # is not a prediction of failure: the OS can swap and the server may evict, and loads often succeed
+        # (OPS-4). Listing the loaded models makes the next false alarm carry the data to fix it.
+        resident = ", ".join(sorted(loaded)) if loaded else "none"
         return False, (
-            f"model '{model_key}' is ~{size_gb:.1f} GB but the fit budget is ~{budget:.1f} GB "
-            f"({available:.1f} GB available x {SAFETY_FACTOR}). It may fail to load — free memory "
-            f"in LM Studio, or choose a smaller model."
+            f"model '{model_key}' is ~{size_gb:.1f} GB; ~{available:.1f} GB is free now, over the "
+            f"~{budget:.1f} GB fit budget ({available:.1f} x {SAFETY_FACTOR}). "
+            f"Loaded in LM Studio: {resident}."
         )
     return True, f"'{model_key}' (~{size_gb:.1f} GB) fits the ~{budget:.1f} GB budget"

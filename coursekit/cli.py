@@ -482,7 +482,9 @@ def _cmd_generate(args) -> int:
         if not args.dry_run:
             verdict, msg = provider.check_fit(model)
             if verdict is False:
-                print(f"Warning ({gen.category}): {msg}\n")
+                print(f"Warning ({gen.category}): tight fit — {msg} It may still load (memory can be "
+                      f"reclaimed or swapped); if loading fails, unload other models or pick a smaller "
+                      f"one.\n")
 
         # Pages are driven by FUNCTION (teaching/glossary/overview), with the teaching generator
         # (monolithic vs decompose) chosen by the program — a per-unit dispatcher, not the one-
