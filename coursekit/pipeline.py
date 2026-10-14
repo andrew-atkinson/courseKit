@@ -159,6 +159,15 @@ def loop(messages, provider, model, generator: Generator | None = None, *,
     else:
         show(f"[yellow]Reached the {max_iters}-turn limit without finalizing.[/yellow]")
 
+    # The model may produce a COMPLETE artifact and still fumble the final call (week 7 of a real course:
+    # a complete 7x4 bank left unfinalized and out of sync with its quiz.json). A generator that can tell
+    # complete from merely consistent may finish it itself; otherwise it stays INCOMPLETE, honestly.
+    if not gen.is_finalized():
+        finish = getattr(gen, "auto_finalize", None)
+        if finish and finish():
+            show("[yellow]The model stopped without calling finalize, but the work was complete — "
+                 "coursekit finalized it.[/yellow]")
+
     # LM Studio returns content=None after a tool-heavy run; downstream writes need a str.
     return (reply.content or "") if reply else ""
 

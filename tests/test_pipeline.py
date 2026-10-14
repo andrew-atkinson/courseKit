@@ -636,3 +636,68 @@ def test_build_assignment_drafts_a_brief_and_rubric_via_the_loop(tmp_path):
     a, problems = ab.build_assignment(unit, provider, "m", tmp_path / "out", material="loops material")
     assert not problems and a is not None and a.rubric is not None
     assert a.title == "Apply loops" and (tmp_path / "out" / "assignment.json").exists()
+
+
+def test_run_unit_refuses_a_system_override_without_transcript_before_any_model_call(tmp_path):
+    # A course override of system.md that dropped {transcript} would send the model no material.
+    unit = _course_with_transcript(tmp_path, override="Brief with no material slot.",
+                                   override_name="system")
+    provider = FakeClient()
+    with pytest.raises(SystemExit, match=r"\{transcript\}"):
+        run_unit(unit, provider, "fake-model")
+    assert provider._raw.calls == 0                               # stopped before the model
+
+
+# ------------------------------------------------- auto-finalize a COMPLETE bank the model fumbled
+
+# one MC group with the full four variants, correct answer at a different position in each
+FULL = [("create_question_group",
+         {"group_id": "c1", "concept_title": "A concept", "question_type": "multiple_choice"})] + [
+    ("add_multiple_choice_variant",
+     {"group_id": "c1", "variant_label": lbl, "question_text": f"Which is right here ({lbl})?",
+      "variant_summary": f"Angle {lbl}", "options": ["a", "b", "c", "d"], "correct_index": i})
+    for i, lbl in enumerate("ABCD")]
+
+
+def _gen(target):
+    from coursekit.generate.quiz.generator import QuizGenerator
+    g = QuizGenerator()
+    g._expected_groups = target
+    return g
+
+
+def test_auto_finalizes_a_complete_bank_when_the_model_fumbles_the_last_call(fresh_bank):
+    # week 7 of a real course: a complete bank, then `<tool_call|>` leaked as prose until nudges ran out
+    client = ScriptedClient([("tools", FULL), ("stop", "<tool_call|>")], repeat_last=True)
+    loop(_msgs(), client, "m", _gen(1), max_nudges=2)
+    assert bankmod.is_finalized()
+
+
+def test_a_bank_short_of_its_group_target_stays_incomplete(fresh_bank):
+    client = ScriptedClient([("tools", FULL), ("stop", "<tool_call|>")], repeat_last=True)
+    loop(_msgs(), client, "m", _gen(2), max_nudges=2)     # brief asked for 2 groups; only 1 built
+    assert not bankmod.is_finalized()                       # an honest INCOMPLETE, not a false success
+
+
+def test_a_group_short_of_its_variants_stays_incomplete(fresh_bank):
+    client = ScriptedClient([("tools", BUILD), ("stop", "<tool_call|>")], repeat_last=True)
+    loop(_msgs(), client, "m", _gen(1), max_nudges=2)     # one variant of four
+    assert not bankmod.is_finalized()
+
+
+def test_no_known_target_never_auto_finalizes(fresh_bank):
+    client = ScriptedClient([("tools", FULL), ("stop", "<tool_call|>")], repeat_last=True)
+    loop(_msgs(), client, "m", _gen(None), max_nudges=2)  # model chose the count: nothing to verify
+    assert not bankmod.is_finalized()
+
+
+def test_run_unit_auto_finalizes_against_the_concept_map_target(tmp_path):
+    from coursekit.generate.page.concept_map import (Concept, ConceptMap, concept_map_path,
+                                                     save_concept_map)
+    unit = _course_with_transcript(tmp_path)
+    save_concept_map(ConceptMap(week="3", concepts=[Concept(name="Loops")]),
+                     concept_map_path(unit.course_root, "3"))       # target: one group
+    client = ScriptedClient([("tools", FULL), ("stop", "<tool_call|>")], repeat_last=True)
+    res = run_unit(unit, client, "m")
+    assert res.finalized
+    assert (unit.output_dir / "quiz.json").exists()                  # artifacts re-written in sync

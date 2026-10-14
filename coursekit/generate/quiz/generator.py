@@ -13,6 +13,10 @@ from coursekit.generate.base import RunResult
 from coursekit.generate.quiz import bank, tools
 from coursekit.generate.quiz.context import build_messages
 
+# The brief asks for four variants per group (prompts/quiz/task.md); auto_finalize treats a group as
+# complete only at that count. ASMT-18 will make it configurable — read the same setting here then.
+VARIANTS_PER_GROUP = 4
+
 
 class QuizGenerator:
     category = "quiz"
@@ -25,6 +29,7 @@ class QuizGenerator:
                   title=unit.week_label, source=unit.transcript_path.name)
         tools.reset_state()
         tools.set_call_log(out_dir / "calls.jsonl")
+        self._expected_groups = None   # set by build_messages from this unit's brief
 
     def tool_specs(self) -> list:
         return tools.TOOL_SPECS
@@ -41,6 +46,11 @@ class QuizGenerator:
         cm = load_for_unit(unit)
         # Per-week wins over per-course: a `questions` on THIS week's concept map beats quiz.yaml's.
         q = (cm.questions if cm is not None and cm.questions else cfg.value("questions"))
+        # The brief's group target, kept so auto_finalize can tell COMPLETE from merely consistent:
+        # `questions:` fixes it exactly; else one group per concept (the model may add extras); with
+        # neither, the model picks the count and there is nothing to verify against.
+        concepts = getattr(cm, "concepts", None) if cm is not None else None
+        self._expected_groups = int(q) if q else (len(concepts) if concepts else None)
         return build_messages(
             transcript, course_title=unit.course_title, week_label=unit.week_label,
             module=unit.module, project_root=unit.course_root,
@@ -68,6 +78,23 @@ class QuizGenerator:
             bank.finalize()   # same deterministic seed → re-writes cleanly with the EU group included
 
     def is_finalized(self) -> bool:
+        return bank.is_finalized()
+
+    def auto_finalize(self) -> bool:
+        """The model stopped without calling finalize_bank (e.g. it leaked `<tool_call|>` as prose and
+        the nudges ran out). The PROGRAM may finish the bank — but only when it is COMPLETE against what
+        the brief asked for. `validate_final` is a consistency check: it passes a bank that gave up
+        halfway (3 of 7 groups, one variant of four), and finalizing that would turn an honest
+        INCOMPLETE into a false success. Complete = at least the target number of groups (unknown →
+        don't guess) and the full set of variants in each (an open-response EU group is single by
+        design). `bank.finalize` still validates on top of this."""
+        target = getattr(self, "_expected_groups", None)
+        if target is None:
+            return False
+        groups = [g for g in bank.get().groups.values() if g.question_type != "open_response"]
+        if len(groups) < target or any(len(g.variants) < VARIANTS_PER_GROUP for g in groups):
+            return False
+        bank.finalize()
         return bank.is_finalized()
 
     def nudge(self, *, stalled: bool) -> str:

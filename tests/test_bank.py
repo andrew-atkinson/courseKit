@@ -361,3 +361,29 @@ def test_short_answer_rejects_a_rubric_description_as_an_answer():
     # a real short answer that merely starts with "the" is fine
     SAVariant(group_id="c1", label="B", variant_summary="name the organelle",
               question_text="Where is ATP made?", accepted_answers=["the mitochondria"])
+
+
+# ------------------------------------------------- back up a finished bank before a re-run clobbers it
+
+def test_init_backs_up_a_finished_bank_before_a_rerun_overwrites_it(tmp_path):
+    (tmp_path / "bank.json").write_text(json.dumps({"run_id": "old", "finalized": True}), encoding="utf-8")
+    bankmod.init("new", tmp_path)
+    bankmod.create_group("c1", "A concept", "multiple_choice")       # first autosave overwrites bank.json
+    assert json.loads((tmp_path / "bank.json").read_text())["run_id"] == "new"
+    assert json.loads((tmp_path / "bank.prev.json").read_text())["run_id"] == "old"   # the good one kept
+
+
+def test_init_never_backs_up_an_unfinished_bank(tmp_path):
+    (tmp_path / "bank.prev.json").write_text('{"good": true}', encoding="utf-8")
+    (tmp_path / "bank.json").write_text(json.dumps({"run_id": "x", "finalized": False}), encoding="utf-8")
+    bankmod.init("new", tmp_path)
+    assert json.loads((tmp_path / "bank.prev.json").read_text()) == {"good": True}   # junk didn't replace it
+
+
+def test_the_backup_is_invisible_to_census(tmp_path):
+    from coursekit import census
+    d = tmp_path / "quizzes" / "week-1"
+    d.mkdir(parents=True)
+    (d / "bank.json").write_text("{}", encoding="utf-8")
+    (d / "bank.prev.json").write_text("{}", encoding="utf-8")
+    assert census.build_census(tmp_path).totals["quizzes"] == 1      # only bank.json counts

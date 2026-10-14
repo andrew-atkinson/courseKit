@@ -8,6 +8,7 @@ Knows nothing about GIFT. See gift.py for serialisation.
 """
 
 import json
+import shutil
 import random
 import re
 from pathlib import Path
@@ -332,6 +333,20 @@ def init(run_id: str, out_dir: Path | None = None, title: str = "Question bank",
     global _bank, _out_dir
     _bank = Bank(run_id=run_id, title=title, source=source)
     _out_dir = Path(out_dir) if out_dir else None
+    if _out_dir is not None:
+        _backup_finished(_out_dir / "bank.json")
+
+
+def _backup_finished(path: Path) -> None:
+    """A fresh run autosaves over `bank.json` after its first question, so a re-run that then fails
+    would destroy a good bank and strand its `quiz.json`/gift. Copy a FINISHED bank aside to
+    `bank.prev.json` first. An unfinished one is never copied — junk must not replace a good backup.
+    (The full fix — autosave to an in-progress file, promote on finalize — is parked.)"""
+    try:
+        if json.loads(path.read_text(encoding="utf-8")).get("finalized"):
+            shutil.copy2(path, path.with_name("bank.prev.json"))
+    except (OSError, ValueError):
+        pass
 
 
 def reset() -> None:
