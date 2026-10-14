@@ -19,8 +19,10 @@ def test_does_not_fit_when_over_budget(monkeypatch):
     _stub(monkeypatch, [{"modelKey": "big", "sizeBytes": 19 * 1024**3}], available=21.0)
     verdict, msg = hardware.check_fit("big")
     assert verdict is False
-    assert "may fail to load" in msg
+    assert "over the ~14.7 GB fit budget" in msg            # a fact, not a prediction of failure
+    assert "may fail to load" not in msg                     # OPS-4: it often loads anyway
     assert "19" in msg and "GB" in msg
+    assert "Loaded in LM Studio: none" in msg                # the diagnostic for the next false alarm
 
 
 def test_unknown_when_model_not_in_catalog(monkeypatch):
@@ -65,7 +67,7 @@ def test_local_provider_delegates_to_the_ram_check(monkeypatch):
     _stub(monkeypatch, [{"modelKey": "big", "sizeBytes": 19 * 1024**3}], available=21.0)
     p = OpenAICompatProvider(client=object(), is_local=True)
     verdict, msg = p.check_fit("big")
-    assert verdict is False and "may fail to load" in msg
+    assert verdict is False and "fit budget" in msg
 
 
 def test_hosted_provider_reports_unknown_not_a_local_ram_verdict(monkeypatch):
@@ -84,3 +86,22 @@ def test_base_provider_default_is_unknown():
         def append_assistant(self, messages, reply): ...
         def append_tool_results(self, messages, results): ...
     assert _Bare().check_fit("anything") == (None, "")
+
+
+def test_over_budget_message_lists_the_resident_models(monkeypatch):
+    # OPS-4 diagnostic: when the warning fires, say what LM Studio is holding — the data needed to
+    # tell "a model will be evicted" from "memory not yet reclaimed after an eject".
+    _stub(monkeypatch, [{"modelKey": "big", "sizeBytes": 19 * 1024**3}], available=21.0)
+    monkeypatch.setattr(hardware, "loaded_model_keys", lambda: {"zeta", "alpha"})
+    verdict, msg = hardware.check_fit("big")
+    assert verdict is False and "Loaded in LM Studio: alpha, zeta." in msg
+
+
+def test_failure_explanation_reads_sensibly_with_the_neutral_message(monkeypatch):
+    # The same message explains a REAL load failure — it must not reassure ("often loads anyway") there.
+    from coursekit import pipeline
+    from coursekit.providers import OpenAICompatProvider
+    _stub(monkeypatch, [{"modelKey": "big", "sizeBytes": 19 * 1024**3}], available=21.0)
+    p = OpenAICompatProvider(client=object(), is_local=True)
+    text = pipeline._model_error_message(p, "big", RuntimeError("failed to load"))
+    assert "fit budget" in text and "often loads anyway" not in text and "Fix: free memory" in text
