@@ -240,7 +240,7 @@ def test_category_names_the_concept():
                              question_text="A question about loops here?",
                              options=["a", "b"], correct_index=0))
     b.groups["c1"].concept_title = "Anatomy of a for loop"
-    assert "$CATEGORY: top/Quizbot/t1/c1 Anatomy of a for loop" in gift.emit_bank(b)
+    assert "$CATEGORY: top/coursekit/t1/c1 Anatomy of a for loop" in gift.emit_bank(b)
 
 
 def test_category_is_sanitised_not_escaped():
@@ -251,7 +251,7 @@ def test_category_is_sanitised_not_escaped():
                              options=["a", "b"], correct_index=0))
     b.groups["c1"].concept_title = "map() / lerp() = remapping"
     line = [ln for ln in gift.emit_bank(b).split("\n") if ln.startswith("$CATEGORY")][0]
-    assert line == "$CATEGORY: top/Quizbot/t1/c1 map() - lerp() = remapping"
+    assert line == "$CATEGORY: top/coursekit/t1/c1 map() - lerp() = remapping"
     assert "\\" not in line
 
 

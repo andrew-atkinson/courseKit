@@ -1,7 +1,7 @@
 // Question bank: Week 3 - loops
 // run: demo
 
-$CATEGORY: top/Quizbot/demo/c1 Anatomy and purpose of a for loop
+$CATEGORY: top/coursekit/demo/c1 Anatomy and purpose of a for loop
 // Anatomy and purpose of a for loop
 
 // [id:c1-A] [tag:c1] [tag:multiple_choice]
@@ -36,7 +36,7 @@ $CATEGORY: top/Quizbot/demo/c1 Anatomy and purpose of a for loop
     ~The loop increments by 1 automatically
 }
 
-$CATEGORY: top/Quizbot/demo/c2 Infinite loops
+$CATEGORY: top/coursekit/demo/c2 Infinite loops
 // Infinite loops
 
 // [id:c2-A] [tag:c2] [tag:true_false]
@@ -51,7 +51,7 @@ $CATEGORY: top/Quizbot/demo/c2 Infinite loops
 // [id:c2-D] [tag:c2] [tag:true_false]
 ::c2-D Convergence claim D::Statement D\: a loop whose variable moves away from the exit condition runs forever. {FALSE}
 
-$CATEGORY: top/Quizbot/demo/c3 Function purposes
+$CATEGORY: top/coursekit/demo/c3 Function purposes
 // Function purposes
 
 // [id:c3-A] [tag:c3] [tag:matching]
@@ -82,7 +82,7 @@ $CATEGORY: top/Quizbot/demo/c3 Function purposes
     =rect() -> draws a rectangle
 }
 
-$CATEGORY: top/Quizbot/demo/c4 Nested loop iterations
+$CATEGORY: top/coursekit/demo/c4 Nested loop iterations
 // Nested loop iterations
 
 // [id:c4-A] [tag:c4] [tag:numerical]
@@ -97,7 +97,7 @@ $CATEGORY: top/Quizbot/demo/c4 Nested loop iterations
 // [id:c4-D] [tag:c4] [tag:numerical]
 ::c4-D Total iterations, set D::An outer loop runs and an inner loop runs. Total iterations? (set D) {#6}
 
-$CATEGORY: top/Quizbot/demo/c5 Code completion
+$CATEGORY: top/coursekit/demo/c5 Code completion
 // Code completion
 
 // [id:c5-A] [tag:c5] [tag:multiple_choice]
@@ -132,7 +132,7 @@ $CATEGORY: top/Quizbot/demo/c5 Code completion
     ~[markdown]`x < 370`
 }
 
-$CATEGORY: top/Quizbot/demo/c6 Naming the parts
+$CATEGORY: top/coursekit/demo/c6 Naming the parts
 // Naming the parts
 
 // [id:c6-A] [tag:c6] [tag:short_answer]
@@ -147,7 +147,7 @@ $CATEGORY: top/Quizbot/demo/c6 Naming the parts
 // [id:c6-D] [tag:c6] [tag:short_answer]
 ::c6-D Naming a loop part, set D::Name the part of the loop described in set D. {=nested =nesting}
 
-$CATEGORY: top/Quizbot/demo/c7 What loops are good for
+$CATEGORY: top/coursekit/demo/c7 What loops are good for
 // What loops are good for
 
 // [id:c7-A] [tag:c7] [tag:multiple_answer]
@@ -182,7 +182,7 @@ $CATEGORY: top/Quizbot/demo/c7 What loops are good for
     ~%50%Guaranteeing the sketch never crashes
 }
 
-$CATEGORY: top/Quizbot/demo/c8 Enduring understanding
+$CATEGORY: top/coursekit/demo/c8 Enduring understanding
 // Enduring understanding
 
 // [id:c8-A] [tag:c8] [tag:open_response]

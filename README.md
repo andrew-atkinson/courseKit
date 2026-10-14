@@ -41,7 +41,7 @@ See [agent/architecture.md](agent/architecture.md) for the map.
 ## Install
 
 ```bash
-git clone https://github.com/andrew-atkinson/quizbot.git && cd coursekit
+git clone https://github.com/andrew-atkinson/courseKit.git && cd courseKit
 uv sync --group dev     # also installs the `coursekit` command (editable)
 ```
 

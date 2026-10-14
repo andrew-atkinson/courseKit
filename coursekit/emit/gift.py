@@ -138,7 +138,7 @@ def _category(run_id: str, group_id: str, concept_title: str) -> str:
     the category path separator, so it has to go.
     """
     safe = " ".join(concept_title.replace("/", "-").replace("\\", "-").split())
-    return f"top/Quizbot/{run_id}/{group_id} {safe}"
+    return f"top/coursekit/{run_id}/{group_id} {safe}"
 
 
 def _meta_comment(v, tags: list[str]) -> str:
