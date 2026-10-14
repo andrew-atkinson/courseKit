@@ -6,7 +6,8 @@ signals, offline. Two deterministic sub-layers:
        it's flagged as a decision ("assignments appear once — declare a cadence?").
   L1-deterministic — concept-map rules (the concept map already encodes the pedagogy structure, so these
        are lookups, not model reasoning): a week marking an enduring understanding → expect an EU
-       assessment (UbD); a concept-DENSE week → expect a glossary page (CLT). Each carries a rationale
+       assessment (UbD) — but only when the faculty declared `eu_question: true`, else it's a flagged
+       decision; a concept-DENSE week → expect a glossary page (CLT). Each carries a rationale
        citing the framework + the map fact. (A "review week → recap" rule is judgmental → deferred to the
        L1-MODEL layer, not here.)
 
@@ -74,13 +75,26 @@ def propose_expectations(path) -> tuple[dict, list[str]]:
             overrides_week.setdefault(w.week, {})["page:glossary"] = 1
             notes.append(f"week {w.week}: page:glossary — CLT (dense: {n_concepts} concepts)")
 
-    if eu_weeks and len(eu_weeks) == len(cm_weeks):      # universal → promote to a week-default
+    # Whether/how EUs are assessed is the faculty's call (instrument + cadence), so a quiz:eu rule is
+    # proposed only on declared intent (`eu_question` in quiz.yaml); undeclared → a flagged decision.
+    eu_intent = courseconfig.load(root, config_name="quiz.yaml").config.get("eu_question")
+    if not eu_weeks:
+        pass
+    elif eu_intent is None:
+        notes.append(f"enduring understanding: {len(eu_weeks)}/{len(cm_weeks)} concept-mapped weeks mark one "
+                     f"— DECISION NEEDED: decide how EUs are assessed (per-week EU question → set "
+                     f"`eu_question: true` in quiz.yaml / per-module project / none). coursekit won't guess it.")
+    elif not eu_intent:
+        notes.append("enduring understanding: `eu_question: false` in quiz.yaml — no quiz:eu rule proposed")
+    elif len(eu_weeks) == len(cm_weeks):                  # universal → promote to a week-default
         defaults.append({"scope": "week", "artifact": "quiz:eu", "count": 1})
-        notes.append("quiz:eu: each week — UbD (every concept-mapped week marks an enduring understanding)")
+        notes.append("quiz:eu: each week — UbD + declared `eu_question: true` (every concept-mapped week "
+                     "marks an enduring understanding)")
     else:
         for wk in eu_weeks:                               # otherwise per-week overrides
             overrides_week.setdefault(wk, {})["quiz:eu"] = 1
-            notes.append(f"week {wk}: quiz:eu — UbD (marks an enduring understanding)")
+            notes.append(f"week {wk}: quiz:eu — UbD + declared `eu_question: true` (marks an enduring "
+                         f"understanding)")
 
     expect: dict = {"defaults": defaults}
     if overrides_week:

@@ -23,9 +23,11 @@ def _cmap(root, week, *, eu="", n_concepts=1):
     save_concept_map(cm, concept_map_path(root, week))
 
 
-def _course(tmp_path, *, eu_all=True, dense_week=None, assignment=True):
+def _course(tmp_path, *, eu_all=True, dense_week=None, assignment=True, eu_question=None):
     root = tmp_path / "course"
     (root / ".vtconfig").mkdir(parents=True)
+    if eu_question is not None:
+        (root / ".vtconfig" / "quiz.yaml").write_text(f"eu_question: {str(eu_question).lower()}\n")
     for wk in ("week-1", "week-2", "week-3"):
         _artifact(root, "pages", wk, json.dumps({"week_ref": wk}))
         _artifact(root, "quizzes", wk, "{}")
@@ -52,15 +54,32 @@ def test_L0_flags_a_sparse_type_instead_of_fabricating_a_rule(tmp_path):
 
 
 def test_L1_eu_universal_becomes_a_week_default(tmp_path):
-    expect, notes = pe.propose_expectations(_course(tmp_path, eu_all=True))
+    expect, notes = pe.propose_expectations(_course(tmp_path, eu_all=True, eu_question=True))
     assert any(r["artifact"] == "quiz:eu" and r["scope"] == "week" for r in expect["defaults"])
     assert any("quiz:eu" in note and "UbD" in note for note in notes)
 
 
 def test_L1_eu_partial_becomes_per_week_overrides(tmp_path):
-    expect, notes = pe.propose_expectations(_course(tmp_path, eu_all=False))   # only week 1 has an EU
+    expect, notes = pe.propose_expectations(_course(tmp_path, eu_all=False, eu_question=True))  # only wk 1 has an EU
     assert not any(r["artifact"] == "quiz:eu" for r in expect["defaults"])      # not universal → no default
     assert expect["overrides"]["week"]["1"]["quiz:eu"] == 1
+
+
+def _eu_rules(expect):
+    return ([r for r in expect["defaults"] if r["artifact"] == "quiz:eu"]
+            + [w for w in expect.get("overrides", {}).get("week", {}).values() if "quiz:eu" in w])
+
+
+def test_L1_eu_undeclared_is_a_flagged_decision_not_a_rule(tmp_path):
+    expect, notes = pe.propose_expectations(_course(tmp_path, eu_all=True))      # no quiz.yaml intent
+    assert _eu_rules(expect) == []
+    assert any("enduring understanding" in note and "DECISION NEEDED" in note for note in notes)
+
+
+def test_L1_eu_declared_false_proposes_nothing(tmp_path):
+    expect, notes = pe.propose_expectations(_course(tmp_path, eu_all=True, eu_question=False))
+    assert _eu_rules(expect) == []
+    assert not any("DECISION NEEDED" in note and "enduring" in note for note in notes)
 
 
 def test_L1_dense_week_gets_a_glossary_override(tmp_path):
@@ -70,7 +89,7 @@ def test_L1_dense_week_gets_a_glossary_override(tmp_path):
 
 
 def test_rationale_grounds_every_default_in_a_fact(tmp_path):
-    _expect, notes = pe.propose_expectations(_course(tmp_path))
+    _expect, notes = pe.propose_expectations(_course(tmp_path, eu_question=True))
     assert any("modal" in n for n in notes)         # L0 cites the pattern
     assert any("UbD" in n for n in notes)           # L1 cites the framework + the map fact
 
