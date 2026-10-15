@@ -1,56 +1,67 @@
-# quizbot / coursekit
+# coursekit
 
-Turns lecture transcripts into randomized Canvas quizzes via a local tool-calling LLM. Longer aim:
-a shared spine (`coursekit/`) that future course-artifact generators reuse. See
-[agent/architecture.md](agent/architecture.md) for the structural map and the migration plan — it is
-the source of truth for how the pieces fit; don't duplicate its diagrams here.
+Turns a course's own material (transcripts, readings, slides) into Canvas/Moodle-ready quizzes, pages, and assignments via a local tool-calling LLM.
+It also evaluates what it made (the critics) and inventories the whole course (the census).
+See [agent/architecture.md](agent/architecture.md) for the structural map — it is the source of truth for how the pieces fit; don't duplicate its diagrams here.
+The forward plan and dated history live in [agent/roadmap.md](agent/roadmap.md).
 
-**The one load-bearing idea:** `bank.json` is a canonical intermediate form. Every input converges on
-it; every emitter (`gift.py`, `qti.py`) reads only it. Adding a platform is one emitter, not one
-converter per input. This is why QTI export needs no model.
+**The one load-bearing idea:** every artifact has a canonical intermediate form — `bank.json` (quizzes), `page.json` (pages), `assignment.json` (assignments), `census.json` (the census).
+Every input converges on the IR; every emitter (`gift.py`, `qti.py`, the cartridge, the census report) reads only it.
+Adding a platform is one emitter, not one converter per input — which is why emitting needs no model.
 
 ## Working here
 
-- **Run the suite; don't recall its size.** `uv run pytest -q` — fully offline, no model, ~1s. There
-  is never a reason to estimate a result you can run.
-- Python ≥3.12, `uv`. Deps: pydantic/dotenv/rich/openai + stdlib (no video stack — that's the
-  transcriber's).
+- **Run the suite; don't recall its size.**
+  `uv run pytest -q` — fully offline, no model, a few seconds.
+  There is never a reason to estimate a result you can run.
+- Python ≥3.12, `uv`.
+  The package imports pydantic, python-dotenv, rich, openai, jinja2, pyyaml, pypdf, python-pptx + stdlib (no video stack — that's the transcriber's).
+  `pyproject.toml` declares more than that; don't read it as the runtime set.
 - Default branch for PRs is `main`.
 
 ## Facticity — this project has been bitten by stale claims
 
-- **Never assert a volatile number from memory** — a test count, a line count, a file size. Run the
-  command or read the file. The test count went wrong four times before a guardrail was added.
-- **A number in prose lives in exactly one place, under a test.** The suite's test count lives only in
-  `README.md`, enforced by [tests/test_docs_facts.py](tests/test_docs_facts.py). Don't repeat it
-  elsewhere — a number in two files rots in one. Decorative counts that show a ratio get a `~`.
-- **Claims about the transcriber are read, not reconstructed.** Its source is on disk (below). Read it
-  before stating what it does; earlier reconstructions from its _outputs_ were wrong.
+- **Never assert a volatile number from memory** — a test count, a line count, a file size.
+  Run the command or read the file.
+  The test count went wrong four times before a guardrail was added.
+- **A number in prose lives in exactly one place, under a test.**
+  The suite's test count lives only in `README.md`, enforced by [tests/test_docs_facts.py](tests/test_docs_facts.py).
+  Don't repeat it elsewhere — a number in two files rots in one.
+  Decorative counts that show a ratio get a `~`.
+- **Claims about the transcriber are read, not reconstructed.**
+  Its source is on disk (below).
+  Read it before stating what it does; earlier reconstructions from its _outputs_ were wrong.
 
 ## Ground truth on disk
 
-- **videotranscriber source:** `~/video_transcription` (separate repo, stays separate — it pulls
-  `mlx-whisper`). The two tools meet through files in a course's `.vtconfig/`, never by importing each
-  other.
-- **Canvas exports (ground truth for the emitters):** real `.imscc` course exports live in
-  `reference/` (gitignored — large, real course content). These are the ground truth behind `qti.py`
-  and the page CC emitter; the CC101 export has 32 real wiki pages. Format notes: `docs/canvasQuizStructure.md`.
-- **`docs/` holds tracked Markdown guides** (`*.md` is version-controlled — user-facing guides:
-  `quizzes.md`, `pages.md`, `configuration.md`, `domain-profile.md`, `canvasQuizStructure.md`);
-  everything else there is gitignored. `reference/` (the heavy exports)
-  is fully gitignored — don't rely on its contents surviving, and don't put the only copy of anything
-  valuable there. `agent/` also holds tracked references (`architecture.md`, `GIFT_format_compact.md`).
-- **Course artifacts live with the course, never in this repo** — a `quizzes/` tree beside the
-  course's own files. The app directory holds only code and tests.
+- **videotranscriber source:** `~/video_transcription` (separate repo, stays separate — it pulls `mlx-whisper`).
+  The two tools meet through files in a course's `.vtconfig/`, never by importing each other.
+- **Canvas exports (ground truth for the emitters):** real `.imscc` course exports live in `reference/` (gitignored — large, real course content).
+  They are the ground truth behind `qti.py`, the page/assignment CC emitters, and the grading-group XML.
+  Format notes: `docs/canvasQuizStructure.md`.
+- **`docs/` holds the tracked user-facing guides** (`*.md`; the README's Documentation section lists them); everything else there is gitignored.
+  `reference/` is fully gitignored — don't rely on its contents surviving, and don't put the only copy of anything valuable there.
+  `agent/` holds the tracked internal references (`architecture.md`, `roadmap.md`, `local-canvas-testing.md`, `GIFT_format_compact.md`).
+- **Course artifacts live with the course, never in this repo** — `quizzes/`, `pages/`, `assignments/` beside the course's own files.
+  The app directory holds only code and tests.
 
 ## Decisions not derivable from the code
 
-- **Per-tool config files are separate.** `context.yaml` (course structure) is shared; the
-  transcriber's `config.yaml` and quizbot's `quiz.yaml` are each private to their tool.
+- **Per-tool config files are separate.**
+  `context.yaml` (course structure) is shared and owned by the transcriber; coursekit's own files (`quiz.yaml`, `page.yaml`, `structure.coursekit.yaml`, …) are private to it.
+  coursekit never writes `context.yaml` — its declared structure, grading groups, and expectations go in its own overlay.
   `coursekit/courseconfig.py` is the shared _mechanism_; each tool owns its _file_.
-- **Content boundary: instructor-authored material only, never student submissions.** Keeps the
-  project out of FERPA scope. Relevant before anyone proposes auto-grading.
-- **File emitters stay first-class**, even once a Canvas API emitter exists — many faculty can't get a
-  token, and a reviewable `.zip` is worth more than an API call. Any API path defaults to dry-run.
-- **The quizbot→coursekit rename is triggered by generator #2, not a date.** Until then the spine is
-  built in place. Don't do the rename mid-feature.
+- **Proposers draft; the faculty decides.**
+  `propose` (structure, `--grading`, `--expectations`) writes a commented draft the faculty owns by editing, and refuses to clobber it without `--force`.
+  A pedagogic choice the faculty hasn't made (a cadence, whether/how EUs are assessed) is a flagged DECISION NEEDED, never a pre-filled rule.
+- **The census is presence, not quality.**
+  It answers "is there an artifact for X?" offline; "is X any good?" needs the model and belongs to the evaluators.
+- **Content boundary: instructor-authored material only, never student submissions.**
+  Keeps the project out of FERPA scope.
+  Relevant before anyone proposes auto-grading.
+- **File emitters stay first-class**, even once a Canvas API emitter exists — many faculty can't get a token, and a reviewable `.zip` is worth more than an API call.
+  Any API path defaults to dry-run.
+- **Real institution and course names stay out of tracked files and commit messages.**
+  Use stand-ins (`CC101` for the creative-coding course, `PH101` for the photography course).
+- **The repo was called quizbot until 2026-10.**
+  "quizbot" in older docs and history is the same tool.
