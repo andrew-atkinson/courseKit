@@ -16,7 +16,8 @@ Adding a platform is one emitter, not one converter per input — which is why e
   There is never a reason to estimate a result you can run.
 - Python ≥3.12, `uv`.
   The package imports pydantic, python-dotenv, rich, openai, jinja2, pyyaml, pypdf, python-pptx + stdlib (no video stack — that's the transcriber's).
-  `pyproject.toml` declares more than that; don't read it as the runtime set.
+  `pyproject.toml` `dependencies` is exactly that set; add a package there only with the import that needs it.
+  Notebook-only packages live in the `notebook` dependency group (`uv sync --group dev --group notebook`).
 - Default branch for PRs is `main`.
 
 ## Facticity — this project has been bitten by stale claims

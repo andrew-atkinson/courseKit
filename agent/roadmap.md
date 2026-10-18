@@ -272,6 +272,7 @@ Increments 1–10 are complete in code; these are the live remnants, so nothing 
 
 A running changelog — one line per completed feature, newest first, with its commit(s).
 The sections above stay forward-looking; deep detail lives in the offline log + git.
+- 2026-10-15 · **Dependency prune** (`77d8f24`). `pyproject.toml` runtime deps cut to what `coursekit/` imports (every declared package grepped across tracked code, evals, and the notebook); unused agent/web/plotting stacks and the `dotenv` shim removed; ipykernel, nbclient, nbconvert moved to a `notebook` group.
 - 2026-10-15 · **OPS-10 — `CLAUDE.md` refreshed** (docs). Retitled, scope + canonical-IR list, rename trigger retired, runtime deps corrected, proposer/census/one-writer decisions recorded. Also: roadmap commit IDs re-pointed after the history rewrite.
 - 2026-10-14 · **Repo hygiene** — README clone URL; GIFT category root `top/Quizbot/` → `top/coursekit/` (`b9b712e`); real course names scrubbed from tracked files and all history (rewrite + force-push; every commit ID changed).
 - 2026-10-14 · **FLOW-9 EU rule → flagged decision** (`25206e9`). `propose --expectations` proposes `quiz:eu` only when `quiz.yaml` declares `eu_question: true`; otherwise a DECISION NEEDED note.
