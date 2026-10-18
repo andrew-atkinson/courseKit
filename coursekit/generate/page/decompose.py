@@ -278,7 +278,10 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
 
 
 def _render(unit, out_dir, project_root) -> None:
-    """Best-effort HTML render beside page.json — mirrors the monolithic generator + fix loop."""
+    """Best-effort HTML render beside page.json — mirrors the monolithic generator + fix loop. Only a
+    finalized page renders: an unfinished build must not overwrite the last good HTML."""
+    if not pageir.is_finalized():
+        return
     try:
         from coursekit.emit import html as html_emit
         from coursekit.generate.page.renderer import load_supplements

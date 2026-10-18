@@ -199,7 +199,7 @@ def _course_tree(tmp_path):
         pdir = course / "pages" / wk
         pdir.mkdir(parents=True)
         P.reset()
-        P.init(f"c-{wk}", pdir, title=f"{wk.title()}", slug=slug, week_ref=wk)
+        P.load(P.Page(page_id=f"c-{wk}", title=f"{wk.title()}", slug=slug, week_ref=wk), pdir)
         P.put_block(P.build_block(kind="heading", block_id="h", text="REVIEW", level=4))
     P.reset()
     return course

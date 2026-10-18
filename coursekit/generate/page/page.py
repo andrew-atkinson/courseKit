@@ -17,6 +17,7 @@ Two rules are load-bearing:
 """
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Literal, Union
@@ -223,13 +224,17 @@ class Page(BaseModel):
 
 _page = Page(page_id="unsaved")
 _out_dir: Path | None = None
+_staged = False   # a fresh build (init) stages until finalize; an adopted page (load) saves in place
 
 
 def init(page_id: str, out_dir: Path | None = None, *, title: str = "Untitled page",
          page_type: str = "week_intro", week_ref: str | None = None, slug: str = "page") -> None:
-    global _page, _out_dir
+    """Start an empty page. It autosaves to `page.partial.json` and is promoted over `page.json` only
+    on finalize, so a re-run that fails leaves the last good page untouched."""
+    global _page, _out_dir, _staged
     _page = Page(page_id=page_id, title=title, page_type=page_type, week_ref=week_ref, slug=slug)
     _out_dir = Path(out_dir) if out_dir else None
+    _staged = True
 
 
 def reset() -> None:
@@ -241,9 +246,10 @@ def load(page_obj: "Page", out_dir: Path | None = None) -> None:
     """Adopt an EXISTING page as the working singleton — for editing a finished page in place (the
     targeted-fix pass reloads a `page.json`, then a `put_block` overwrites just the flagged block and
     autosaves). Distinct from `init`, which starts empty."""
-    global _page, _out_dir
+    global _page, _out_dir, _staged
     _page = page_obj
     _out_dir = Path(out_dir) if out_dir else None
+    _staged = False
 
 
 def get() -> Page:
@@ -255,13 +261,15 @@ def is_finalized() -> bool:
 
 
 def _autosave() -> None:
-    """Persist after every write, exactly as bank.py does — a crash mid-build loses nothing."""
+    """Persist after every write, exactly as bank.py does — a crash mid-build loses nothing, and a
+    staged build reaches `page.json` (atomically) only once finalized."""
     if _out_dir is None:
         return
     _out_dir.mkdir(parents=True, exist_ok=True)
-    (_out_dir / "page.json").write_text(
-        json.dumps(_page.model_dump(), indent=2), encoding="utf-8"
-    )
+    partial = _out_dir / "page.partial.json"
+    partial.write_text(json.dumps(_page.model_dump(), indent=2), encoding="utf-8")
+    if _page.finalized or not _staged:
+        os.replace(partial, _out_dir / "page.json")
 
 
 def build_block(kind: str, **kwargs) -> Block:

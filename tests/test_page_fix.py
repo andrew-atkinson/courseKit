@@ -92,7 +92,8 @@ def test_fix_course_pages_updates_page_on_disk(tmp_path, fresh):
     (tmp_path / "week-9.md").write_text("Load the file into a variable you declare in preload().")
     outd = tmp_path / "pages" / "week-9"
     outd.mkdir(parents=True)
-    pageir.init("c-week-9", out_dir=outd, title="Week 9", week_ref="week-9", slug="week-9")
+    pageir.load(pageir.Page(page_id="c-week-9", title="Week 9", week_ref="week-9", slug="week-9"),
+                out_dir=outd)                               # adopted → saves in place to page.json
     tools.add_heading("h", "Realtime")
     tools.add_code("realtime-code", code="sound.play();", language="js")
     pageir.reset()                                          # page.json now on disk at outd

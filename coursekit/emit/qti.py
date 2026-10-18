@@ -813,7 +813,8 @@ def _incomplete_reason(bank) -> str | None:
     The concrete break is an **empty group** — a concept the model opened but never filled — which
     otherwise sails through as a phantom question that draws nothing, so the quiz is silently short
     (week 9's `c5` was exactly this). `bank.validate_final` catches it at generation time and refuses
-    to finalize; emit re-checks it because a partial, autosaved `bank.json` is still on disk."""
+    to finalize; emit re-checks it because a `bank.json` from before OPS-11 (when runs autosaved
+    straight to it) or a hand-edited one can still be partial."""
     if not bank.groups:
         return "no question groups"
     empty = [gid for gid, g in bank.groups.items() if not g.variants]

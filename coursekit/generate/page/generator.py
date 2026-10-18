@@ -77,8 +77,9 @@ class PageGenerator:
         from coursekit.emit import html as html_emit
         from coursekit.generate.page.renderer import load_supplements
         from coursekit.generate.page.style import load_style
-        supplements = load_supplements(unit.course_root, unit.week_slug)
-        html_emit.write_html(pg, out_dir, supplements, load_style(unit.course_root))
+        if page.is_finalized():   # an unfinished build must not overwrite the last good HTML either
+            supplements = load_supplements(unit.course_root, unit.week_slug)
+            html_emit.write_html(pg, out_dir, supplements, load_style(unit.course_root))
 
         return RunResult(
             unit=unit, finalized=page.is_finalized(), output_dir=out_dir,

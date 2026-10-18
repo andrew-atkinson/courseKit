@@ -230,11 +230,11 @@ def test_autosave_writes_after_every_put(tmp_path):
     bankmod.init("run1", tmp_path)
     bankmod.create_group("c1", "Loops", "multiple_choice")
     bankmod.put_variant(_mc("A", 0))
-    saved = json.loads((tmp_path / "bank.json").read_text())
+    saved = json.loads((tmp_path / "bank.partial.json").read_text())   # in progress, not yet promoted
     assert saved["groups"]["c1"]["variants"]["A"]["correct_index"] == 0
 
     bankmod.put_variant(_mc("B", 1))
-    saved = json.loads((tmp_path / "bank.json").read_text())
+    saved = json.loads((tmp_path / "bank.partial.json").read_text())
     assert sorted(saved["groups"]["c1"]["variants"]) == ["A", "B"]
 
 
@@ -262,7 +262,7 @@ def test_bank_json_round_trips_through_the_model(tmp_path):
                                      variant_summary="Pairs",
                                      pairs=[Pair(left="a", right="b"),
                                             Pair(left="c", right="d")]))
-    reloaded = bankmod.Bank.model_validate_json((tmp_path / "bank.json").read_text())
+    reloaded = bankmod.Bank.model_validate_json((tmp_path / "bank.partial.json").read_text())
     assert reloaded.groups["c1"].variants["A"].kind == "multiple_choice"
     assert reloaded.groups["c5"].variants["A"].kind == "matching"
 
@@ -363,27 +363,45 @@ def test_short_answer_rejects_a_rubric_description_as_an_answer():
               question_text="Where is ATP made?", accepted_answers=["the mitochondria"])
 
 
-# ------------------------------------------------- back up a finished bank before a re-run clobbers it
+# ------------------------------------------- OPS-11: a failed re-run must not clobber a good bank
 
-def test_init_backs_up_a_finished_bank_before_a_rerun_overwrites_it(tmp_path):
-    (tmp_path / "bank.json").write_text(json.dumps({"run_id": "old", "finalized": True}), encoding="utf-8")
-    bankmod.init("new", tmp_path)
-    bankmod.create_group("c1", "A concept", "multiple_choice")       # first autosave overwrites bank.json
+def _finished_bank(d, run_id):
+    bankmod.init(run_id, d)
+    bankmod.create_group("c1", "Loops", "multiple_choice")
+    for i, lbl in enumerate("ABCD"):
+        bankmod.put_variant(_mc(lbl, i))
+    assert bankmod.finalize(seed=42).startswith("OK")
+
+
+def test_a_rerun_that_fails_before_finalize_leaves_the_good_bank_byte_identical(tmp_path):
+    _finished_bank(tmp_path, "good")
+    before = {n: (tmp_path / n).read_bytes() for n in ("bank.json", "quiz.json", "bank.gift")}
+    bankmod.init("rerun", tmp_path)                                  # the re-run starts...
+    bankmod.create_group("c1", "Other", "multiple_choice")
+    bankmod.put_variant(_mc("A", 0))                                 # ...autosaves, then dies here
+    assert {n: (tmp_path / n).read_bytes() for n in before} == before
+    assert json.loads((tmp_path / "bank.partial.json").read_text())["run_id"] == "rerun"
+
+
+def test_finalize_promotes_the_in_progress_bank(tmp_path):
+    _finished_bank(tmp_path, "old")
+    _finished_bank(tmp_path, "new")
     assert json.loads((tmp_path / "bank.json").read_text())["run_id"] == "new"
-    assert json.loads((tmp_path / "bank.prev.json").read_text())["run_id"] == "old"   # the good one kept
+    assert not (tmp_path / "bank.partial.json").exists()
 
 
-def test_init_never_backs_up_an_unfinished_bank(tmp_path):
-    (tmp_path / "bank.prev.json").write_text('{"good": true}', encoding="utf-8")
-    (tmp_path / "bank.json").write_text(json.dumps({"run_id": "x", "finalized": False}), encoding="utf-8")
-    bankmod.init("new", tmp_path)
-    assert json.loads((tmp_path / "bank.prev.json").read_text()) == {"good": True}   # junk didn't replace it
+def test_an_adopted_bank_saves_in_place(tmp_path):
+    # fix / the EU pass `load` an existing bank and edit it: those edits land in bank.json directly
+    _finished_bank(tmp_path, "good")
+    bankmod.load(bankmod.Bank.model_validate_json((tmp_path / "bank.json").read_text()), tmp_path)
+    bankmod.create_group("c2", "Arrays", "multiple_choice")
+    assert "c2" in json.loads((tmp_path / "bank.json").read_text())["groups"]
+    assert not (tmp_path / "bank.partial.json").exists()
 
 
-def test_the_backup_is_invisible_to_census(tmp_path):
+def test_the_in_progress_bank_is_invisible_to_census(tmp_path):
     from coursekit import census
     d = tmp_path / "quizzes" / "week-1"
     d.mkdir(parents=True)
-    (d / "bank.json").write_text("{}", encoding="utf-8")
-    (d / "bank.prev.json").write_text("{}", encoding="utf-8")
-    assert census.build_census(tmp_path).totals["quizzes"] == 1      # only bank.json counts
+    (d / "bank.partial.json").write_text("{}", encoding="utf-8")
+    assert census.build_census(tmp_path).totals["quizzes"] == 0      # only bank.json counts

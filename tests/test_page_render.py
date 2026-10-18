@@ -265,9 +265,9 @@ def test_reemit_rerenders_page_json_with_current_supplements(tmp_path):
     pdir = course / "pages" / "week-3"
     pdir.mkdir(parents=True)
     P.reset()
-    P.init("c-week-3", pdir, title="Week 3", slug="week-3", week_ref="week-3")
+    P.load(P.Page(page_id="c-week-3", title="Week 3", slug="week-3", week_ref="week-3"), pdir)
     P.put_block(P.build_block(kind="heading", block_id="h", text="REVIEW", level=4))
-    # (page.json now on disk via autosave)
+    # (page.json now on disk: an adopted page saves in place)
 
     results = reemit(course)
 

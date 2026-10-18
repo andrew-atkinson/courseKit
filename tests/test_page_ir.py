@@ -76,11 +76,12 @@ def test_put_block_appends_then_overwrites_in_place(fresh):
     assert page.blocks["intro"].text == "second"          # latest wins
 
 
-def test_autosave_writes_page_json(fresh, tmp_path):
+def test_autosave_writes_the_in_progress_page(fresh, tmp_path):
     P.init("wk3", tmp_path, title="Week 3: Repetition", slug="week-3-repetition")
     P.put_block(P.build_block("heading", block_id="h", text="REVIEW"))
 
-    saved = json.loads((tmp_path / "page.json").read_text())
+    assert not (tmp_path / "page.json").exists()          # only a finalized build is promoted
+    saved = json.loads((tmp_path / "page.partial.json").read_text())
     assert saved["title"] == "Week 3: Repetition"
     assert saved["blocks"]["h"]["text"] == "REVIEW"
     assert saved["finalized"] is False
@@ -110,6 +111,24 @@ def test_finalize_succeeds_with_a_heading_and_retrieval(fresh):
     assert P.validate_final() == []
     assert P.finalize().startswith("OK")
     assert P.is_finalized()
+
+
+def _finishable_page(d, page_id):
+    P.init(page_id, d, title="Week 3", slug="week-3")
+    P.put_block(P.build_block("heading", block_id="h", text="REVIEW"))
+    P.put_block(P.build_block("details", block_id="predict", summary="Predict?", text="Ten."))
+
+
+def test_a_rerun_that_fails_before_finalize_leaves_the_good_page_byte_identical(fresh, tmp_path):
+    _finishable_page(tmp_path, "good")
+    assert P.finalize().startswith("OK")
+    before = (tmp_path / "page.json").read_bytes()
+    _finishable_page(tmp_path, "rerun")                     # autosaves twice, then dies unfinalized
+    assert (tmp_path / "page.json").read_bytes() == before
+    assert json.loads((tmp_path / "page.partial.json").read_text())["page_id"] == "rerun"
+    assert P.finalize().startswith("OK")                    # ...and a finished re-run is promoted
+    assert json.loads((tmp_path / "page.json").read_text())["page_id"] == "rerun"
+    assert not (tmp_path / "page.partial.json").exists()
 
 
 def test_empty_page_is_not_finalizable(fresh):
