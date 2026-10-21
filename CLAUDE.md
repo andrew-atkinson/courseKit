@@ -62,6 +62,10 @@ Adding a platform is one emitter, not one converter per input — which is why e
   Relevant before anyone proposes auto-grading.
 - **File emitters stay first-class**, even once a Canvas API emitter exists — many faculty can't get a token, and a reviewable `.zip` is worth more than an API call.
   Any API path defaults to dry-run.
+- **The unit is the course's teaching block; a week is only one cadence.**
+  Courses meet twice a week, in blocks, by quarter, or self-paced, so new code and docs say *unit* and give it its own identity (id, order, label, optional module, optional calendar slot).
+  "Week" survives only as a label, a legacy alias (`--week`, `week_ref`, `weeks:` in `context.yaml`), or an existing on-disk name — never as something to parse meaning from.
+  See [agent/structure-review.md](agent/structure-review.md).
 - **Real institution and course names stay out of tracked files and commit messages.**
   Use stand-ins (`CC101` for the creative-coding course, `PH101` for the photography course).
 - **The repo was called quizbot until 2026-10.**

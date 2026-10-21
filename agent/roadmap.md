@@ -44,6 +44,7 @@ The forward view is organized by **capability area**, with a stable semantic ID 
 
 **Areas** (each: one-line standing):
 
+- **`CORE`** the course model & contracts — one model of the course, artifact records, explicit contracts, an operations layer; proposed 2026-10-19 by [structure-review.md](structure-review.md).
 - **`COMP`** components & composition — the shared block vocabulary; seed device↔function table in `docs/design.md`, otherwise unbuilt.
 - **`PAGE`** page generation — mature: `page.json` IR, monolithic + decompose, function axis + auto-router, boundary segmentation.
 - **`ASMT`** assessment & activities — quizzes shipped (6 types, flexible count); assignments/discussions/rubrics/etc. new.
@@ -59,6 +60,15 @@ The forward view is organized by **capability area**, with a stable semantic ID 
 - **`OPS`** tooling & housekeeping.
 
 ## Roadmap outline (by area · do-first → do-last)
+
+**CORE** *(the structure the ambition needs — see [structure-review.md](structure-review.md); each step is its own branch with a pass criterion)*
+- `CORE-1 · H1 · ✨` **Contracts — required-when-enabled, every skip recorded (user, 2026-10-19).** The loaders' "context is enrichment: degrade, never raise" rule predates features that NEED context, so a missing input collapses to `None`/`""` and a switched-on feature silently does less (ASMT-19, the `{transcript}` drop, the empty-PDF quiz). Three rules: the consumer decides what is optional, not the loader (loaders report absence with a reason); one builder per object and one function per rule; every degrade lands in an outcome report. Vehicle: `UX-8`'s error/warning/outcome types. Then a read-only audit labelling each broad `except Exception` fallback and `getattr` default as optional vs required-when-enabled, and ASMT-19 layer 1 as the first fix. Test pattern: every opt-in feature, switched on, produces its artifact or fails loudly — never a no-op. ⇐ UX-8
+- `CORE-2 · H1 · ✨` **One course model.** A `Course` loaded once by the only folder walker — scope tree, declared structure/grading/expectations, concept maps, artifact index; units are views (`course.unit("3")`), never hand-built. **A unit has its own identity — id, order, label, optional module, optional calendar slot — never a week number** (user, 2026-10-21: the week is an arbitrary unit; courses meet twice a week, in blocks, by quarter, self-paced). Define it here, not after the course model is built on weeks. Migrate the census and the emit sources first (the pair that drifted). `architecture.md` is refreshed here.
+- `CORE-3 · H2 · ✨` **Generator state in instances, not module globals** (`bank._bank`, `page._page`) — one job per process today; the app and the operations layer need more.
+- `CORE-4 · H2 · ✨` **Artifact records — status + provenance** (input hashes, model, prompt, config, evaluations) beside each IR. Stale detection, FLOW-9 Phase 2 (pipeline stage), and UX-5 (history) build on it.
+- `CORE-5 · H2 · ✨` **Units, not weeks, everywhere** — migrate the remaining week-identified code (`week_num`/`week_key`/`week_ref`, `--week`, `scope: week`, per-week census) onto units, and add course > module > unit > source document as first-class nodes an artifact attaches to. A migration, not a rename: on-disk names stay (`week-3` is a fine unit id for a weekly course), meaning stops being parsed from `week-N`, and old names survive as edge aliases (`--week`, `week_ref`, `scope: week`). `weeks:` in `context.yaml` is the transcriber's contract — its successor is agreed with that repo. Calendar time (dates, sessions) is a separate, optional property of a unit — what CRSE-2/CRSE-5 need. ⇒ ASMT-19 layer 2, STRC-1.
+- `CORE-6 · H2 · ✨` **Authority as data** — declared / derived / proposed recorded wherever a value can come from more than one source (the census's `expectation_basis` is the first instance).
+- `CORE-7 · H2 · ✨` **The operations layer** — verbs as library functions returning a result (artifacts + outcome report); `cli.py` becomes a thin renderer. ⇒ UX-3 (the app).
 
 **COMP** *(foundation — build before multiplying content types)*
 - `COMP-1 · H1 · ✅` Component catalog: every block/device + the pedagogic function it serves — `coursekit/generate/catalog.py` (a registry, drift-guarded against `page._KINDS`).
