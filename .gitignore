@@ -20,6 +20,8 @@ reference/
 
 # me only
 setup.md
+# offline product/strategy docs — never committed
+private/
 
 # Jupyter Notebooks
 .ipynb_checkpoints/
