@@ -11,10 +11,10 @@ several weeks or drawing on earlier work is a matter of what material/scope the 
 change here.
 """
 
-import json
 from pathlib import Path
 
 from coursekit import prompts
+from coursekit.generate import dispatch
 from coursekit.generate.assignment.assignment import (Assignment, Rubric, RubricCriterion,
                                                       RubricRating)
 
@@ -139,27 +139,10 @@ TOOL_SPECS = [
 
 
 def run_tool_calls(tool_calls):
-    """Dispatch the model's calls → [(id, content)]; never raise, stop after finalize (mirrors the
-    quiz dispatcher's contract so the shared loop drives it)."""
-    from pydantic import ValidationError
-    results, done = [], False
-    for tc in tool_calls:
-        if done:
-            results.append((tc.id, "(ignored: already finalized)"))
-            continue
-        fn = _REGISTRY.get(tc.name)
-        if fn is None:
-            results.append((tc.id, f"ERROR: no tool '{tc.name}'. Use: {', '.join(_REGISTRY)}"))
-            continue
-        try:
-            args = json.loads(tc.arguments) if (tc.arguments or "").strip() else {}
-            out = fn(**args)
-        except (ValidationError, TypeError, ValueError, json.JSONDecodeError) as e:
-            out = f"ERROR: {tc.name}: {e}"
-        results.append((tc.id, out))
-        if not out.startswith("ERROR") and tc.name == "finalize_assignment":
-            done = True
-    return results
+    """Dispatch through the shared dispatcher — the same contract as quizzes and pages: never raise,
+    actionable ERROR strings, stop after finalize, and a calls.jsonl beside the output for replay."""
+    log = _out_dir / "calls.jsonl" if _out_dir else None
+    return dispatch.run_tool_calls(_REGISTRY, tool_calls, log, terminal_tools={"finalize_assignment"})
 
 
 class _AssignmentGenerator:

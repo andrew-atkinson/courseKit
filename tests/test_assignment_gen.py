@@ -86,3 +86,24 @@ def test_run_tool_calls_dispatches_and_stops_after_finalize():
     ])
     assert ab.is_finalized()
     assert results[-1][1].startswith("(ignored")                 # nothing after finalize takes effect
+
+
+def test_assignment_dispatch_shares_the_quiz_and_page_contract(tmp_path):
+    """One dispatcher for every generator: a calls.jsonl beside the output (replayable without a
+    model), and a non-object argument refused with the shared, actionable message (the old
+    assignment-only dispatcher answered with Python's "argument after ** must be a mapping")."""
+    import json
+    import types
+
+    from coursekit.generate import dispatch
+    ab.reset(assignment_id="a", slug="a", week_ref="week-1", default_points=10, out_dir=tmp_path)
+    calls = [types.SimpleNamespace(id="1", name="set_assignment", arguments="[1, 2]"),
+             types.SimpleNamespace(id="2", name="set_assignment",
+                                   arguments=json.dumps({"title": "T", "task": "Apply the idea."}))]
+    (_, bad), (_, ok) = ab.run_tool_calls(calls)
+    assert bad == "ERROR: arguments for 'set_assignment' must be a JSON object, got list."
+    assert ok.startswith("OK brief set")
+    log = tmp_path / "calls.jsonl"
+    assert [json.loads(line)["name"] for line in log.read_text().splitlines()] == ["set_assignment"] * 2
+    ab.reset(assignment_id="a", slug="a", week_ref="week-1", default_points=10)
+    assert dispatch.replay(ab._REGISTRY, log)[1].startswith("OK brief set")

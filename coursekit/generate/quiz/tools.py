@@ -11,14 +11,13 @@ Tool results are prompt. Every ack is re-sent on every later turn, so keep them 
 and leave the full listing to get_bank_report.
 """
 
-import json
 import os
 from pathlib import Path
 from typing import Callable
 from dotenv import load_dotenv
 from coursekit import outcomes
+from coursekit.generate import dispatch
 from coursekit.generate.quiz import bank
-from coursekit.generate.quiz.bank import ValidationError
 
 load_dotenv(override=True)
 
@@ -524,74 +523,14 @@ TOOL_SPECS = [_SCHEMAS[name] for name in TOOL_REGISTRY]
 tools = [{"type": "function", "function": spec} for spec in TOOL_SPECS]
 
 
-def _fmt_errors(e: ValidationError) -> str:
-    """Pydantic's own text is jargon ('Input should be a valid integer [type=int_type...]').
-    A small model needs the field and the problem, nothing else."""
-    out = []
-    for err in e.errors()[:4]:
-        loc = ".".join(str(p) for p in err["loc"] if p != "value_error")
-        msg = err["msg"].removeprefix("Value error, ")
-        out.append(f"{loc}: {msg}" if loc else msg)
-    return "; ".join(out)
-
-
 def _dispatch_one(name: str, raw_args: str | None) -> str:
     """Never raise. A malformed call at iteration 17 must not lose the first 16 variants."""
-    fn = TOOL_REGISTRY.get(name)
-    if fn is None:
-        return f"ERROR: no tool named '{name}'. Available: {', '.join(TOOL_REGISTRY)}"
-    try:
-        # Zero-argument tools commonly arrive as "" rather than "{}".
-        args = json.loads(raw_args) if (raw_args or "").strip() else {}
-    except json.JSONDecodeError as e:
-        return f"ERROR: arguments for '{name}' were not valid JSON ({e}). Send the call again."
-    if not isinstance(args, dict):
-        return f"ERROR: arguments for '{name}' must be a JSON object, got {type(args).__name__}."
-    try:
-        return fn(**args)
-    except ValidationError as e:
-        return f"ERROR: {_fmt_errors(e)}"
-    except TypeError as e:
-        return f"ERROR: wrong arguments for '{name}': {e}"
-    except Exception as e:
-        return f"ERROR: {name} failed: {type(e).__name__}: {e}"
+    return dispatch.dispatch_one(TOOL_REGISTRY, name, raw_args)
 
 
 def run_tool_calls(tool_calls) -> list[tuple[str, str]]:
-    """Dispatch neutral ToolCalls -> [(tool_call_id, content)].
-
-    Returns pairs rather than provider-shaped messages: how a tool result is represented in a
-    conversation is the provider's business (OpenAI keys it by tool_call_id, Anthropic uses
-    tool_result blocks), while what the tool *did* is ours.
-
-    Content is a plain string, never json.dumps'd — wrapping an ack in quotes and escaping it
-    costs tokens on every subsequent turn and reads worse to a small model.
-    """
-    results = []
-    finalized = False
-    for tc in tool_calls:
-        # Stop at the first successful finalize: the driver only checks after a whole turn's batch,
-        # but a model can emit its whole build (and then rebuild) in one turn. Anything after the
-        # finalize is a runaway; ignore it so the artifact is the one the model first committed to.
-        if finalized:
-            results.append((tc.id, "(ignored: the artifact is already finalized)"))
-            continue
-        if _call_log is not None:
-            _call_log.parent.mkdir(parents=True, exist_ok=True)
-            with open(_call_log, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"name": tc.name, "arguments": tc.arguments}) + "\n")
-        content = _dispatch_one(tc.name, tc.arguments)
-        results.append((tc.id, content))
-        if tc.name == "finalize_bank" and not content.startswith("ERROR"):
-            finalized = True
-    return results
+    return dispatch.run_tool_calls(TOOL_REGISTRY, tool_calls, _call_log, terminal_tools={"finalize_bank"})
 
 
 def replay(path) -> list[str]:
-    """Feed a recorded calls.jsonl back through dispatch with no model attached."""
-    out = []
-    for line in Path(path).read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            rec = json.loads(line)
-            out.append(_dispatch_one(rec["name"], rec["arguments"]))
-    return out
+    return dispatch.replay(TOOL_REGISTRY, path)

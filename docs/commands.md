@@ -91,4 +91,4 @@ Whole-week generation ends with a cold-read review by default (`--no-review` ski
 | `uv run pytest`        | The offline unit suite. Deterministic, no model.                  | x        |
 | `uv run pytest evals/` | Model-in-the-loop evals (critic judgment). Skips without a model. | ✓        |
 
-Exit codes: `0` success · `1` a unit failed to finalize · `2` the model could not be loaded.
+Exit codes: `0` success · `1` a unit failed to finalize, or a problem with your settings or source material (one actionable message on stderr — e.g. a missing or unsupported `--source`, a prompt override without `{transcript}`, a `propose` that would overwrite your edits) · `2` the model could not be loaded or its endpoint could not be reached.

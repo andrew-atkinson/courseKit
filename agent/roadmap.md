@@ -161,6 +161,7 @@ The forward view is organized by **capability area**, with a stable semantic ID 
 - `SHIP-2 · H2 · ⬜` Video + timestamp references (survive imscc). ↓ ⇐ SHIP-1, PAGE-8
 - `SHIP-3 · H2 · ✨` New Quizzes format (Canvas default; we're Classic-only).
 - `SHIP-6 · H2 · 🧭` Emit the STRC objects (module_meta / weighting / grading rules / MasteryPaths). ⇐ STRC-*
+- `SHIP-7 · H2 · ✨` **One cartridge packager — `emit cc` and `emit qti` still package themselves (user, 2026-10-22).** `cartridge.py` (`emit course`) is the shared assembler, but `cc.py` and `qti.py` each keep their own manifest, organizations, file packaging, and `.imscc` writer (`_manifest`, `_organizations`, `package_files`, `write_imscc`, `emit_manifest`), plus duplicated one-line XML helpers (`_h`, `_xml`) — found by the duplicate-helper scan that also caught the triplicated tool dispatch (fixed 2026-10-22). These are the Canvas-verified export paths, so the move needs a byte-level guard: capture the `.imscc` / QTI `.zip` each command emits today as golden files, route both commands through `cartridge.py`, and require identical packages (or a manifest-equivalence check where ordering legitimately differs) before any Canvas re-import. Done when one packaging path serves `emit cc`, `emit qti`, and `emit course`, the goldens match, and the duplicated helpers are gone.
 - `SHIP-4 · H3 · ⬜` Canvas API push. ↓ · `SHIP-5 · H3 · ⬜` Canvas extension / LTI. ↓
 
 **FLOW**
@@ -289,6 +290,8 @@ Increments 1–10 are complete in code; these are the live remnants, so nothing 
 
 A running changelog — one line per completed feature, newest first, with its commit(s).
 The sections above stay forward-looking; deep detail lives in the offline log + git.
+- 2026-10-22 · **Dispatch dedupe** (branch `dispatch-dedupe`). Quizzes ran a verbatim copy of the shared tool dispatcher (`generate/dispatch.py`) and assignments a third, weaker one; both now delegate to it. Assignments gain a replayable `calls.jsonl` and the shared, actionable argument errors. The scan also found the cartridge-packaging duplication → `SHIP-7`.
+- 2026-10-22 · **CORE-1.2 — errors and notices as data** (`b10da99`). `coursekit/outcomes.py`: `CoursekitError` (code, details, hint, category) and `info`/`warn`/`error` notices captured per run; library code no longer exits or prints (enforced by `tests/test_outcomes.py`); CLI output unchanged.
 - 2026-10-18 · **OPS-11 — atomic artifact writes** (`645862b`). Quiz banks and pages autosave to an in-progress file and are promoted to `bank.json`/`page.json` only on finalize, so a re-run that fails leaves the last good artifact byte-identical; page HTML renders only once finalized; `bank.prev.json` retired.
 - 2026-10-15 · **Dependency prune** (`77d8f24`). `pyproject.toml` runtime deps cut to what `coursekit/` imports (every declared package grepped across tracked code, evals, and the notebook); unused agent/web/plotting stacks and the `dotenv` shim removed; ipykernel, nbclient, nbconvert moved to a `notebook` group.
 - 2026-10-15 · **OPS-10 — `CLAUDE.md` refreshed** (docs). Retitled, scope + canonical-IR list, rename trigger retired, runtime deps corrected, proposer/census/one-writer decisions recorded. Also: roadmap commit IDs re-pointed after the history rewrite.
