@@ -12,6 +12,7 @@ from pathlib import Path
 
 from coursekit import courseconfig
 from coursekit.ingest.propose import overlay_path
+from coursekit.outcomes import CoursekitError
 
 # content kind -> the gradebook group it proposes. Kinds are detected from generated artifacts on disk.
 _GROUP_NAME = {"assignment": "Assignments", "quiz": "Quizzes"}
@@ -52,19 +53,18 @@ def propose_grading(path) -> dict:
 def write_grading(path, grading: dict, *, force: bool = False) -> Path:
     """Merge `grading` into the overlay, PRESERVING any existing `weeks`. Refuse to overwrite an existing
     `grading` block without `force` (so a re-run never silently discards hand-set weights)."""
-    try:
-        import yaml
-    except ImportError:
-        raise SystemExit("writing the overlay needs pyyaml (pip/uv install it).")
+    import yaml
     root = courseconfig.find_root(Path(path).expanduser())
     if root is None:
-        raise SystemExit("no .vtconfig course root found — create a .vtconfig/ folder in the course root first.")
+        raise CoursekitError("no .vtconfig course root found — create a .vtconfig/ folder in the course root "
+                             "first.", code="course.no_root", details={"path": str(path)})
     dest = overlay_path(root)
     data = courseconfig._read_yaml(dest) if dest.exists() else {}
     if not isinstance(data, dict):
         data = {}
     if data.get("grading") and not force:
-        raise SystemExit(f"{dest} already declares `grading:` — pass --force to redraft (discards hand-set weights).")
+        raise CoursekitError(f"{dest} already declares `grading:` — pass --force to redraft (discards hand-set weights).",
+                             code="overlay.section_exists", details={"path": str(dest), "section": "grading"})
     data["grading"] = grading
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(_HEADER + yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")

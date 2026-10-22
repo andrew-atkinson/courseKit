@@ -16,6 +16,7 @@ from coursekit import courseconfig, coursestructure
 from coursekit.discover import Unit, slugify
 from coursekit.ingest.extract import SUPPORTED_SUFFIXES, extract_text, is_supported
 from coursekit.ingest.ingest import _week_of
+from coursekit.outcomes import CoursekitError
 
 
 def _declared_week_of(source: Path, struct) -> str | None:
@@ -52,17 +53,20 @@ def generate_targeted_quiz(source, provider, model, *, output_root=None, max_ite
 
     source = Path(source).expanduser().resolve()
     if not source.is_file():
-        raise SystemExit(f"no such file: {source}")
+        raise CoursekitError(f"no such file: {source}", code="source.not_found", category="source",
+                             details={"path": str(source)})
     if not is_supported(source):
-        raise SystemExit(f"unsupported source '{source.name}' — need one of "
-                         f"{', '.join(sorted(SUPPORTED_SUFFIXES))}")
+        raise CoursekitError(f"unsupported source '{source.name}' — need one of "
+                             f"{', '.join(sorted(SUPPORTED_SUFFIXES))}", code="source.unsupported",
+                             category="source", details={"path": str(source), "allowed": sorted(SUPPORTED_SUFFIXES)})
     text = extract_text(source)
     if not text.strip():
-        raise SystemExit(
+        raise CoursekitError(
             f"extracted no text from '{source.name}' — nothing to quiz. If it's a scanned/image PDF it "
             f"has no text layer; OCR it first, or supply a text-based source (.md/.txt/.docx/.pptx). "
             f"(Generating anyway would produce questions from the model's own knowledge, not your "
-            f"material — an ungrounded quiz.)")
+            f"material — an ungrounded quiz.)",
+            code="source.no_text", category="source", details={"path": str(source)})
 
     cfg = courseconfig.load(source, config_name="quiz.yaml")     # domain.md / voice / quiz.yaml from here
     root = cfg.root

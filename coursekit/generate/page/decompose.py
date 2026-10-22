@@ -24,13 +24,14 @@ import os
 import re
 from pathlib import Path
 
-from coursekit import courseconfig, prompts
+from coursekit import courseconfig, outcomes, prompts
 from coursekit.discover import find_units, slugify
 from coursekit.generate import catalog
 from coursekit.generate.page import page as pageir
 from coursekit.generate.page import tools
 from coursekit.generate.page.concept_map import load_for_unit
 from coursekit.providers.base import Reply
+from coursekit.outcomes import CoursekitError
 
 _ADD_SPECS = [s for s in tools.TOOL_SPECS if s["name"].startswith("add_")]
 # The components a per-concept section BODY composes from (COMP-3 palette scope) — the whole page's
@@ -132,7 +133,8 @@ def _run_pass(provider, model, system: str, user: str, *, max_turns: int = 8,
         try:
             reply = provider.chat_with_tools(model=model, messages=messages, tools=specs)
         except Exception as e:
-            print(f"    (pass error: {type(e).__name__}: {e})")   # surface it, don't swallow silently
+            outcomes.warn("page.pass_error", f"    (pass error: {type(e).__name__}: {e})",   # surfaced, not swallowed
+                          error_type=type(e).__name__)
             if stats is not None:                                  # …and tally it (timeout tracking)
                 stats["errors"] = stats.get("errors", 0) + 1
                 stats.setdefault("error_types", []).append(type(e).__name__)
@@ -183,7 +185,8 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
     cfg = unit.config
     cm = load_for_unit(unit)
     if cm is None or not cm.concepts:
-        raise SystemExit(f"{unit.week_slug}: no concept map (run `analyze` first).")
+        raise CoursekitError(f"{unit.week_slug}: no concept map (run `analyze` first).",
+                             code="concept_map.missing", category="source", details={"unit": unit.week_slug})
     transcript = Path(unit.transcript_path).read_text(encoding="utf-8", errors="replace")
 
     out_dir = Path(out_dir)
@@ -213,7 +216,7 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
     n = _run_pass(provider, model, sysmsg("frame"),
                   f"Topic: {unit.week_label or unit.week_slug}\nEnduring understanding: {eu}\n"
                   f"Concepts this week: {names}", stats=stats)
-    print(f"  frame: +{n} block(s)")
+    outcomes.info("page.frame", f"  frame: +{n} block(s)", blocks=n)
 
     # Boundary-correct per-concept material from `analyze` (one contiguous verbatim span per concept, so
     # the example travels with its definition); fall back to the keyword slicer per concept when absent.
@@ -251,7 +254,8 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
         if added == 0:
             empties.append(c.name)
         tag = src + (f",{len(chunks)}×" if len(chunks) > 1 else "") + (f",retry{retries}" if retries else "")
-        print(f"  {c.name[:24]:24s} [{tag}]: {len(material):6d}/{full} chars → +{added} content block(s)")
+        outcomes.info("page.section", f"  {c.name[:24]:24s} [{tag}]: {len(material):6d}/{full} chars → "
+                      f"+{added} content block(s)", concept=c.name, blocks=added)
 
     # Same deterministic-heading treatment as the concepts — place the summary heading first so the
     # close pass can only add content beneath it (last run it emitted the heading last → empty section).
@@ -259,20 +263,23 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
                                         role="summary"))
     n = _run_pass(provider, model, sysmsg("close"),
                   f"Concepts this week: {names}\nEnduring understanding: {eu}", stats=stats)
-    print(f"  close: +{n} content block(s)")
+    outcomes.info("page.close", f"  close: +{n} content block(s)", blocks=n)
 
     if stats.get("errors"):                            # the timeout/overheating signal, aggregated
         from collections import Counter
         kinds = ", ".join(f"{k}×{v}" for k, v in Counter(stats["error_types"]).items())
-        print(f"  ⚠ {stats['errors']} pass error(s) — candidate timeouts/overheating: {kinds}")
+        outcomes.warn("page.pass_errors", f"  ⚠ {stats['errors']} pass error(s) — candidate "
+                      f"timeouts/overheating: {kinds}", errors=stats["errors"])
     if empties:
-        print(f"  ⚠ {len(empties)} section(s) still empty after {RETRY_EMPTY} retries: {', '.join(empties)}")
+        outcomes.warn("page.empty_sections", f"  ⚠ {len(empties)} section(s) still empty after "
+                      f"{RETRY_EMPTY} retries: {', '.join(empties)}", sections=empties)
 
     problems = pageir.validate_final()
     if not problems:
         pageir.finalize()
     else:
-        print("  (did not finalize: " + "; ".join(problems) + ")")
+        outcomes.warn("page.not_finalized", "  (did not finalize: " + "; ".join(problems) + ")",
+                      problems=problems)
     _render(unit, out_dir, project_root)
     return pageir.get(), problems
 
@@ -289,7 +296,8 @@ def _render(unit, out_dir, project_root) -> None:
         supplements = load_supplements(project_root, unit.week_slug)
         html_emit.write_html(pageir.get(), Path(out_dir), supplements, load_style(project_root))
     except Exception as e:
-        print(f"  (render skipped: {type(e).__name__}: {e})")
+        outcomes.warn("page.render_skipped", f"  (render skipped: {type(e).__name__}: {e})",
+                      error_type=type(e).__name__)
 
 
 def main() -> int:
@@ -358,4 +366,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from coursekit.console import run
+    raise SystemExit(run(main))

@@ -28,6 +28,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from coursekit.outcomes import CoursekitError
+
 # Shipped defaults live beside the repo root, matching the transcriber's layout.
 _SHIPPED = Path(__file__).resolve().parent.parent / "prompts"
 _OVERRIDE_SUBDIR = Path(".vtconfig") / "prompts"
@@ -63,15 +65,16 @@ class Prompt:
 def require(prompt: Prompt, *names: str) -> None:
     """Refuse a prompt whose template lacks a placeholder the caller fills with essential content —
     e.g. a course override of system.md that dropped `{transcript}` would otherwise send the model no
-    course material at all, silently. A user-config error, so it exits with an actionable message
-    (coursekit's convention) before any model call."""
+    course material at all, silently. A user-config error, raised with an actionable message before any
+    model call."""
     missing = [n for n in names if "{" + n + "}" not in prompt.body]
     if missing:
         tags = ", ".join("{" + n + "}" for n in missing)
-        raise SystemExit(
+        raise CoursekitError(
             f"prompt {prompt.path} has no {tags} placeholder, so that content would never reach the "
             f"model. Add {tags} where it belongs — the shipped prompts in prompts/{prompt.category}/ "
-            f"show the expected placement.")
+            f"show the expected placement.",
+            code="prompt.missing_placeholder", details={"path": str(prompt.path), "missing": missing})
 
 
 def _split_frontmatter(text: str) -> tuple[dict, str]:

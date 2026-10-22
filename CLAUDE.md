@@ -18,6 +18,9 @@ Adding a platform is one emitter, not one converter per input — which is why e
   The package imports pydantic, python-dotenv, rich, openai, jinja2, pyyaml, pypdf, python-pptx + stdlib (no video stack — that's the transcriber's).
   `pyproject.toml` `dependencies` is exactly that set; add a package there only with the import that needs it.
   Notebook-only packages live in the `notebook` dependency group (`uv sync --group dev --group notebook`).
+- **Library code never exits or prints.**
+  It raises `CoursekitError` (a stable `code`, `details`, a `category`) and reports progress and warnings through `coursekit.outcomes` (`info` / `warn` / `error`); the CLI and the per-module `main()` scripts render them via `console.py`.
+  [tests/test_outcomes.py](tests/test_outcomes.py) enforces it.
 - Default branch for PRs is `main`.
 
 ## Facticity — this project has been bitten by stale claims

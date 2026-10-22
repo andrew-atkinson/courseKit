@@ -20,6 +20,7 @@ from coursekit import courseconfig, prompts
 from coursekit.discover import slugify
 from coursekit.generate.page import concept_map as cmap
 from coursekit.generate.page.page import Page, build_block
+from coursekit.outcomes import CoursekitError
 
 
 def _blocks(pairs) -> dict:
@@ -106,7 +107,8 @@ def generate_overviews(course_path, *, provider=None, model=None, framing: bool 
     cfg = courseconfig.load(course_path)
     root = cfg.root
     if not root:
-        raise SystemExit("no .vtconfig course root found (need context.yaml + concept maps)")
+        raise CoursekitError("no .vtconfig course root found (need context.yaml + concept maps)",
+                             code="course.no_root", details={"path": str(course_path)})
     course_title = cfg.course_title or "Course"
     weeks = (cfg.context or {}).get("weeks") or {}
 
@@ -181,4 +183,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from coursekit.console import run
+    raise SystemExit(run(main))

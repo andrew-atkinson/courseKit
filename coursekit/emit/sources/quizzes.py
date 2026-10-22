@@ -12,6 +12,7 @@ hang off a `learning-application-resource` dependency. The *questions* come from
 `qti.emit_assessment` the .zip path uses — only the packaging differs.
 """
 
+from coursekit import outcomes
 from coursekit.courseconfig import week_key
 from coursekit.emit import cc, qti
 from coursekit.emit.cartridge import CartridgeItem
@@ -67,7 +68,8 @@ class QuizzesSource:
         from coursekit.emit.assignment import group_ident
         entries, skipped = qti._load_banks(course_path)   # (bank, quiz, bank_json); guards run here
         for bj, reason in skipped:                          # a broken week is warned + omitted, not fatal
-            print(f"  ⚠ skipped quiz {bj.parent.name}: {reason}")
+            outcomes.warn("emit.quiz_skipped", f"  ⚠ skipped quiz {bj.parent.name}: {reason}",
+                          quiz=bj.parent.name, reason=reason)
         scheme = CourseStructure.load(course_path).grading()   # declared grading groups (STRC-2)
         items = []
         for bank, quiz, bj in entries:

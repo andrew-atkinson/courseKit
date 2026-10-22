@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 from typing import Callable
 from dotenv import load_dotenv
-from rich.console import Console
+from coursekit import outcomes
 from coursekit.generate.quiz import bank
 from coursekit.generate.quiz.bank import ValidationError
 
@@ -26,18 +26,6 @@ checklist = []
 completed = []
 
 _call_log: Path | None = None
-
-
-def show(text, markup: bool = True):
-    """markup=False for anything containing our own bracketed text.
-
-    The bank report says "[multiple_choice]" and GIFT says "[markdown]"; Rich reads both
-    as style tags and silently eats them. soft_wrap stops long report lines being folded.
-    """
-    try:
-        Console(soft_wrap=True).print(text, markup=markup)
-    except Exception:
-        print(text)
 
 
 def set_call_log(path: Path | None) -> None:
@@ -56,28 +44,19 @@ def reset_state() -> None:
 
 # ------------------------------------------------------------- checklist
 
-def get_checklist_report(markup: bool = False) -> str:
-    """markup=False for the model, True for the console.
-
-    The rich version must never be returned to the model: it is re-sent every turn and
-    teaches it to emit the markup the system prompt forbids.
-    """
-    lines = []
-    for index, item in enumerate(checklist):
-        done = completed[index]
-        if markup:
-            lines.append(f"Checklist #{index + 1}: "
-                         + (f"[green][strike]{item}[/strike][/green]" if done else item))
-        else:
-            lines.append(f"#{index + 1} [{'x' if done else ' '}] {item}")
-    return "\n".join(lines)
+def get_checklist_report() -> str:
+    """The checklist as plain text — the same lines for the model and the console. (No rich markup:
+    it is re-sent every turn and would teach the model to emit the markup the system prompt forbids.)"""
+    return "\n".join(f"#{index + 1} [{'x' if done else ' '}] {item}"
+                     for index, (item, done) in enumerate(zip(checklist, completed)))
 
 
 def create_checklist(descriptions: list[str]) -> str:
     checklist.extend(descriptions)
     completed.extend([False] * len(descriptions))
-    show(get_checklist_report(markup=True))
-    return get_checklist_report()
+    report = get_checklist_report()
+    outcomes.info("quiz.checklist", report)
+    return report
 
 
 create_checklist_json = {
@@ -102,9 +81,10 @@ def mark_complete(index: int, completion_notes: str) -> str:
     if not 1 <= index <= len(checklist):
         return f"ERROR: no checklist item at #{index}. There are {len(checklist)}."
     completed[index - 1] = True
-    show(completion_notes, markup=False)
-    show(get_checklist_report(markup=True))
-    return get_checklist_report()
+    outcomes.info("quiz.checklist_note", completion_notes)
+    report = get_checklist_report()
+    outcomes.info("quiz.checklist", report)
+    return report
 
 
 mark_complete_json = {
@@ -437,7 +417,7 @@ add_matching_variant_json = {
 
 def get_bank_report() -> str:
     report = bank.report()
-    show(report, markup=False)
+    outcomes.info("quiz.bank_report", report)
     return report
 
 
@@ -452,7 +432,7 @@ get_bank_report_json = {
 
 def finalize_bank() -> str:
     result = bank.finalize()
-    show(result, markup=False)
+    outcomes.info("quiz.finalize", result)
     return result
 
 

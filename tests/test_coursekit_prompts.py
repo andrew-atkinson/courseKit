@@ -1,5 +1,6 @@
 import pytest
 from coursekit import prompts
+from coursekit.outcomes import CoursekitError
 
 
 def _write(path, name, category, body, description="d"):
@@ -146,8 +147,9 @@ def test_override_without_transcript_is_refused_with_an_actionable_message(tmp_p
     build = importlib.import_module(module).build_messages
     _write(tmp_path / f".vtconfig/prompts/{category}/system.md", "system", category,
            "A custom brief that forgot the material. {context_line}")
-    with pytest.raises(SystemExit) as e:
+    with pytest.raises(CoursekitError) as e:
         build("TRANSCRIPT-TEXT", project_root=tmp_path, week_label="Week 3")
+    assert e.value.code == "prompt.missing_placeholder" and e.value.details["missing"] == ["transcript"]
     msg = str(e.value)
     assert "{transcript}" in msg and "system.md" in msg and f"prompts/{category}/" in msg
 
@@ -167,5 +169,5 @@ def test_require_passes_when_present_and_names_every_missing_placeholder(tmp_pat
     _write(tmp_path / ".vtconfig/prompts/quiz/t.md", "t", "quiz", "has {transcript} only")
     p = prompts.load("quiz", "t", project_root=tmp_path)
     prompts.require(p, "transcript")                              # present → no error
-    with pytest.raises(SystemExit, match=r"\{palette\}, \{context_line\}"):
+    with pytest.raises(CoursekitError, match=r"\{palette\}, \{context_line\}"):
         prompts.require(p, "transcript", "palette", "context_line")

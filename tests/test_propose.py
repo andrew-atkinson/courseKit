@@ -5,6 +5,7 @@ import pytest
 
 from coursekit.coursestructure import CourseStructure
 from coursekit.ingest import propose as P
+from coursekit.outcomes import CoursekitError
 
 
 def _course(tmp_path):
@@ -73,13 +74,15 @@ def test_write_overlay_refuses_overwrite_without_force(tmp_path):
     root = _course(tmp_path)
     _touch(root / "week-3" / "a.pdf")
     P.write_overlay(P.propose(root))
-    with pytest.raises(SystemExit, match="already exists"):
-        P.write_overlay(P.propose(root))                # a second run must not clobber edits
+    with pytest.raises(CoursekitError, match="already exists") as e:
+        P.write_overlay(P.propose(root))
+    assert e.value.code == "overlay.exists"                # a second run must not clobber edits
     P.write_overlay(P.propose(root), force=True)        # ...unless forced
 
 
 def test_write_overlay_without_a_root_errors(tmp_path):
     # no .vtconfig anywhere -> nowhere to put the overlay
     _touch(tmp_path / "loose" / "week-3.md")
-    with pytest.raises(SystemExit, match="course root"):
+    with pytest.raises(CoursekitError, match="course root") as e:
         P.write_overlay(P.propose(tmp_path / "loose"))
+    assert e.value.code == "course.no_root" and e.value.category == "config"

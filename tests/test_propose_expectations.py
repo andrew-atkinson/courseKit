@@ -8,6 +8,7 @@ import pytest
 from coursekit import courseconfig
 from coursekit.generate.page.concept_map import Concept, ConceptMap, concept_map_path, save_concept_map
 from coursekit.ingest import propose_expectations as pe
+from coursekit.outcomes import CoursekitError
 
 
 def _artifact(root, kind, slug, body):
@@ -106,8 +107,9 @@ def test_write_is_merge_aware_and_refuses_to_clobber(tmp_path):
     assert "week 1" in data["weeks"] and data["grading"]["groups"]    # pre-existing blocks preserved
     assert data["expect"]["defaults"]                                 # the new block landed
 
-    with pytest.raises(SystemExit):                                   # second write refuses without --force
+    with pytest.raises(CoursekitError) as e:                          # second write refuses without --force
         pe.write_expectations(root, expect, notes)
+    assert e.value.code == "overlay.section_exists" and e.value.details["section"] == "expect"
     pe.write_expectations(root, expect, notes, force=True)            # --force redrafts
 
 

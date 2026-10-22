@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from coursekit.generate.quiz import targeted
+from coursekit.outcomes import CoursekitError
 
 
 def test_targeted_slug_carries_the_week_and_the_doc():
@@ -58,13 +59,15 @@ def test_unsupported_source_is_rejected(tmp_path):
     root, _ = _course(tmp_path)
     bad = root / "week-3" / "photo.jpg"          # an image — coursekit is text-only
     bad.write_text("not really a jpeg", encoding="utf-8")
-    with pytest.raises(SystemExit):
+    with pytest.raises(CoursekitError) as e:
         targeted.generate_targeted_quiz(bad, None, "m")
+    assert e.value.code == "source.unsupported" and e.value.category == "source"
 
 
 def test_missing_source_is_rejected(tmp_path):
-    with pytest.raises(SystemExit):
+    with pytest.raises(CoursekitError) as e:
         targeted.generate_targeted_quiz(tmp_path / "nope.md", None, "m")
+    assert e.value.code == "source.not_found"
 
 
 def test_text_empty_source_is_refused_before_the_model_runs(tmp_path, monkeypatch):
@@ -77,8 +80,9 @@ def test_text_empty_source_is_refused_before_the_model_runs(tmp_path, monkeypatc
     import coursekit.pipeline as pl
     monkeypatch.setattr(pl, "run_unit", lambda *a, **k: called.append(1))
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(CoursekitError) as e:
         targeted.generate_targeted_quiz(empty, None, "m")
+    assert e.value.code == "source.no_text"
     assert not called                                        # the model was never reached
     assert not (root / "quizzes").exists()                   # and no source.md / bank.json was written
 

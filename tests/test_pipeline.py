@@ -2,6 +2,7 @@ import json
 import pytest
 from coursekit.providers import OpenAICompatProvider
 from coursekit.discover import find_units
+from coursekit.outcomes import CoursekitError
 from coursekit.pipeline import run_course, run_unit
 
 
@@ -643,7 +644,7 @@ def test_run_unit_refuses_a_system_override_without_transcript_before_any_model_
     unit = _course_with_transcript(tmp_path, override="Brief with no material slot.",
                                    override_name="system")
     provider = FakeClient()
-    with pytest.raises(SystemExit, match=r"\{transcript\}"):
+    with pytest.raises(CoursekitError, match=r"\{transcript\}"):
         run_unit(unit, provider, "fake-model")
     assert provider._raw.calls == 0                               # stopped before the model
 

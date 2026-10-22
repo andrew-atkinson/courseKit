@@ -116,4 +116,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from coursekit.console import run
+    raise SystemExit(run(main))

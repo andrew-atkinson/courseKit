@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-from coursekit import courseconfig, pipeline
+from coursekit import console, courseconfig, pipeline
 from coursekit.emit import cc as cc_emit
 from coursekit.emit import html as html_emit
 from coursekit.emit import qti
@@ -986,7 +986,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
-    return args.func(args)
+    return console.run(lambda: args.func(args))
 
 
 if __name__ == "__main__":

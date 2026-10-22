@@ -6,6 +6,8 @@ gets its own implementation when needed; the contract in base.py is what makes t
 without touching callers.
 """
 
+from coursekit import outcomes
+
 from .base import Provider, Reply, ToolCall
 
 
@@ -30,7 +32,8 @@ class OpenAICompatProvider(Provider):
                 except ValueError:
                     # A typo like MODEL_TIMEOUT=20m shouldn't crash every command with a bare
                     # ValueError from deep in provider construction — fall back with a clear note.
-                    print(f"MODEL_TIMEOUT={raw!r} is not a number of seconds; using 1200.")
+                    outcomes.warn("config.model_timeout_invalid",
+                                  f"MODEL_TIMEOUT={raw!r} is not a number of seconds; using 1200.", value=raw)
                     timeout = 1200.0
             client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
         self._client = client

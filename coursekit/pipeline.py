@@ -12,16 +12,20 @@ from dataclasses import replace
 from pathlib import Path
 
 from coursekit import courseconfig
-from coursekit.console import show
+from coursekit import outcomes
+from coursekit.outcomes import CoursekitError
 from coursekit.discover import Unit, find_units, slugify
 from coursekit.generate.base import Generator, RunResult
 from coursekit.providers import Reply
 
 
-class ModelLoadError(RuntimeError):
+class ModelLoadError(CoursekitError, RuntimeError):
     """The model endpoint could not serve the request in a way that fails EVERY unit — the model
     would not load (usually out of RAM) or the endpoint was unreachable (server down). Aborts the
     batch, unlike a per-unit timeout, which leaves one artifact unfinished and moves on."""
+
+    code = "model.unavailable"
+    category = "infra"
 
 
 _LOAD_MARKERS = ("failed to load model", "insufficient system resources",
@@ -108,8 +112,8 @@ def loop(messages, provider, model, generator: Generator | None = None, *,
             # unfinalized → reported INCOMPLETE) instead of crashing with a raw traceback, so a batch
             # or a --source loop moves on. Give a slow local model more room with MODEL_TIMEOUT.
             if _looks_like_timeout(exc):
-                show("[yellow]Model request timed out — leaving this artifact unfinished "
-                     "(raise MODEL_TIMEOUT to give a slow local model more time).[/yellow]")
+                outcomes.warn("model.timeout", "Model request timed out — leaving this artifact unfinished "
+                              "(raise MODEL_TIMEOUT to give a slow local model more time).", model=model)
                 break
             # A DOWN endpoint (server not running, refused) fails every unit — abort the batch with a
             # clear message instead of N misleading per-unit 'timed out's. Checked after timeout so a
@@ -136,7 +140,7 @@ def loop(messages, provider, model, generator: Generator | None = None, *,
                 error_streak = 0
             if error_streak >= stall_limit:
                 if nudges >= max_nudges:
-                    show("[red]Bailing: tool calls kept failing.[/red]")
+                    outcomes.error("loop.tool_calls_failing", "Bailing: tool calls kept failing.")
                     break
                 nudges += 1
                 error_streak = 0
@@ -147,7 +151,7 @@ def loop(messages, provider, model, generator: Generator | None = None, *,
         if gen.is_finalized():
             break
         if nudges >= max_nudges:
-            show("[yellow]Model stopped without finalizing; nudge budget spent.[/yellow]")
+            outcomes.warn("loop.not_finalized", "Model stopped without finalizing; nudge budget spent.")
             break
         nudges += 1
         # Re-append without raw_message on purpose: the provider then synthesises a plain
@@ -157,7 +161,8 @@ def loop(messages, provider, model, generator: Generator | None = None, *,
                                                   content=reply.content))
         provider.append_user(messages, gen.nudge(stalled=False))
     else:
-        show(f"[yellow]Reached the {max_iters}-turn limit without finalizing.[/yellow]")
+        outcomes.warn("loop.turn_limit", f"Reached the {max_iters}-turn limit without finalizing.",
+                      max_iters=max_iters)
 
     # The model may produce a COMPLETE artifact and still fumble the final call (week 7 of a real course:
     # a complete 7x4 bank left unfinalized and out of sync with its quiz.json). A generator that can tell
@@ -165,8 +170,8 @@ def loop(messages, provider, model, generator: Generator | None = None, *,
     if not gen.is_finalized():
         finish = getattr(gen, "auto_finalize", None)
         if finish and finish():
-            show("[yellow]The model stopped without calling finalize, but the work was complete — "
-                 "coursekit finalized it.[/yellow]")
+            outcomes.warn("loop.auto_finalized", "The model stopped without calling finalize, but the work "
+                          "was complete — coursekit finalized it.")
 
     # LM Studio returns content=None after a tool-heavy run; downstream writes need a str.
     return (reply.content or "") if reply else ""

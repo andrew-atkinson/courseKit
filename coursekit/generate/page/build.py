@@ -16,7 +16,7 @@ so evaluate/fix/emit see every function uniformly. Returns a RunResult like the 
 
 from pathlib import Path
 
-from coursekit import courseconfig
+from coursekit import courseconfig, outcomes
 from coursekit.generate.base import RunResult
 from coursekit.generate.page import decompose, glossary as glossary_mod, route
 from coursekit.generate.page.concept_map import load_for_unit
@@ -54,7 +54,8 @@ def route_teaching(unit, *, verbose: bool = True) -> str:
     choice = "decompose" if reasons else "monolithic"
     if verbose:
         why = "; ".join(reasons) if reasons else "fits a single pass"
-        print(f"  [route] {unit.week_slug}: {choice} ({why})")
+        outcomes.info("page.route", f"  [route] {unit.week_slug}: {choice} ({why})",
+                      unit=unit.week_slug, choice=choice, reasons=reasons)
     return choice
 
 

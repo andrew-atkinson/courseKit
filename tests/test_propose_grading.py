@@ -5,6 +5,7 @@ import pytest
 
 from coursekit import courseconfig
 from coursekit.ingest import propose_grading as pg
+from coursekit.outcomes import CoursekitError
 
 
 def _course(tmp_path, *, assignments=True, quizzes=True):
@@ -49,6 +50,7 @@ def test_write_preserves_weeks_and_refuses_to_clobber(tmp_path):
     assert "week 3" in data["weeks"]                             # the weeks block survived the merge
     assert data["grading"]["groups"][0]["name"] == "Assignments"
 
-    with pytest.raises(SystemExit):                             # a second write refuses without --force
+    with pytest.raises(CoursekitError) as e:                    # a second write refuses without --force
         pg.write_grading(root, pg.propose_grading(root))
+    assert e.value.code == "overlay.section_exists" and e.value.details["section"] == "grading"
     pg.write_grading(root, pg.propose_grading(root), force=True)  # --force redrafts

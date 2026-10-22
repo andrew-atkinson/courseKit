@@ -19,6 +19,7 @@ from pathlib import Path
 
 from coursekit import courseconfig
 from coursekit.ingest.propose import overlay_path
+from coursekit.outcomes import CoursekitError
 
 # ponytail: a density threshold is a heuristic; 8 concepts ≈ "dense enough that a glossary helps" (CLT).
 GLOSSARY_THRESHOLD = 8
@@ -111,19 +112,18 @@ _HEADER = (
 def write_expectations(path, expect: dict, notes: list[str], *, force: bool = False) -> Path:
     """Merge `expect` into the overlay, PRESERVING `weeks`/`grading`. Refuse to overwrite an existing
     `expect` block without `force`."""
-    try:
-        import yaml
-    except ImportError:
-        raise SystemExit("writing the overlay needs pyyaml (pip/uv install it).")
+    import yaml
     root = courseconfig.find_root(Path(path).expanduser())
     if root is None:
-        raise SystemExit("no .vtconfig course root found — create a .vtconfig/ folder in the course root first.")
+        raise CoursekitError("no .vtconfig course root found — create a .vtconfig/ folder in the course root "
+                             "first.", code="course.no_root", details={"path": str(path)})
     dest = overlay_path(root)
     data = courseconfig._read_yaml(dest) if dest.exists() else {}
     if not isinstance(data, dict):
         data = {}
     if data.get("expect") and not force:
-        raise SystemExit(f"{dest} already declares `expect:` — pass --force to redraft (discards hand edits).")
+        raise CoursekitError(f"{dest} already declares `expect:` — pass --force to redraft (discards hand edits).",
+                             code="overlay.section_exists", details={"path": str(dest), "section": "expect"})
     data["expect"] = expect
     header = _HEADER + "".join(f"#   - {note}\n" for note in notes) + "\n"
     dest.parent.mkdir(parents=True, exist_ok=True)

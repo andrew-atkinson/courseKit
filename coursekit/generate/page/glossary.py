@@ -18,7 +18,7 @@ import argparse
 import os
 from pathlib import Path
 
-from coursekit import courseconfig, prompts
+from coursekit import courseconfig, outcomes, prompts
 from coursekit.discover import find_units, slugify
 from coursekit.generate.page import decompose
 from coursekit.generate.page import page as pageir
@@ -88,19 +88,21 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
         seen.setdefault(e["term"].strip().lower(), e)
     if seen:
         pageir.put_block(pageir.build_block("glossary", block_id="terms", entries=list(seen.values())))
-    print(f"  glossary: {len(seen)} term(s){f' (retry{retries})' if retries else ''}"
-          f"{f' over {len(chunks)} chunk(s)' if len(chunks) > 1 else ''}")
+    outcomes.info("page.glossary_terms", f"  glossary: {len(seen)} term(s){f' (retry{retries})' if retries else ''}"
+                  f"{f' over {len(chunks)} chunk(s)' if len(chunks) > 1 else ''}", terms=len(seen))
 
     if stats.get("errors"):
         from collections import Counter
         kinds = ", ".join(f"{k}×{v}" for k, v in Counter(stats["error_types"]).items())
-        print(f"  ⚠ {stats['errors']} pass error(s) — candidate timeouts/overheating: {kinds}")
+        outcomes.warn("page.pass_errors", f"  ⚠ {stats['errors']} pass error(s) — candidate "
+                      f"timeouts/overheating: {kinds}", errors=stats["errors"])
 
     problems = pageir.validate_final()
     if not problems:
         pageir.finalize()
     else:
-        print("  (did not finalize: " + "; ".join(problems) + ")")
+        outcomes.warn("page.not_finalized", "  (did not finalize: " + "; ".join(problems) + ")",
+                      problems=problems)
     decompose._render(unit, out_dir, project_root)
     return pageir.get(), problems
 
@@ -132,4 +134,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from coursekit.console import run
+    raise SystemExit(run(main))
