@@ -222,6 +222,34 @@ def _cmd_propose_grading(args) -> int:
     return 0
 
 
+def _cmd_check(args) -> int:
+    """Validate every `.vtconfig` settings file at once (CORE-1.3) — so a mistake surfaces before a long
+    model run, and one bad file doesn't hide the next. Offline, no model."""
+    from pathlib import Path
+
+    from coursekit import schemas
+    from coursekit.outcomes import CoursekitError
+    root = courseconfig.find_root(Path(args.path).expanduser())
+    if root is None:
+        raise CoursekitError("no .vtconfig course root found — run this on a course folder.",
+                             code="course.no_root", details={"path": args.path})
+    checked, errors = schemas.check(root)
+    vt = str(root / courseconfig.VTCONFIG_DIR_NAME) + "/"
+    bad = {e.details.get("path") for e in errors}
+    for path in checked:
+        if str(path) not in bad:
+            print(f"✓ {str(path).removeprefix(vt)}")
+    for e in errors:
+        print(f"✗ {e.message.replace(vt, '')}")
+    if not checked:
+        print("No settings files to check.")
+    elif errors:
+        print(f"\n{len(bad)} of {len(checked)} file(s) have problems.")
+    else:
+        print(f"\nAll {len(checked)} file(s) are valid.")
+    return 1 if errors else 0
+
+
 def _cmd_census(args) -> int:
     """Walk the course and write census.json (IR) + census.md (report) — a deterministic, offline
     inventory of materials + generated artifacts, with the presence gaps (FLOW-9). No model."""
@@ -834,6 +862,12 @@ def build_parser() -> argparse.ArgumentParser:
         prog="coursekit", description="Generate Canvas artifacts from course material.")
     sub = parser.add_subparsers(dest="command", required=True,
                                 metavar="{ingest,analyze,generate,emit}")
+
+    # check — validate every .vtconfig settings file, offline
+    pk = sub.add_parser("check", help="validate the course's .vtconfig settings files — every file, every "
+                                      "problem, before a model run (offline, no model)")
+    pk.add_argument("path", help="the course root (or any directory under it)")
+    pk.set_defaults(func=_cmd_check)
 
     # census — inventory the whole course (materials + generated artifacts + presence gaps), offline
     pc = sub.add_parser("census",

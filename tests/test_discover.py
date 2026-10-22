@@ -113,25 +113,6 @@ def test_course_root_found_by_walking_up_from_a_directory_scan(tmp_path):
     assert units[0].output_dir == (root / "quizzes" / "week-3").resolve()
 
 
-def test_missing_pyyaml_degrades_gracefully(tmp_path, monkeypatch):
-    root = _make_course(tmp_path)
-    # Simulate pyyaml being unavailable.
-    import builtins
-    real_import = builtins.__import__
-
-    def fake_import(name, *a, **k):
-        if name == "yaml":
-            raise ImportError("no yaml")
-        return real_import(name, *a, **k)
-
-    monkeypatch.setattr(builtins, "__import__", fake_import)
-    unit = find_units(root / "output" / "week 3" / "week-3.md")[0]
-    # No enrichment, but still a valid unit anchored at the course root.
-    assert unit.course_title is None
-    assert unit.week_label == "Week 3"  # falls back to number-only, no title
-    assert unit.course_root == root.resolve()
-
-
 # ----------------------------------------------------- output_root override
 
 def test_output_root_override_uses_course_slug(tmp_path):

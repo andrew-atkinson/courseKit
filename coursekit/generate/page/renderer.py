@@ -372,7 +372,8 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
 
 
 def load_supplements(course_root, week_ref) -> dict:
-    """A course's instructor-authored supplements for one page, or {} when absent. Never raises.
+    """A course's instructor-authored supplements for one page, or {} when absent. A file that is
+    present but unreadable or invalid raises a CoursekitError (see coursekit.schemas).
 
     Matched by **week identity, not an exact filename** — any `.vtconfig/pages/*.yaml` whose name
     resolves to the same week number wins, so `week-3.yaml`, `week-3-repetition.yaml`, and
@@ -398,9 +399,5 @@ def load_supplements(course_root, week_ref) -> dict:
     if match is None:
         return {}
 
-    try:
-        import yaml
-        data = yaml.safe_load(match.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
+    from coursekit import schemas
+    return schemas.load(match, schemas.Supplements)

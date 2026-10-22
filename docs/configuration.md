@@ -52,17 +52,38 @@ A course carries its own settings in a `.vtconfig/` folder at its root — the s
 ### Generator settings — `quiz.yaml` / `page.yaml`
 
 Each generator reads its own file.
-Every key is optional.
+Every key is optional, but a key coursekit doesn't recognise — or one in the wrong file — is an error, not a silently ignored line.
 
 ```yaml
-# <course root>/.vtconfig/quiz.yaml   (page.yaml is identical in shape)
+# <course root>/.vtconfig/quiz.yaml
 model: qwen2.5-32b-instruct # used when MODEL_NAME is not set in the environment
 system_prompt: system # which prompts/<gen>/<name>.md to use for the rules…
 task_prompt: exam # …and for the brief (default: system / task)
 ```
 
+| File | Keys |
+|---|---|
+| `quiz.yaml` | `model`, `system_prompt`, `task_prompt`, `questions` (a fixed number of question groups), `eu_question` (`true` adds the enduring-understanding question) |
+| `page.yaml` | `model`, `system_prompt`, `task_prompt`, `max_pass_chars`, `mono_char_budget`, `mono_concept_budget` (how much material one model pass takes, and when a page is split into passes) |
+| `evaluate.yaml` | `model`, `reads` (cold reads per item) |
+| `ingest.yaml` | `model` |
+| `assignment.yaml` | `model`, `assignment_points` |
+
 `task_prompt: exam` tells the generator to load `exam.md` instead of `task.md` — resolved the same way as any prompt (the course's own override first, then the shipped file).
 `MODEL_NAME` in the environment still wins over `model` here; the file is the per-course default, not an override.
+
+### Checking your settings
+
+A settings file that doesn't exist just means "use the defaults".
+A file that exists but can't be read, or holds a value coursekit can't use, stops the run with a message naming the file, the key, the value, and what's allowed — it is never quietly ignored.
+To check every file at once after editing (tool settings, `style.yaml`, page supplements, the structure overlay, concept maps):
+
+```bash
+uv run coursekit check "/path/to/course"
+```
+
+Each file gets a ✓ or a ✗ with its problems, for example `grading.groups[0].weight: Input should be a valid number (got 'twenty')` or `theme: unknown theme — did you mean 'bauhaus'?`.
+A grading weight may be written `20` or `20%`.
 
 ### Prompt overrides
 

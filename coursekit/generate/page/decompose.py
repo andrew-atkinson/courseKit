@@ -182,7 +182,7 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
     (page, problems) where problems is `validate_final()` (empty means it finalized). `neighbours` adds
     the prev/next coherence window to each concept pass (name+gist only)."""
     project_root = project_root or unit.course_root
-    cfg = unit.config
+    cfg = courseconfig.load(unit.transcript_path, config_name="page.yaml")   # page settings, not quiz.yaml
     cm = load_for_unit(unit)
     if cm is None or not cm.concepts:
         raise CoursekitError(f"{unit.week_slug}: no concept map (run `analyze` first).",

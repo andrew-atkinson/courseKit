@@ -53,11 +53,11 @@ class GlossaryProvider:
         messages.append({"role": "user", "content": text})
 
 
-def _unit(tmp_path, body="Loops repeat a block. Arrays store ordered data.", *, quiz_yaml=""):
+def _unit(tmp_path, body="Loops repeat a block. Arrays store ordered data.", *, page_yaml=""):
     root = tmp_path / "course"
     (root / ".vtconfig").mkdir(parents=True)
-    if quiz_yaml:
-        (root / ".vtconfig" / "quiz.yaml").write_text(quiz_yaml, encoding="utf-8")
+    if page_yaml:
+        (root / ".vtconfig" / "page.yaml").write_text(page_yaml, encoding="utf-8")
     f = root / "output" / "week-3.md"
     f.parent.mkdir(parents=True)
     f.write_text(body, encoding="utf-8")
@@ -91,7 +91,7 @@ def test_glossary_dedups_terms_across_chunks(fresh, tmp_path):
     # tiny budget forces two chunks; the two passes share "Loop" (dedup) and add distinct terms (union)
     unit = _unit(tmp_path, "Loops repeat a block of code many times over.\n\n"
                            "Arrays store ordered data you can index into.",
-                 quiz_yaml="max_pass_chars: 40\n")
+                 page_yaml="max_pass_chars: 40\n")
     prov = GlossaryProvider(
         [{"term": "Loop", "definition": "first-wins definition"}],
         [{"term": "loop", "definition": "SECOND definition, discarded"},

@@ -44,7 +44,7 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
     means it finalized. One `add_glossary` pass per material chunk; terms are harvested per chunk and
     deduped into one glossary block deterministically."""
     project_root = project_root or unit.course_root
-    cfg = unit.config
+    cfg = courseconfig.load(unit.transcript_path, config_name="page.yaml")   # page settings, not quiz.yaml
     transcript = Path(unit.transcript_path).read_text(encoding="utf-8", errors="replace")
 
     out_dir = Path(out_dir)

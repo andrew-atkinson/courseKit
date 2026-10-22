@@ -1,6 +1,6 @@
-import builtins
 import pytest
 from coursekit import courseconfig as cc
+from coursekit.outcomes import CoursekitError
 
 
 # --------------------------------------------------------------- fixtures
@@ -59,30 +59,20 @@ def test_load_with_marker_but_no_files(tmp_path):
     assert cfg.context_path == root / ".vtconfig" / "context.yaml"
 
 
-def test_malformed_yaml_degrades_to_empty(tmp_path):
+def test_malformed_yaml_is_an_error_naming_the_file_and_line(tmp_path):
+    # Present-but-broken is not absent: silently using defaults hid every setting in the file.
     root, inp = _project(tmp_path, config="model: [unclosed\n:::")
-    cfg = cc.load(inp, config_name="quiz.yaml")
-    assert cfg.config == {}
+    with pytest.raises(CoursekitError) as e:
+        cc.load(inp, config_name="quiz.yaml")
+    assert e.value.code == "config.unreadable"
+    assert e.value.details["path"].endswith("quiz.yaml") and e.value.details["line"]
 
 
 def test_a_yaml_scalar_is_not_a_config(tmp_path):
-    # A file that parses but isn't a mapping must not become a dict-shaped surprise.
+    # A file that parses but isn't a mapping is an error, not a dict-shaped surprise.
     root, inp = _project(tmp_path, config="just a string")
-    assert cc.load(inp, config_name="quiz.yaml").config == {}
-
-
-def test_missing_pyyaml_degrades(tmp_path, monkeypatch):
-    root, inp = _project(tmp_path, config="model: gemma\n")
-    real_import = builtins.__import__
-
-    def no_yaml(name, *a, **k):
-        if name == "yaml":
-            raise ImportError("no pyyaml")
-        return real_import(name, *a, **k)
-
-    monkeypatch.setattr(builtins, "__import__", no_yaml)
-    cfg = cc.load(inp, config_name="quiz.yaml")
-    assert cfg.config == {}   # degraded, did not raise
+    with pytest.raises(CoursekitError, match="key: value"):
+        cc.load(inp, config_name="quiz.yaml")
 
 
 # ------------------------------------ test 3: legacy_search is opt-in

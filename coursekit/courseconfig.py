@@ -15,9 +15,10 @@ shared because it is a fact about the course; technical settings are per-tool be
 different jobs (the transcriber runs vision and whisper models; quizbot runs a tool-calling text
 model, and may legitimately want a different one).
 
-`load()` never raises. A course config is enrichment: its absence, corruption, or a machine without
-pyyaml all degrade to empty dicts rather than failing a run. That was already how `discover.py`
-treated `context.yaml`; this promotes it and makes it uniform.
+A course config is enrichment, so an ABSENT file degrades to an empty dict. A file that is present but
+broken is not absent: unreadable YAML raises a `CoursekitError` naming the file and line, and a
+coursekit-owned settings file is validated against its schema (`coursekit.schemas`) — an unknown key
+or a bad value raises rather than silently turning the setting off.
 """
 
 import re
@@ -250,24 +251,15 @@ def find_config_file(start: Path, name: str = "config.yaml", *,
 
 
 def _read_yaml(path: Path | None) -> dict:
-    """A yaml mapping, or {} for anything that isn't one — missing file, bad YAML, no pyyaml."""
-    if path is None or not path.is_file():
-        return {}
-    try:
-        import yaml  # guarded: a machine without pyyaml degrades rather than crashing
-    except ImportError:
-        return {}
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
+    """A yaml mapping, or {} when the file is absent. Present but unreadable raises (see schemas)."""
+    from coursekit import schemas
+    return schemas.read_yaml(path) if path is not None else {}
 
 
 def load(start, *, config_name: str = "config.yaml",
          legacy_search: bool = False) -> CourseConfig:
-    """Resolve the course project containing `start`. Never raises.
+    """Resolve the course project containing `start`. Absent files degrade to {}; a present but broken
+    one raises a `CoursekitError`, and coursekit's own settings files are schema-validated.
 
     `config_name` selects which tool's config file to read — quizbot passes "quiz.yaml", the
     transcriber "config.yaml". The path fields point at where each file lives, or where it *would*
@@ -283,9 +275,13 @@ def load(start, *, config_name: str = "config.yaml",
         context_path = context_path or root / VTCONFIG_DIR_NAME / "context.yaml"
         config_path = config_path or root / VTCONFIG_DIR_NAME / config_name
 
+    from coursekit import schemas
+    config = _read_yaml(config_path)
+    if config and config_name in schemas.SETTINGS:
+        config = schemas.validate(config_path, config, schemas.SETTINGS[config_name]).model_dump(exclude_none=True)
     return CourseConfig(
         root=root,
-        config=_read_yaml(config_path),
+        config=config,
         context=_read_yaml(context_path),
         config_path=config_path,
         context_path=context_path,

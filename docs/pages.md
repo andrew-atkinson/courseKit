@@ -83,6 +83,7 @@ Either way the host must be on the allowlist below, or it renders as a plain lin
 A Canvas-relative link (e.g. `$WIKI_REFERENCE$/files/…`) is fine as a `url` too — Canvas resolves it on import.
 
 You never edit `page.json` by hand: regenerating the page rewrites it, but never touches this file.
+After editing a supplements file, `uv run coursekit check <course>` confirms it reads cleanly — a YAML slip or an example with no `url` is reported instead of quietly dropped.
 
 ### Iterating without re-running the model
 

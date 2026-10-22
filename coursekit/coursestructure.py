@@ -176,11 +176,11 @@ def _as_source(raw, *, default_kind: str | None = None, default_role: str = "con
 
 
 def _read_overlay(cfg: courseconfig.CourseConfig) -> dict:
-    """coursekit's whole overlay (`.vtconfig/structure.coursekit.yaml`), or {}. Same graceful
-    degradation as every other yaml read — a missing/partial/bad file yields {}."""
+    """coursekit's whole overlay (`.vtconfig/structure.coursekit.yaml`), validated, or {} when absent."""
     if cfg.root is None:
         return {}
-    data = courseconfig._read_yaml(cfg.root / courseconfig.VTCONFIG_DIR_NAME / OVERLAY_NAME)
+    from coursekit import schemas
+    data = schemas.load(cfg.root / courseconfig.VTCONFIG_DIR_NAME / OVERLAY_NAME, schemas.StructureOverlay)
     return data if isinstance(data, dict) else {}
 
 
@@ -208,8 +208,8 @@ def _compose(base: dict, overlay: dict) -> dict:
 
 class CourseStructure:
     """A read-only view of the declared course structure: the transcriber's `context.yaml` composed
-    with coursekit's own `structure.coursekit.yaml` overlay. Never raises; a missing or partial
-    manifest yields empty results, so callers fall back to inference."""
+    with coursekit's own `structure.coursekit.yaml` overlay. A missing or partial manifest yields empty
+    results, so callers fall back to inference; a broken or invalid overlay raises a CoursekitError."""
 
     def __init__(self, cfg: courseconfig.CourseConfig):
         self._cfg = cfg
@@ -219,7 +219,7 @@ class CourseStructure:
 
     @classmethod
     def load(cls, start, *, config_name: str = "quiz.yaml") -> "CourseStructure":
-        """Resolve the course containing `start` and read its structure. Never raises."""
+        """Resolve the course containing `start` and read its structure."""
         return cls(courseconfig.load(start, config_name=config_name))
 
     @property

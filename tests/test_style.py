@@ -11,6 +11,7 @@ import pytest
 from coursekit.generate.page import page as P
 from coursekit.generate.page import style as S
 from coursekit.generate.page.renderer import render_body
+from coursekit.outcomes import CoursekitError
 
 
 @pytest.fixture
@@ -98,9 +99,14 @@ def test_course_selects_a_theme(tmp_path):
     assert S.load_style(tmp_path)["_name"] == "terminal"
 
 
-def test_unknown_theme_falls_back(tmp_path):
+def test_unknown_theme_is_an_error_not_a_silent_default(tmp_path):
     (tmp_path / ".vtconfig").mkdir()
-    (tmp_path / ".vtconfig" / "style.yaml").write_text("theme: vaporwave\n", encoding="utf-8")
+    (tmp_path / ".vtconfig" / "style.yaml").write_text("theme: bauhuas\n", encoding="utf-8")
+    with pytest.raises(CoursekitError, match="did you mean 'bauhaus'"):
+        S.load_style(tmp_path)
+
+
+def test_no_style_file_still_means_the_default_theme(tmp_path):
     assert S.load_style(tmp_path)["_name"] == S.DEFAULT_THEME
 
 

@@ -173,10 +173,10 @@ A `coursekit/settings.py` module owns every write to a coursekit-owned file:
 ## Fix order for step 3 (`core-1-required-inputs`), by harm
 
 1. **Grading values** — `weight: 20%` → `0` and dropped groups ship wrong grade weights to Canvas.
-   Fixed by the `StructureOverlay` schema (above).
+   Fixed by the `StructureOverlay` schema (above). ✅ done in CORE-1.3.
 2. **The EU path** — the three silent exits, including ASMT-19 layer 1.
 3. **Overview / recap pages** — refuse without a concept map.
-4. **Broken config files** — fixed by the schemas and `coursekit check` (above): one shared "present but unreadable" error in place of `courseconfig._read_yaml`, `style._read_yaml`, `load_supplements`, and the overlay reader; unknown theme names rejected with the list of available themes.
+4. **Broken config files** — ✅ done in CORE-1.3 — fixed by the schemas and `coursekit check` (above): one shared "present but unreadable" error in place of `courseconfig._read_yaml`, `style._read_yaml`, `load_supplements`, and the overlay reader; unknown theme names rejected with the list of available themes.
 5. **Critic failures** — explicit `ERROR` results for pedagogy, groundedness, and concept delivery, like facticity.
 6. **`fix` re-render** and **census unreadable artifacts** — record them.
 7. **Unreadable vs absent concept map** — so `decompose` stops advising `analyze` for a corrupt file.

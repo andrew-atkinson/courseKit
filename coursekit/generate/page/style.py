@@ -220,13 +220,15 @@ def load_theme(name: str) -> dict:
 def load_style(course_root) -> dict:
     """Resolve a course's style: `.vtconfig/style.yaml` selects a theme + constrained overrides.
 
-    Never raises. Absent/invalid degrades to the default theme. An override that breaks a
+    No file means the default theme; an unreadable file, an unknown theme, or a bad value raises a
+    CoursekitError (see coursekit.schemas). An override that breaks a
     guardrail (e.g. an unreadable accent) is dropped with the theme's own value kept — the
     validation message is surfaced under '_problems' for the caller to show.
     """
     selection = {}
     if course_root:
-        selection = _read_yaml(Path(course_root) / ".vtconfig" / "style.yaml")
+        from coursekit import schemas
+        selection = schemas.load(Path(course_root) / ".vtconfig" / "style.yaml", schemas.StyleSettings)
 
     name = selection.get("theme") or DEFAULT_THEME
     theme = load_theme(name)
@@ -237,7 +239,7 @@ def load_style(course_root) -> dict:
     theme["_name"] = name
     problems = []
 
-    # Constrained overrides: accent (WCAG-checked), density, radius.
+    # Constrained overrides: accent (WCAG-checked) and density.
     if selection.get("accent"):
         candidate = dict(theme)
         candidate["color"] = dict(theme.get("color") or {})
