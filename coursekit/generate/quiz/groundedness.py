@@ -16,6 +16,7 @@ Discovery reuses `_iter_quiz_banks`, so it covers whole-week AND targeted quizze
 import re
 from dataclasses import dataclass, field
 
+from coursekit.generate.critic import ask as ask_critic
 from coursekit.generate.quiz.evaluate import (
     READ_TEMPERATURE,
     _critic_body,
@@ -62,6 +63,7 @@ class BankGroundedness:
     quiz_id: str
     items: list[GroundItem] = field(default_factory=list)
     raw: str = ""
+    unchecked: list[str] = field(default_factory=list)   # "group/label" whose critic call failed — not in coverage
 
     @property
     def total(self) -> int:
@@ -82,36 +84,42 @@ class BankGroundedness:
 
 def evaluate_bank_groundedness(bank, material: str, provider, model: str, *, quiz_id: str = "",
                                project_root=None, progress=None) -> BankGroundedness:
-    """Classify each quiz variant's provenance against the material, question by question. Best-effort:
-    a per-question critic error yields no item for that question, never an exception."""
+    """Classify each quiz variant's provenance against the material, question by question. A question
+    whose critic call fails is listed in `unchecked` (and kept out of the coverage), not dropped."""
     critic = _critic_body(GROUNDEDNESS_CATEGORY, project_root, name="groundedness")
     items: list[GroundItem] = []
     raw_parts: list[str] = []
+    unchecked: list[str] = []
     for g in bank.groups.values():
         for v in g.variants.values():
             user = (f"The week's source material:\n<material>\n{material}\n</material>\n\n"
                     f"The quiz question to classify:\n{_format_question(v)}\n\n"
                     f"Classify this question's provenance against the material.")
             messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]
-            try:
-                reply = provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE)
-            except Exception as e:
-                reply = f"(critic call failed: {e})"
+            reply = ask_critic(provider, model, messages, temperature=READ_TEMPERATURE,
+                               item=f"groundedness {quiz_id} {g.group_id}/{v.label}")
+            if reply is None:
+                unchecked.append(f"{g.group_id}/{v.label}")
+                continue
             raw_parts.append(f"## {g.group_id}/{v.label}\n{reply}")
             parsed = _parse_grounding(reply)
             if parsed:
                 items.append(GroundItem(g.group_id, v.label, v.question_text.strip(), parsed[0], parsed[1]))
             if progress:
                 progress(f"  {quiz_id} {g.group_id}/{v.label} — {parsed[0] if parsed else '?'}")
-    return BankGroundedness(quiz_id, items, "\n\n".join(raw_parts))
+    return BankGroundedness(quiz_id, items, "\n\n".join(raw_parts), unchecked)
 
 
 def render_groundedness(bg: BankGroundedness) -> str:
+    gap = (f"⚠️ {len(bg.unchecked)} question(s) NOT CHECKED (the critic call failed): "
+           f"{', '.join(bg.unchecked)}\n\n" if bg.unchecked else "")
     if not bg.items:
-        return f"# Quiz groundedness — {bg.quiz_id}\n\n(no questions classified)\n"
+        return f"# Quiz groundedness — {bg.quiz_id}\n\n{gap}(no questions classified)\n"
     lines = [f"# Quiz groundedness — {bg.quiz_id}  "
              f"({bg.coverage * 100:.0f}% answerable from the material · {len(bg.model_supplied)} "
              f"model-knowledge, of {bg.total} question(s))", ""]
+    if gap:
+        lines.append(gap)
     if bg.model_supplied:
         lines.append("**Testing the model's knowledge, not the source** — the material does not supply "
                      "the answer. A low count is fine; a high one means the source is too thin to ground "

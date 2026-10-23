@@ -23,7 +23,7 @@ exactly as the deterministic proposer does — the model is asked only for the h
 import json
 from pathlib import Path
 
-from coursekit import courseconfig
+from coursekit import courseconfig, outcomes
 from coursekit.ingest.extract import extract_text
 from coursekit.ingest.propose import Proposal, _source_entry, _sort_sources, _week_num_of, scan_supported
 
@@ -65,9 +65,13 @@ _SYSTEM = (
 
 
 def _peek(p: Path) -> str:
+    """A short content excerpt for `--deep`. Optional, so an unreadable file doesn't stop the proposal —
+    but it is recorded, since that file is then grouped by its name alone."""
     try:
         text = " ".join(extract_text(p).split())
-    except Exception:
+    except Exception as e:
+        outcomes.warn("propose.peek_failed", f"  {p.name}: couldn't read its content ({type(e).__name__}) — "
+                      f"grouped by its file name only.", path=str(p))
         return ""
     return text[:_PEEK_CHARS]
 

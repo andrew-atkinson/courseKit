@@ -85,11 +85,8 @@ def _split_frontmatter(text: str) -> tuple[dict, str]:
     if end == -1:
         return {}, text.strip()
     raw, body = text[3:end], text[end + 4:]
-    try:
-        import yaml
-        meta = yaml.safe_load(raw) or {}
-    except ImportError:  # degrade rather than fail — the body is what matters
-        meta = {}
+    import yaml
+    meta = yaml.safe_load(raw) or {}
     return (meta if isinstance(meta, dict) else {}), body.strip()
 
 

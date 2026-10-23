@@ -22,7 +22,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from coursekit import courseconfig, coursestructure
+from coursekit import courseconfig, coursestructure, outcomes
 
 _ARTIFACT_LABELS = ("page", "quiz", "assignment", "concept map")
 
@@ -92,6 +92,7 @@ class Census(BaseModel):
     course: ScopeCensus | None = None                          # declared course rules
     grading_groups: list[str] = Field(default_factory=list)          # declared group names (STRC-2)
     unused_grading_groups: list[str] = Field(default_factory=list)   # declared groups with no items placed
+    unreadable: list[str] = Field(default_factory=list)   # artifact files present but unreadable (counted, flagged)
 
     @property
     def gap_count(self) -> int:
@@ -122,10 +123,15 @@ class Census(BaseModel):
                 "concept maps": sum(1 for w in real if w.concept_map)}
 
 
-def _load_json(p: Path) -> dict:
+def _load_json(p: Path, unreadable: list[str]) -> dict:
+    """An artifact's JSON. One that is present but unreadable still COUNTS (the census is presence),
+    but is listed in `unreadable` and warned about — never silently read as empty."""
     try:
         return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError) as e:
+        unreadable.append(str(p))
+        outcomes.warn("census.unreadable_artifact", f"  {p}: unreadable ({type(e).__name__}) — counted, "
+                      f"but its contents couldn't be read.", path=str(p))
         return {}
 
 
@@ -141,6 +147,7 @@ def build_census(course_path) -> Census:
 
     weeks: dict[str, WeekCensus] = {}
     placed: list[tuple[str, str]] = []   # (kind, slug) per graded item — for grading-group resolution
+    unreadable: list[str] = []
 
     def wk(num: str) -> WeekCensus:
         if num not in weeks:
@@ -159,7 +166,7 @@ def build_census(course_path) -> Census:
     _PAGE_SUBTYPE = {"glossary": "page:glossary", "week_recap": "page:recap", "week_intro": "page:teaching",
                      "week_overview": "page:overview", "module_overview": "page:overview"}
     for pj in sorted(root.glob("pages/*/page.json")):
-        d = _load_json(pj)
+        d = _load_json(pj, unreadable)
         num = courseconfig.week_key(d.get("week_ref") or pj.parent.name)
         if num:
             w = wk(num); w.pages += 1; _bump(w, "page")
@@ -170,12 +177,12 @@ def build_census(course_path) -> Census:
         num = courseconfig.week_key(bj.parent.name)
         if num:
             w = wk(num); w.quizzes += 1; _bump(w, "quiz")
-            groups = _load_json(bj).get("groups") or {}
+            groups = _load_json(bj, unreadable).get("groups") or {}
             if any(isinstance(g, dict) and g.get("question_type") == "open_response" for g in groups.values()):
                 _bump(w, "quiz:eu")                          # the EU performance question (ASMT-3)
             placed.append(("quiz", bj.parent.name))
     for aj in sorted(root.glob("assignments/*/assignment.json")):
-        d = _load_json(aj)
+        d = _load_json(aj, unreadable)
         num = courseconfig.week_key(d.get("week_ref") or aj.parent.name)
         if num:
             w = wk(num); w.assignments += 1; _bump(w, "assignment")
@@ -194,7 +201,9 @@ def build_census(course_path) -> Census:
                 w.materials.insert(0, Material(kind="week doc", title=md.name))
 
     census = Census(course_title=struct.course_title or root.name,   # fall back to the folder name
-                    weeks=sorted((w for w in weeks.values()), key=lambda w: _wsort(w.week)))
+                    weeks=sorted((w for w in weeks.values()), key=lambda w: _wsort(w.week)),
+                    unreadable=[str(Path(u).relative_to(root)) if Path(u).is_relative_to(root) else u
+                                for u in unreadable])
     _compute_gaps(census, struct, placed)
     return census
 
@@ -304,6 +313,10 @@ def render_report(census: Census) -> str:
                      f"{_cell(w.quizzes)} | {_cell(w.assignments)} | {cm} |")
 
     lines += ["", "## Gaps", ""] + (_gap_lines(census) or ["No gaps found."])
+    if census.unreadable:
+        lines += ["", "## Unreadable artifacts", "",
+                  "Present (so counted above) but their contents couldn't be read — regenerate or repair them:", ""]
+        lines += [f"- `{u}`" for u in census.unreadable]
     return "\n".join(lines) + "\n"
 
 

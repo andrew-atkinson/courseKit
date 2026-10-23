@@ -42,12 +42,16 @@ def test_unreadable_reply_drops_that_question():
     assert bg.total == 1                                     # the unparseable question is dropped
 
 
-def test_critic_error_is_best_effort():
+def test_a_failed_critic_call_is_listed_not_counted():
     class _Boom:
         def chat(self, **kw):
             raise RuntimeError("down")
-    bg = gnd.evaluate_bank_groundedness(grounded_bank(), MATERIAL, _Boom(), "m")
-    assert bg.total == 0 and bg.coverage == 0.0
+    bank = grounded_bank()
+    bg = gnd.evaluate_bank_groundedness(bank, MATERIAL, _Boom(), "m")
+    assert bg.total == 0                                       # nothing judged…
+    n = sum(len(g.variants) for g in bank.groups.values())
+    assert len(bg.unchecked) == n                              # …and every question is listed as NOT CHECKED
+    assert "NOT CHECKED" in gnd.render_groundedness(bg)
 
 
 def test_render_names_model_knowledge_and_lists_all_questions():

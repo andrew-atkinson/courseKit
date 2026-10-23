@@ -20,6 +20,7 @@ from coursekit import courseconfig, outcomes
 from coursekit.generate.base import RunResult
 from coursekit.generate.page import decompose, glossary as glossary_mod, route
 from coursekit.generate.page.concept_map import load_for_unit
+from coursekit.outcomes import CoursekitError
 
 FUNCTIONS = ("teaching", "glossary", "overview", "recap")
 GENERATORS = ("auto", "monolithic", "decompose")
@@ -76,8 +77,14 @@ def build_page_unit(unit, provider, model, *, function: str = "teaching", genera
     if function in DETERMINISTIC_FUNCTIONS:
         from coursekit.generate.overview import build_week_overview, build_week_recap
         builder = build_week_overview if function == "overview" else build_week_recap
+        cm = load_for_unit(unit)
+        if cm is None or not cm.concepts:        # these pages are built FROM the map — refuse, don't ship an intro
+            raise CoursekitError(f"{unit.week_slug}: a {function} page is built from the concept map, and "
+                                 f"{'there is none (run `analyze` first)' if cm is None else 'it lists no concepts'}.",
+                                 code="concept_map.missing", category="source",
+                                 details={"unit": unit.week_slug, "function": function})
         page = builder(unit.course_title or "Course", unit.week_num,
-                       unit.week_label or unit.week_slug, unit.module or "", load_for_unit(unit))
+                       unit.week_label or unit.week_slug, unit.module or "", cm)
         out = parent / f"{unit.week_slug}-{function}"
         _write_page(page, out, project_root)
         return RunResult(unit, finalized=True, output_dir=out, counts={"blocks": len(page.blocks)})

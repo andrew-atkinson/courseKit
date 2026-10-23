@@ -114,7 +114,7 @@ Labels: **ok** (optional, or by design) · **recorded** (degrades, but prints a 
 | `generate/quiz/generator.py` `postprocess` | silent-required | `if not eu: return`, and the EU pass's `False` is ignored |
 | `generate/quiz/targeted.py` `generate_targeted_quiz` | silent-required | unit built without a unit number (ASMT-19) |
 | `generate/overview.py` `build_week_overview` / `build_week_recap` | silent-required | `cm is None` → intro-only page, reported finished |
-| `pipeline.py` `run_course` | dead (risky) | `getattr(generator, "artifacts_subdir", "quizzes")` — the protocol requires the attribute, and the default would misfile a new generator's output |
+| `pipeline.py` `run_course` | risky default | `getattr(generator, "artifacts_subdir", "quizzes")` — not dead after all: it quietly mapped `generator=None` to quizzes; but a new generator missing the attribute would also have been misfiled into `quizzes/`. Fixed in CORE-1.5: the default generator is resolved explicitly and the attribute read directly |
 | `courseconfig._read_yaml`, `concept_map.py`, `prompts.py` | dead | "no pyyaml" guards — pyyaml is a declared dependency |
 
 ### `getattr` defaults
@@ -174,12 +174,12 @@ A `coursekit/settings.py` module owns every write to a coursekit-owned file:
 
 1. **Grading values** — `weight: 20%` → `0` and dropped groups ship wrong grade weights to Canvas.
    Fixed by the `StructureOverlay` schema (above). ✅ done in CORE-1.3.
-2. **The EU path** — the three silent exits, including ASMT-19 layer 1.
-3. **Overview / recap pages** — refuse without a concept map.
+2. **The EU path** — the three silent exits, including ASMT-19 layer 1. ✅ done in CORE-1.5.
+3. **Overview / recap pages** — refuse without a concept map. ✅ done in CORE-1.5 (the whole-course builder records each skipped unit instead).
 4. **Broken config files** — ✅ done in CORE-1.3 — fixed by the schemas and `coursekit check` (above): one shared "present but unreadable" error in place of `courseconfig._read_yaml`, `style._read_yaml`, `load_supplements`, and the overlay reader; unknown theme names rejected with the list of available themes.
-5. **Critic failures** — explicit `ERROR` results for pedagogy, groundedness, and concept delivery, like facticity.
-6. **`fix` re-render** and **census unreadable artifacts** — record them.
-7. **Unreadable vs absent concept map** — so `decompose` stops advising `analyze` for a corrupt file.
-8. **Dead code** — the pyyaml guards and the `artifacts_subdir` default.
+5. ✅ done in CORE-1.5 — **Critic failures** — explicit `ERROR` results for pedagogy, groundedness, and concept delivery, like facticity.
+6. **`fix` re-render** and **census unreadable artifacts** — record them. ✅ done in CORE-1.5.
+7. **Unreadable vs absent concept map** — so `decompose` stops advising `analyze` for a corrupt file. ✅ done in CORE-1.5.
+8. **Dead code** — the pyyaml guards and the `artifacts_subdir` default. ✅ done in CORE-1.5 (the `artifacts_subdir` default turned out not to be dead — see its row).
 
 Each fix gets the feature-on test: switched on, it produces its artifact or fails loudly — never a no-op.

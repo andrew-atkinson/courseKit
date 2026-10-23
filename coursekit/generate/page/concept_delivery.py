@@ -12,6 +12,7 @@ Reuses the domain-aware review loader (`_critic_body`) and the whole-page render
 import re
 from dataclasses import dataclass, field
 
+from coursekit.generate.critic import ask as ask_critic
 from coursekit.generate.page.pedagogy import _render_page
 from coursekit.generate.quiz.evaluate import READ_TEMPERATURE, _critic_body
 
@@ -33,6 +34,7 @@ class PageConcepts:
     page_id: str
     concepts: list[ConceptScore] = field(default_factory=list)
     raw: str = ""
+    failed: str = ""    # set when the critic call itself failed: NOT SCORED, not "no concepts"
 
     @property
     def average(self) -> float:
@@ -68,15 +70,16 @@ def evaluate_page_concepts(page, material: str, provider, model: str, *, project
     user = (f"The week's teaching material:\n<material>\n{material}\n</material>\n\n"
             f"The full page, in order:\n{_render_page(page)}\n\n{task}")
     messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]
-    try:
-        reply = provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE)
-    except Exception as e:
-        reply = f"(critic call failed: {e})"
+    reply = ask_critic(provider, model, messages, temperature=READ_TEMPERATURE, item=f"concept delivery {page.page_id}")
+    if reply is None:
+        return PageConcepts(page.page_id, failed="the critic call failed")
     concepts = [ConceptScore(n, s, note) for n, s, note in _parse_concepts(reply)]
     return PageConcepts(page.page_id, concepts, reply)
 
 
 def render_concepts(pc: PageConcepts) -> str:
+    if pc.failed:
+        return f"# Concept delivery — {pc.page_id}\n\n(NOT SCORED — {pc.failed})\n"
     if not pc.concepts:
         return f"# Concept delivery — {pc.page_id}\n\n(no concepts parsed)\n"
     lines = [f"# Concept delivery — {pc.page_id}  "

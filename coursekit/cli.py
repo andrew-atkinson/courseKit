@@ -761,37 +761,42 @@ def _cmd_evaluate(args) -> int:
             print(f"Quiz groundedness: read {len(qg)} quiz(zes).")
             for q in qg:
                 print(f"  {q.quiz_id}: {q.coverage*100:.0f}% answerable from material · "
-                      f"{len(q.model_supplied)} model-knowledge")
+                      f"{len(q.model_supplied)} model-knowledge"
+                      + (f" · {len(q.unchecked)} NOT CHECKED" if q.unchecked else ""))
             print(f"  -> {qout}")
             reviews.append(qout)
             tot = sum(q.total for q in qg) or 1
             metrics["quiz_groundedness"] = {"quizzes": len(qg),
                                             "coverage": round(sum(q.engaging for q in qg) / tot, 2),
-                                            "model_knowledge": sum(len(q.model_supplied) for q in qg)}
+                                            "model_knowledge": sum(len(q.model_supplied) for q in qg),
+                                            "unchecked": sum(len(q.unchecked) for q in qg)}
 
     # --all adds the deeper page-quality rubrics (form + concept delivery) on top of facticity.
     if args.all and do_page:
         rubrics, out = ped.evaluate_course_pedagogy(args.path, weeks=weeks, provider=provider, model=model)
         if rubrics:
             did_something = True
-            print(f"Pedagogy: scored {len(rubrics)} page(s).")
+            scored = [r for r in rubrics if not r.failed]        # a failed call is NOT a total of 0
+            print(f"Pedagogy: scored {len(scored)} of {len(rubrics)} page(s).")
             for r in rubrics:
-                print(f"  {r.page_id}: {r.total}/{3 * len(ped.CRITERIA)}")
+                print(f"  {r.page_id}: " + (f"NOT SCORED — {r.failed}" if r.failed else f"{r.total}/{3 * len(ped.CRITERIA)}"))
             print(f"  -> {out}")
             reviews.append(out)
-            metrics["pedagogy"] = {"pages": len(rubrics),
-                                   "avg_total": round(sum(r.total for r in rubrics) / len(rubrics), 1)}
+            metrics["pedagogy"] = {"pages": len(scored), "not_scored": len(rubrics) - len(scored),
+                                   "avg_total": round(sum(r.total for r in scored) / len(scored), 1) if scored else None}
 
         concepts, cout = cd.evaluate_course_concepts(args.path, weeks=weeks, provider=provider, model=model)
         if concepts:
             did_something = True
-            print(f"Concept delivery: scored {len(concepts)} page(s).")
+            scored_c = [c for c in concepts if not c.failed]
+            print(f"Concept delivery: scored {len(scored_c)} of {len(concepts)} page(s).")
             for c in concepts:
-                print(f"  {c.page_id}: avg {c.average:.1f}/3 over {len(c.concepts)} concept(s)")
+                print(f"  {c.page_id}: " + (f"NOT SCORED — {c.failed}" if c.failed
+                                            else f"avg {c.average:.1f}/3 over {len(c.concepts)} concept(s)"))
             print(f"  -> {cout}")
             reviews.append(cout)
-            metrics["concepts"] = {"pages": len(concepts),
-                                   "avg": round(sum(c.average for c in concepts) / len(concepts), 1)}
+            metrics["concepts"] = {"pages": len(scored_c), "not_scored": len(concepts) - len(scored_c),
+                                   "avg": round(sum(c.average for c in scored_c) / len(scored_c), 1) if scored_c else None}
 
         from coursekit.generate.page import groundedness as gnd
         grounded, gout = gnd.evaluate_course_groundedness(args.path, weeks=weeks, provider=provider,
@@ -801,13 +806,15 @@ def _cmd_evaluate(args) -> int:
             print(f"Groundedness: read {len(grounded)} page(s).")
             for g in grounded:
                 print(f"  {g.page_id}: {g.coverage*100:.0f}% engage material · "
-                      f"{len(g.model_supplied)} model-supplied · {len(g.tensions)} in tension")
+                      f"{len(g.model_supplied)} model-supplied · {len(g.tensions)} in tension"
+                      + (f" · {len(g.unchecked)} section(s) NOT CHECKED" if g.unchecked else ""))
             print(f"  -> {gout}")
             reviews.append(gout)
             tot = sum(g.total for g in grounded) or 1
             metrics["groundedness"] = {"pages": len(grounded),
                                        "coverage": round(sum(g.engaging for g in grounded) / tot, 2),
-                                       "in_tension": sum(len(g.tensions) for g in grounded)}
+                                       "in_tension": sum(len(g.tensions) for g in grounded),
+                                       "unchecked": sum(len(g.unchecked) for g in grounded)}
 
     if not did_something:
         print("Nothing found to evaluate (need generated bank.json / page.json under the course).")

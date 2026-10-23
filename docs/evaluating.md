@@ -41,6 +41,9 @@ So quality is a **trend you can read over time** — did a change help, did a re
 
 A realistic result on a full course: a small local model marks a wrong answer or writes a buggy code block a few percent of the time, and the cold read catches them — the errors that would otherwise ship to students silently.
 
+If a critic call itself fails (a model hiccup, not a judgment), the report says so — a page is **NOT SCORED** and a section or question **NOT CHECKED** — and it's left out of the averages, so a failed call never reads as a low score.
+A model that won't load stops the run with an error instead.
+
 ## `fix` — repair in place
 
 ```bash

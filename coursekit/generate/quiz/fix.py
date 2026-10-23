@@ -48,13 +48,9 @@ def _fixer_body(project_root) -> str:
 
 
 def _abort_if_model_error(provider, model, exc) -> None:
-    """A model-load / connection failure is INFRA, not a per-item 'could not fix' — re-raise it as
-    `ModelLoadError` so the whole fix run aborts with a clear message (the same way `generate` does),
-    rather than reporting every flagged item as unfixable. A content-level exception returns None, and
-    the caller breaks the loop for just that one item. (Shared by the quiz and page fix loops.)"""
-    from coursekit.pipeline import ModelLoadError, _looks_like_model_error, _model_error_message
-    if _looks_like_model_error(exc):
-        raise ModelLoadError(_model_error_message(provider, model, exc)) from exc
+    """Shared by the quiz and page fix loops — see `pipeline.abort_if_model_error`."""
+    from coursekit.pipeline import abort_if_model_error
+    abort_if_model_error(provider, model, exc)
 
 
 def fix_one(finding, transcript: str, provider, model: str, *, critic: str,

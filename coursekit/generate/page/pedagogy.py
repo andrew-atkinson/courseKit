@@ -15,6 +15,7 @@ import re
 from dataclasses import dataclass, field
 
 from coursekit import prompts
+from coursekit.generate.critic import ask as ask_critic
 from coursekit.generate.page.evaluate import _format_block
 from coursekit.generate.quiz.evaluate import READ_TEMPERATURE
 
@@ -39,6 +40,7 @@ class PageRubric:
     page_id: str
     scores: dict[str, RubricScore] = field(default_factory=dict)
     raw: str = ""       # the critic's full reply, for debugging a bad parse
+    failed: str = ""    # set when the critic call itself failed: the page is NOT SCORED, not scored 0
 
     @property
     def total(self) -> int:
@@ -68,22 +70,24 @@ def _parse_rubric(reply: str) -> dict[str, tuple[int, str]]:
 
 
 def evaluate_page_pedagogy(page, material: str, provider, model: str, *, project_root=None) -> PageRubric:
-    """Score one page against the five criteria. Best-effort: a provider error or an unreadable reply
-    yields -1 scores, never an exception."""
+    """Score one page against the five criteria. An unreadable reply yields -1 for the criteria it
+    missed; a failed critic call marks the whole page NOT SCORED (`failed`), never a total of 0."""
     critic = prompts.load(PEDAGOGY_CATEGORY, "pedagogy", project_root=project_root).body
     user = (f"The week's teaching material:\n<material>\n{material}\n</material>\n\n"
             f"The full page, in order:\n{_render_page(page)}\n\nScore this page.")
     messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]
-    try:
-        reply = provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE)
-    except Exception as e:
-        reply = f"(critic call failed: {e})"
+    reply = ask_critic(provider, model, messages, temperature=READ_TEMPERATURE, item=f"pedagogy {page.page_id}")
+    if reply is None:
+        return PageRubric(page.page_id, {c: RubricScore(c, -1, "not scored") for c in CRITERIA},
+                          failed="the critic call failed")
     parsed = _parse_rubric(reply)
     scores = {c: RubricScore(c, *parsed.get(c, (-1, "not scored"))) for c in CRITERIA}
     return PageRubric(page.page_id, scores, reply)
 
 
 def render_rubric(rubric: PageRubric) -> str:
+    if rubric.failed:
+        return f"# Page pedagogy — {rubric.page_id}  (NOT SCORED — {rubric.failed})\n"
     lines = [f"# Page pedagogy — {rubric.page_id}  (total {rubric.total}/{3 * len(CRITERIA)})", ""]
     for c in CRITERIA:
         s = rubric.scores[c]

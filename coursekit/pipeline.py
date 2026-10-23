@@ -38,6 +38,14 @@ def _looks_like_model_error(exc: Exception) -> bool:
     return getattr(exc, "status_code", None) == 404
 
 
+def abort_if_model_error(provider, model, exc) -> None:
+    """A model that won't load is INFRA, not a per-item failure — re-raise it as `ModelLoadError` so the
+    whole run aborts with a clear message, rather than reporting every item as failed. A content-level
+    exception returns, and the caller handles just that item. (Used by the fix loops and the critics.)"""
+    if _looks_like_model_error(exc):
+        raise ModelLoadError(_model_error_message(provider, model, exc)) from exc
+
+
 def _looks_like_timeout(exc: Exception) -> bool:
     """A request TIMEOUT — the model was slow on a big artifact. Transient and PER-UNIT: end this
     unit cleanly (reported INCOMPLETE) and move on, don't abort the batch. Distinct from an
@@ -235,8 +243,10 @@ def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
     dispatches by function and routes monolithic/decompose, instead of the default one-conversation
     `run_unit`. Discovery, week-filtering, and dry-run are shared regardless.
     """
-    # The output tree (quizzes/, pages/, …) is the generator's, so a course can hold both.
-    subdir = getattr(generator, "artifacts_subdir", "quizzes")
+    # The output tree (quizzes/, pages/, …) is the generator's, so a course can hold both. Read it
+    # directly: a generator that forgets `artifacts_subdir` fails loudly instead of writing into quizzes/.
+    generator = generator or _default_generator()
+    subdir = generator.artifacts_subdir
     units = find_units(path, output_root=output_root, subdir=subdir)
     if weeks:
         units = [u for u in units if any(_week_matches(w, u) for w in weeks)]

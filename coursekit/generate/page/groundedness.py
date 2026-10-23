@@ -20,6 +20,7 @@ wrong SOURCE (upstream); tension + facticity FAIL ≈ a model error to fix.
 import re
 from dataclasses import dataclass, field
 
+from coursekit.generate.critic import ask as ask_critic
 from coursekit.generate.page.evaluate import _SKIP_KINDS, _format_block
 from coursekit.generate.quiz.evaluate import READ_TEMPERATURE, _critic_body
 
@@ -52,6 +53,7 @@ class PageGroundedness:
     page_id: str
     claims: list[Claim] = field(default_factory=list)
     raw: str = ""       # the per-block critic replies, kept for debugging a surprising number
+    unchecked: list[str] = field(default_factory=list)   # blocks whose critic call failed — not in coverage
 
     @property
     def total(self) -> int:
@@ -90,11 +92,12 @@ def _parse_claims(reply: str) -> list[Claim]:
 def evaluate_page_groundedness(page, material: str, provider, model: str, *, week: str = "",
                                project_root=None, progress=None) -> PageGroundedness:
     """Classify the claims in EACH content block by provenance against the material, block by block, so
-    every section is examined. Best-effort: a per-block critic error yields no claims for that block,
-    never an exception."""
+    every section is examined. A block whose critic call fails is listed in `unchecked` (and kept out of
+    the coverage) rather than silently contributing nothing."""
     critic = _critic_body(GROUNDEDNESS_CATEGORY, project_root, name="groundedness")
     claims: list[Claim] = []
     raw_parts: list[str] = []
+    unchecked: list[str] = []
     for b in page.blocks.values():
         if b.kind in _SKIP_KINDS:                    # a heading is a label, not a claim to trace
             continue
@@ -102,10 +105,11 @@ def evaluate_page_groundedness(page, material: str, provider, model: str, *, wee
                 f"The page section to classify:\n{_format_block(b)}\n\n"
                 f"Classify each substantive claim in THIS section by its provenance against the material.")
         messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]
-        try:
-            reply = provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE)
-        except Exception as e:
-            reply = f"(critic call failed: {e})"
+        reply = ask_critic(provider, model, messages, temperature=READ_TEMPERATURE,
+                           item=f"groundedness {week} {b.block_id}".replace("  ", " "))
+        if reply is None:                        # not checked — kept out of the coverage, and listed
+            unchecked.append(b.block_id)
+            continue
         raw_parts.append(f"## {b.block_id} ({b.kind})\n{reply}")
         block_claims = _parse_claims(reply)
         for c in block_claims:
@@ -114,15 +118,19 @@ def evaluate_page_groundedness(page, material: str, provider, model: str, *, wee
         if progress:
             g = sum(1 for c in block_claims if c.tag == "grounded")
             progress(f"  {week} {b.block_id} ({b.kind}) — {len(block_claims)} claim(s), {g} grounded")
-    return PageGroundedness(page.page_id, claims, "\n\n".join(raw_parts))
+    return PageGroundedness(page.page_id, claims, "\n\n".join(raw_parts), unchecked)
 
 
 def render_groundedness(pg: PageGroundedness) -> str:
+    gap = (f"⚠️ {len(pg.unchecked)} section(s) NOT CHECKED (the critic call failed): "
+           f"{', '.join(pg.unchecked)}\n\n" if pg.unchecked else "")
     if not pg.claims:
-        return f"# Groundedness — {pg.page_id}\n\n(no claims parsed)\n"
+        return f"# Groundedness — {pg.page_id}\n\n{gap}(no claims parsed)\n"
     lines = [f"# Groundedness — {pg.page_id}  "
              f"({pg.coverage * 100:.0f}% engage the material · {len(pg.model_supplied)} model-supplied "
              f"· {len(pg.tensions)} in tension, of {pg.total} claim(s))", ""]
+    if gap:
+        lines.append(gap)
     if pg.tensions:
         lines.append("**In tension with the material** — a contradiction; read against facticity: a "
                      "tension facticity PASSES suggests the *source* is wrong (upstream), one it FLAGS "

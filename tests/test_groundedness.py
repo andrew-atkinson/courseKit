@@ -72,7 +72,9 @@ def test_a_block_critic_error_costs_only_that_block():
                 raise RuntimeError("down")
             return _claims("GROUNDED")
     pg = gnd.evaluate_page_groundedness(_page("a", "b", "c"), "m", _Boom(), "x")
-    assert pg.total == 2                               # the errored block drops out; the others survive
+    assert pg.total == 2                               # the others survive…
+    assert len(pg.unchecked) == 1                      # …and the errored block is listed, not silently lost
+    assert "1 section(s) NOT CHECKED" in gnd.render_groundedness(pg)
 
 
 def test_render_shows_split_flags_tension_and_lists_all_claims():

@@ -6,6 +6,8 @@ dispatcher chooses the right path.
 
 import types
 
+import pytest
+
 from coursekit.discover import find_units
 from coursekit.generate.page import build as pb
 
@@ -65,15 +67,29 @@ def test_page_yaml_can_tune_the_router(tmp_path):
 
 # ------------------------------------------------------------- overview: deterministic, no model
 
-def test_overview_function_writes_a_page(tmp_path):
-    u = _unit(tmp_path)
-    r = pb.build_page_unit(u, None, "m", function="overview")
-    assert r.finalized and r.output_dir.name == "week-3-overview"
-    assert (r.output_dir / "page.json").exists()
+def _with_map(u):
+    from coursekit.generate.page.concept_map import Concept, ConceptMap, concept_map_path, save_concept_map
+    save_concept_map(ConceptMap(week="3", enduring_understanding="Loops scale effort.",
+                                concepts=[Concept(name="For loops"), Concept(name="Nested loops")]),
+                     concept_map_path(u.course_root, u.week_num))
+    return u
 
 
-def test_recap_function_writes_a_page(tmp_path):
+@pytest.mark.parametrize("function", ["overview", "recap"])
+def test_overview_and_recap_are_built_from_the_concept_map(tmp_path, function):
+    u = _with_map(_unit(tmp_path))
+    r = pb.build_page_unit(u, None, "m", function=function)           # deterministic, no model
+    assert r.finalized and r.output_dir.name == f"week-3-{function}"
+    page = (r.output_dir / "page.json").read_text()
+    assert "Nested loops" in page and "Loops scale effort." in page
+
+
+@pytest.mark.parametrize("function", ["overview", "recap"])
+def test_overview_and_recap_refuse_without_a_concept_map(tmp_path, function):
+    # Regression: with no map these were written as an intro-only page and reported finished.
+    from coursekit.outcomes import CoursekitError
     u = _unit(tmp_path)
-    r = pb.build_page_unit(u, None, "m", function="recap")            # deterministic, no model
-    assert r.finalized and r.output_dir.name == "week-3-recap"
-    assert (r.output_dir / "page.json").exists()
+    with pytest.raises(CoursekitError, match="run `analyze` first") as e:
+        pb.build_page_unit(u, None, "m", function=function)
+    assert e.value.code == "concept_map.missing"
+    assert not (u.course_root / "pages" / f"week-3-{function}").exists()

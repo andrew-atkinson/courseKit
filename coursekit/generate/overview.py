@@ -16,7 +16,7 @@ import argparse
 import os
 from pathlib import Path
 
-from coursekit import courseconfig, prompts
+from coursekit import courseconfig, outcomes, prompts
 from coursekit.discover import slugify
 from coursekit.generate.page import concept_map as cmap
 from coursekit.generate.page.page import Page, build_block
@@ -126,7 +126,9 @@ def generate_overviews(course_path, *, provider=None, model=None, framing: bool 
                 {"role": "user", "content": f"Title: {title}\nTopics: {topics}\nBig idea: {eu or '(none stated)'}"},
             ]).strip()
             return "" if ("http" in out or "://" in out) else out   # framing carries no links
-        except Exception:
+        except Exception as e:                   # optional: the default intro stands in, but say so
+            outcomes.warn("overview.framing_failed", f"  {title}: framing skipped ({type(e).__name__}: {e}) "
+                                                     f"— using the default intro.", page=title)
             return ""
 
     parsed = []
@@ -142,6 +144,9 @@ def generate_overviews(course_path, *, provider=None, model=None, framing: bool 
 
     for num, title, module, cm in parsed:
         if cm is None or not cm.concepts:        # nothing to orient toward without a concept map
+            outcomes.warn("overview.skipped", f"  week {num} ({title}): no overview — "
+                          f"{'no concept map; run `coursekit analyze`' if cm is None else 'its concept map lists no concepts'}.",
+                          unit=num)
             continue
         f = frame(f"Week {num}: {title}", ", ".join(c.name for c in cm.concepts), cm.enduring_understanding)
         written.append(_render_overview(build_week_overview(course_title, num, title, module, cm, framing=f),
