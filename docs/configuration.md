@@ -72,6 +72,23 @@ task_prompt: exam # …and for the brief (default: system / task)
 `task_prompt: exam` tells the generator to load `exam.md` instead of `task.md` — resolved the same way as any prompt (the course's own override first, then the shipped file).
 `MODEL_NAME` in the environment still wins over `model` here; the file is the per-course default, not an override.
 
+### Changing settings
+
+You can edit these files by hand, but the safer way is `coursekit config`, which checks every change against the file's rules before saving it — a value it can't use is refused and the file is left exactly as it was:
+
+```bash
+uv run coursekit config set "/path/to/course" quiz.eu_question true
+uv run coursekit config set "/path/to/course" style.theme terminal
+uv run coursekit config set "/path/to/course" grading.groups.Projects.weight 20%
+uv run coursekit config show "/path/to/course"            # everything set so far
+uv run coursekit config unset "/path/to/course" grading.groups.Projects
+```
+
+A setting's first part names the file (`quiz`, `page`, `evaluate`, `ingest`, `assignment`, `style`; `pages.<name>` for a page's supplements); `grading`, `expect`, and `weeks` live in the structure overlay.
+Grading groups are addressed by name.
+`context.yaml` belongs to the transcriber and is never changed by coursekit.
+Rewriting a file drops any comments you added by hand, so keep notes somewhere else.
+
 ### Checking your settings
 
 A settings file that doesn't exist just means "use the defaults".

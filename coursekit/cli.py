@@ -250,6 +250,53 @@ def _cmd_check(args) -> int:
     return 1 if errors else 0
 
 
+def _cmd_config(args) -> int:
+    """Read and change `.vtconfig` settings through the settings API (CORE-1.4) instead of editing the
+    YAML by hand: every change is validated against the file's schema before it's saved."""
+    from pathlib import Path
+
+    import yaml
+
+    from coursekit import settings
+    from coursekit.outcomes import CoursekitError
+    root = courseconfig.find_root(Path(args.path).expanduser())
+    if root is None:
+        raise CoursekitError("no .vtconfig course root found — run this on a course folder.",
+                             code="course.no_root", details={"path": args.path})
+
+    def dump(value) -> str:
+        return yaml.safe_dump(value, sort_keys=False, allow_unicode=True, default_flow_style=False).rstrip()
+
+    if args.action == "check":
+        return _cmd_check(args)
+    if args.action == "show":
+        docs = [args.key] if args.key else list(settings.DOCS)
+        shown = 0
+        for doc in docs:
+            data = settings.read(root, doc)
+            if data or args.key:
+                print(f"# {doc}\n{dump(data) if data else '(nothing set — defaults apply)'}\n")
+                shown += 1
+        if not shown:
+            print("No settings yet — every setting is at its default.")
+        return 0
+    if not args.key:
+        raise CoursekitError(f"`config {args.action}` needs a setting, e.g. quiz.eu_question", code="settings.bad_key")
+    if args.action == "get":
+        value = settings.get(root, args.key)
+        print(dump(value) if isinstance(value, (dict, list)) else value)
+        return 0
+    if args.action == "set":
+        if args.value is None:
+            raise CoursekitError(f"`config set {args.key}` needs a value", code="settings.bad_key")
+        settings.set(root, args.key, yaml.safe_load(args.value))
+        print(f"{args.key} = {settings.get(root, args.key)}")
+        return 0
+    settings.unset(root, args.key)                          # action == "unset"
+    print(f"removed {args.key}")
+    return 0
+
+
 def _cmd_census(args) -> int:
     """Walk the course and write census.json (IR) + census.md (report) — a deterministic, offline
     inventory of materials + generated artifacts, with the presence gaps (FLOW-9). No model."""
@@ -868,6 +915,16 @@ def build_parser() -> argparse.ArgumentParser:
                                       "problem, before a model run (offline, no model)")
     pk.add_argument("path", help="the course root (or any directory under it)")
     pk.set_defaults(func=_cmd_check)
+
+    # config — read and change settings through the validated settings API
+    pcf = sub.add_parser("config", help="show, get, set, or unset a .vtconfig setting — validated before "
+                                        "it's saved (offline, no model)")
+    pcf.add_argument("action", choices=["show", "get", "set", "unset", "check"])
+    pcf.add_argument("path", help="the course root (or any directory under it)")
+    pcf.add_argument("key", nargs="?", help="a setting, e.g. quiz.eu_question or grading.groups.Projects.weight "
+                                            "(for show: a document, e.g. style)")
+    pcf.add_argument("value", nargs="?", help="the new value, for set (YAML: true, 5, 20%%, [a, b])")
+    pcf.set_defaults(func=_cmd_config)
 
     # census — inventory the whole course (materials + generated artifacts + presence gaps), offline
     pc = sub.add_parser("census",

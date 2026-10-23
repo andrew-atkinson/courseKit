@@ -21,6 +21,8 @@ Adding a platform is one emitter, not one converter per input — which is why e
 - **Library code never exits or prints.**
   It raises `CoursekitError` (a stable `code`, `details`, a `category`) and reports progress and warnings through `coursekit.outcomes` (`info` / `warn` / `error`); the CLI and the per-module `main()` scripts render them via `console.py`.
   [tests/test_outcomes.py](tests/test_outcomes.py) enforces it.
+- **coursekit writes its own `.vtconfig` settings only through `coursekit/settings.py`** — validated against `coursekit/schemas.py`, atomic, never `context.yaml`.
+  New code that changes a setting calls the settings API; it never dumps YAML into `.vtconfig/` itself.
 - Default branch for PRs is `main`.
 
 ## Facticity — this project has been bitten by stale claims

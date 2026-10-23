@@ -27,7 +27,7 @@ _OVERLAY_HEADER = (
     "# transcriber's context.yaml when the reader loads it. coursekit writes this file; you may edit\n"
     "# it freely. Precedence: context.yaml owns week titles/modules; this overlay owns each week's\n"
     "# typed `sources` (and an optional `doc:` pointer). Re-run `coursekit propose --force` to redraft\n"
-    "# (which discards manual edits).\n\n"
+    "# the weeks (discarding manual edits to them; grading and expectations are kept).\n\n"
 )
 
 
@@ -114,17 +114,10 @@ def overlay_path(root: Path) -> Path:
 
 
 def write_overlay(proposal: Proposal, *, force: bool = False) -> Path:
-    """Write the proposal to coursekit's own overlay file. Refuses to overwrite an existing overlay
-    without `force`, so a re-run never silently discards the faculty's manual edits."""
+    """Write the proposed `weeks:` into coursekit's own overlay file, keeping any `grading:`/`expect:`.
+    Refuses to replace declared weeks without `force`, so a re-run never silently discards manual edits."""
     if proposal.root is None:
         raise CoursekitError("no .vtconfig course root found — the overlay lives in .vtconfig/. "
                              "Create a .vtconfig/ folder in the course root first.", code="course.no_root")
-    import yaml
-    dest = overlay_path(proposal.root)
-    if dest.exists() and not force:
-        raise CoursekitError(f"{dest} already exists — pass --force to redraft (discards manual edits).",
-                             code="overlay.exists", details={"path": str(dest)})
-    body = yaml.safe_dump({"weeks": proposal.weeks}, sort_keys=False, allow_unicode=True)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(_OVERLAY_HEADER + body, encoding="utf-8")
-    return dest
+    from coursekit import settings
+    return settings.propose_section(proposal.root, "weeks", proposal.weeks, force=force, header=_OVERLAY_HEADER)

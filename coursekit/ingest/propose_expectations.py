@@ -18,7 +18,6 @@ the rationale as comments; the faculty owns it by editing. The model enters only
 from pathlib import Path
 
 from coursekit import courseconfig
-from coursekit.ingest.propose import overlay_path
 from coursekit.outcomes import CoursekitError
 
 # ponytail: a density threshold is a heuristic; 8 concepts ≈ "dense enough that a glossary helps" (CLT).
@@ -112,20 +111,10 @@ _HEADER = (
 def write_expectations(path, expect: dict, notes: list[str], *, force: bool = False) -> Path:
     """Merge `expect` into the overlay, PRESERVING `weeks`/`grading`. Refuse to overwrite an existing
     `expect` block without `force`."""
-    import yaml
     root = courseconfig.find_root(Path(path).expanduser())
     if root is None:
         raise CoursekitError("no .vtconfig course root found — create a .vtconfig/ folder in the course root "
                              "first.", code="course.no_root", details={"path": str(path)})
-    dest = overlay_path(root)
-    data = courseconfig._read_yaml(dest) if dest.exists() else {}
-    if not isinstance(data, dict):
-        data = {}
-    if data.get("expect") and not force:
-        raise CoursekitError(f"{dest} already declares `expect:` — pass --force to redraft (discards hand edits).",
-                             code="overlay.section_exists", details={"path": str(dest), "section": "expect"})
-    data["expect"] = expect
+    from coursekit import settings
     header = _HEADER + "".join(f"#   - {note}\n" for note in notes) + "\n"
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(header + yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
-    return dest
+    return settings.propose_section(root, "expect", expect, force=force, header=header)

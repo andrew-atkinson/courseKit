@@ -74,9 +74,9 @@ def test_write_overlay_refuses_overwrite_without_force(tmp_path):
     root = _course(tmp_path)
     _touch(root / "week-3" / "a.pdf")
     P.write_overlay(P.propose(root))
-    with pytest.raises(CoursekitError, match="already exists") as e:
+    with pytest.raises(CoursekitError, match="already declares `weeks:`") as e:
         P.write_overlay(P.propose(root))
-    assert e.value.code == "overlay.exists"                # a second run must not clobber edits
+    assert e.value.code == "overlay.section_exists"                # a second run must not clobber edits
     P.write_overlay(P.propose(root), force=True)        # ...unless forced
 
 
@@ -86,3 +86,20 @@ def test_write_overlay_without_a_root_errors(tmp_path):
     with pytest.raises(CoursekitError, match="course root") as e:
         P.write_overlay(P.propose(tmp_path / "loose"))
     assert e.value.code == "course.no_root" and e.value.category == "config"
+
+
+def test_force_redrafts_the_weeks_but_keeps_grading_and_expectations(tmp_path):
+    # Regression: write_overlay used to write a fresh file holding only `weeks:`, so
+    # `propose --force` silently deleted the faculty's grading weights and expectations.
+    from coursekit import settings
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    _touch(root / "week-3" / "a.pdf")
+    P.write_overlay(P.propose(root))
+    settings.set(root, "grading.groups.Projects.weight", 60)
+    settings.set(root, "expect.defaults", [{"scope": "week", "artifact": "page"}])
+    P.write_overlay(P.propose(root), force=True)
+    data = settings.read(root, "structure")
+    assert data["grading"]["groups"] == [{"name": "Projects", "weight": 60.0}]
+    assert data["expect"]["defaults"] == [{"scope": "week", "artifact": "page"}]
+    assert data["weeks"]
