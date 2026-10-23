@@ -25,12 +25,9 @@ GLOSSARY_THRESHOLD = 8
 
 
 def _load_cm(root: Path, week: str):
-    """The week's concept map, or None. Offline, never raises."""
+    """The week's concept map, or None when it doesn't exist; a broken map raises."""
     from coursekit.generate.page.concept_map import concept_map_path, load_concept_map
-    try:
-        return load_concept_map(concept_map_path(root, week))
-    except Exception:
-        return None
+    return load_concept_map(concept_map_path(root, week))
 
 
 def propose_expectations(path) -> tuple[dict, list[str]]:

@@ -37,11 +37,15 @@ def targeted_slug(source: Path, struct=None) -> str:
     Week detection prefers the DECLARED structure (FLOW-7) — a source the manifest assigns to a week
     uses THAT week — then falls back to ingest's strict `_week_of` ancestor match (which, unlike the old
     loose per-ancestor `week_key`, won't mistake a bare-numeric ancestor like `.../2024/` for a week)."""
-    wk = _declared_week_of(source, struct) if struct is not None else None
-    if wk is None:
-        wk = _week_of(source)
+    wk = unit_of(source, struct)
     doc = slugify(source.stem)
     return f"week-{wk}-{doc}" if wk else doc
+
+
+def unit_of(source: Path, struct=None) -> str | None:
+    """The unit number a `--source` belongs to: the DECLARED structure first, then the path."""
+    wk = _declared_week_of(source, struct) if struct is not None else None
+    return wk if wk is not None else _week_of(source)
 
 
 def generate_targeted_quiz(source, provider, model, *, output_root=None, max_iters=None):
@@ -70,7 +74,8 @@ def generate_targeted_quiz(source, provider, model, *, output_root=None, max_ite
 
     cfg = courseconfig.load(source, config_name="quiz.yaml")     # domain.md / voice / quiz.yaml from here
     root = cfg.root
-    slug = targeted_slug(source, coursestructure.CourseStructure(cfg))   # declared week wins, reusing cfg
+    struct = coursestructure.CourseStructure(cfg)
+    slug = targeted_slug(source, struct)                         # declared unit wins, reusing cfg
     base = Path(output_root).expanduser().resolve() if output_root else (root or source.parent)
     out_dir = base / "quizzes" / slug
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -81,8 +86,11 @@ def generate_targeted_quiz(source, provider, model, *, output_root=None, max_ite
     material.write_text(text, encoding="utf-8")
 
     course_slug = slugify(cfg.course_title or (root.name if root else source.parent.name))
+    # The unit number lets unit-keyed lookups (its concept map's enduring understanding, for
+    # `eu_question`) find the unit (ASMT-19 layer 1). The quiz's SHAPE stays the document's own:
+    # concept_shape=False keeps the unit's concept list out of a single reading's brief.
     unit = Unit(transcript_path=material, week_slug=slug, output_dir=out_dir,
-                course_slug=course_slug, week_label=source.stem,
+                course_slug=course_slug, week_label=source.stem, week_num=unit_of(source, struct),
                 course_title=cfg.course_title, module=None, course_root=root, config=cfg)
     kw = {} if max_iters is None else {"max_iters": max_iters}
-    return pipeline.run_unit(unit, provider, model, QuizGenerator(), **kw)
+    return pipeline.run_unit(unit, provider, model, QuizGenerator(concept_shape=False), **kw)

@@ -8,6 +8,7 @@ import json
 import pytest
 
 from coursekit.generate.page import concept_map as cm
+from coursekit.outcomes import CoursekitError
 
 
 def _write_knowledge(folder, stem, **fields):
@@ -110,5 +111,6 @@ def test_load_invalid_raises(tmp_path):
     pytest.importorskip("yaml")
     bad = tmp_path / "bad.yaml"
     bad.write_text("week: week 3\nbogus_field: 1\n")  # extra=forbid -> a broken edit is surfaced
-    with pytest.raises(Exception):
+    with pytest.raises(CoursekitError) as e:
         cm.load_concept_map(bad)
+    assert e.value.code == "config.invalid" and any("bogus_field" in p for p in e.value.details["problems"])

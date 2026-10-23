@@ -112,10 +112,7 @@ def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None
         names = None
         key = u.week_num if u.course_root else None
         if key:
-            try:
-                cmap = load_concept_map(concept_map_path(u.course_root, key))
-            except Exception:
-                cmap = None
+            cmap = load_concept_map(concept_map_path(u.course_root, key))   # a broken map raises
             if cmap and cmap.concepts:
                 names = [c.name for c in cmap.concepts]
         pc = evaluate_page_concepts(page, material, provider, model, project_root=u.course_root,

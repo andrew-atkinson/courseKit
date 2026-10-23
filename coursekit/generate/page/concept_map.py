@@ -182,17 +182,14 @@ def concept_map_path(course_root, week_key: str) -> Path:
 
 def load_concept_map(path) -> ConceptMap | None:
     """Read a concept map from its yaml, or None if absent (enrichment — its absence is never an
-    error; the generator falls back to inline derivation). A *present but invalid* file raises, so a
-    broken hand-edit is surfaced loudly rather than silently ignored."""
+    error; the generator falls back to inline derivation). A *present but unreadable or invalid* file
+    raises a CoursekitError naming the file and each problem, so a broken hand-edit is surfaced
+    rather than silently treated as "no map"."""
+    from coursekit import schemas
     p = Path(path)
     if not p.exists():
         return None
-    try:
-        import yaml  # guarded: a machine without pyyaml degrades to "no map", like courseconfig
-    except ImportError:
-        return None
-    data = yaml.safe_load(p.read_text()) or {}
-    return ConceptMap.model_validate(data)
+    return schemas.validate(p, schemas.read_yaml(p), ConceptMap)
 
 
 def save_concept_map(cm: ConceptMap, path) -> Path:
@@ -208,15 +205,10 @@ def save_concept_map(cm: ConceptMap, path) -> Path:
 
 
 def load_for_unit(unit) -> ConceptMap | None:
-    """The concept map for a discovered week `unit`, or None. Best-effort — the map is enrichment, so
-    no course root, no map file, or an unreadable map all fall back to None (the generator then works
-    without it). Shared by the page and quiz generators (the analyze artifact isn't page-specific)."""
-    if not getattr(unit, "course_root", None):
+    """The concept map for a discovered `unit`, or None when there is none — no course root, no unit
+    number, or no map file yet (run `analyze`). A map that exists but is unreadable or invalid raises
+    (see `load_concept_map`): it is not the same as having no map. Shared by the page and quiz
+    generators (the analyze artifact isn't page-specific)."""
+    if not unit.course_root or not unit.week_num:
         return None
-    key = unit.week_num
-    if not key:
-        return None
-    try:
-        return load_concept_map(concept_map_path(unit.course_root, key))
-    except Exception:
-        return None
+    return load_concept_map(concept_map_path(unit.course_root, unit.week_num))

@@ -598,8 +598,11 @@ def test_eu_pass_leaves_the_bank_unchanged_when_it_fails():
         def chat_with_tools(self, **kw):
             raise RuntimeError("boom")
 
-    assert not eu.generate_eu_question(_Boom(), "m", "material", "an enduring idea", None)
+    from coursekit import outcomes
+    with outcomes.capture(sink=lambda n: None) as report:
+        assert not eu.generate_eu_question(_Boom(), "m", "material", "an enduring idea", None)
     assert "enduring_understanding" not in bank.get().groups   # the empty group is removed, not left
+    assert [n.code for n in report.warnings] == ["eu.pass_error"]   # …and the failure is recorded, not silent
 
 
 def test_eu_pass_is_idempotent_a_rerun_replaces_the_question():

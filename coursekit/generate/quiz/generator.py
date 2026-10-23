@@ -22,6 +22,12 @@ class QuizGenerator:
     category = "quiz"
     artifacts_subdir = "quizzes"
 
+    def __init__(self, *, concept_shape: bool = True):
+        # concept_shape=False: shape the quiz by the material alone, not the unit's concept map — for a
+        # single-document (targeted) quiz, whose unit's concept list is the wrong grain (ASMT-19). The
+        # unit's map is still read for its enduring understanding (postprocess).
+        self.concept_shape = concept_shape
+
     def reset(self, unit: Unit, out_dir: Path) -> None:
         # Fresh per-unit state. The module-level singletons in bank.py and tools.py would
         # otherwise carry one week's groups, checklist, and call-log into the next.
@@ -43,7 +49,7 @@ class QuizGenerator:
         # groups is content-relative: the week's concept map suggests it (one per concept + the
         # enduring understanding), and quiz.yaml's `questions:` overrides that with a fixed count.
         from coursekit.generate.page.concept_map import load_for_unit
-        cm = load_for_unit(unit)
+        cm = load_for_unit(unit) if self.concept_shape else None
         # Per-week wins over per-course: a `questions` on THIS week's concept map beats quiz.yaml's.
         q = (cm.questions if cm is not None and cm.questions else cfg.value("questions"))
         # The brief's group target, kept so auto_finalize can tell COMPLETE from merely consistent:
@@ -65,17 +71,31 @@ class QuizGenerator:
         """ASMT-3 (opt-in `eu_question: true`): add the enduring-understanding transfer task through
         the DETERMINISTIC EU pass — the program fixes the type to open_response, the model writes only
         the content — then re-finalize so it lands in bank.json/quiz.json/gift. Only runs on a bank the
-        main loop actually finalized; a failed pass leaves the bank untouched."""
-        if not cfg.value("eu_question") or not bank.is_finalized():
+        main loop actually finalized; a failed pass leaves the bank untouched. Switched on, it either adds
+        the question or records why not — never a silent no-op (CORE-1.5)."""
+        if not cfg.value("eu_question"):
             return
+        from coursekit import outcomes
         from coursekit.generate.page.concept_map import load_for_unit
         from coursekit.generate.quiz import eu as eu_pass
+        where = unit.week_slug
+        if not bank.is_finalized():
+            outcomes.warn("eu.skipped", f"  {where}: no EU question — the quiz itself didn't finish.",
+                          unit=where, reason="quiz_not_finalized")
+            return
         cm = load_for_unit(unit)
         eu = cm.enduring_understanding if cm is not None else ""
         if not eu:
-            return   # nothing to build a transfer task from
+            why = ("it has no concept map — run `coursekit analyze` first" if cm is None
+                   else "its concept map has no enduring understanding — add one, or re-run `analyze`")
+            outcomes.warn("eu.skipped", f"  {where}: eu_question is on but no EU question was added — {why}.",
+                          unit=where, reason="no_concept_map" if cm is None else "no_enduring_understanding")
+            return
         if eu_pass.generate_eu_question(provider, model, transcript, eu, unit.course_root):
             bank.finalize()   # same deterministic seed → re-writes cleanly with the EU group included
+        else:
+            outcomes.warn("eu.not_added", f"  {where}: the model didn't write the EU question — the quiz is "
+                                          f"saved without it; re-run to try again.", unit=where)
 
     def is_finalized(self) -> bool:
         return bank.is_finalized()

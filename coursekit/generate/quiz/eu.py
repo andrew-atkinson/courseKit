@@ -8,8 +8,9 @@ type. That moves the type decision out of the model's monolithic generation loop
 (the model wrote a good prompt but recorded it as a short-answer with a rubric-description "answer").
 """
 
-from coursekit import prompts
+from coursekit import outcomes, prompts
 from coursekit.generate.quiz import bank, tools
+from coursekit.outcomes import CoursekitError
 
 _EU_GID = "enduring_understanding"
 _EU_SPEC = [s for s in tools.TOOL_SPECS if s["name"] == "add_open_response_variant"]
@@ -46,13 +47,15 @@ def generate_eu_question(provider, model, material: str, eu: str, project_root=N
     try:
         loop([{"role": "system", "content": system}, {"role": "user", "content": user}],
              provider, model, _EUGenerator(), max_iters=6)
-    except Exception:
-        pass
-    g = bank.get().groups.get(_EU_GID)
-    if g and g.variants:
-        return True
-    bank.get().groups.pop(_EU_GID, None)       # the pass failed — don't leave an empty group behind
-    return False
+    except CoursekitError:
+        raise                                  # infrastructure (a model that won't load) aborts the run
+    except Exception as e:                     # anything else: recorded, the finished quiz kept
+        outcomes.warn("eu.pass_error", f"  EU pass failed: {type(e).__name__}: {e}", error_type=type(e).__name__)
+    finally:
+        g = bank.get().groups.get(_EU_GID)
+        if not (g and g.variants):             # never leave an empty EU group behind
+            bank.get().groups.pop(_EU_GID, None)
+    return bool(g and g.variants)
 
 
 def main() -> int:
