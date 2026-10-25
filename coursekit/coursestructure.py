@@ -195,7 +195,9 @@ def _compose(base: dict, overlay: dict) -> dict:
     on the fields it owns (doc, sources); `context.yaml` keeps IDENTITY (title, module) — so the two
     programs' contributions coexist without either clobbering the other's."""
     out = {}
-    for key in set(base) | set(overlay):
+    # Declared order is data (a GUI will reorder units by rewriting it): the overlay's order first —
+    # coursekit's own file — then any unit only `context.yaml` declares, in its order.
+    for key in dict.fromkeys([*overlay, *base]):
         b = base.get(key) if isinstance(base.get(key), dict) else {}
         o = overlay.get(key) if isinstance(overlay.get(key), dict) else {}
         merged = {**b, **o}
@@ -242,6 +244,16 @@ class CourseStructure:
             if k is not None and isinstance(entry, dict):
                 out.append((k, entry))
         return sorted(out, key=lambda kv: _week_sort(kv[0]))
+
+    def iter_declared(self) -> list[tuple[str, dict]]:
+        """(key, entry) for every declared unit in DECLARED order — numeric or not (`intro`). The order
+        is the overlay's, then `context.yaml`'s; it is never computed from the keys."""
+        return [(k, e) for k, e in self._weeks.items() if isinstance(e, dict)]
+
+    def declares_order(self) -> bool:
+        """True once coursekit's own overlay declares units — the file the settings API (and a GUI)
+        writes, so its order was chosen. `context.yaml`'s listing alone is a scan order, not a choice."""
+        return bool(_read_overlay_weeks(self._cfg))
 
     def grading(self) -> GradingScheme:
         """The declared grading scheme (STRC-2) from the overlay's `grading:` block, or an empty scheme

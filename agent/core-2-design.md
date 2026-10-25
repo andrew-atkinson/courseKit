@@ -124,6 +124,17 @@ So nothing the GUI would change may be *inferred* — it has to be stored data a
 
 Increments 2 and 3 each delete a set of walkers, which is the point: the review's ~15 walkers drop toward one.
 
+**Step 1 — done 2026-10-24** (`coursekit/course.py`, `tests/test_course.py`).
+Passed on both real courses (read only): the same units, labels, and docs as `find_units`; per-unit artifact counts identical to the census; the census's units equal the model's units plus `undeclared_units`.
+Found on the way, each now a rule in the model:
+
+- **Declared order was being thrown away.**
+  `CourseStructure` merged `context.yaml` and the overlay through a `set`, so no stored order could survive; the merge now keeps declared order (overlay first), and `iter_declared` exposes it.
+- **Only coursekit's overlay declares an order.**
+  `context.yaml`'s listing is the transcriber's scan order (one real course lists every unit but 9), so without an overlay order units sort by number — `declares_order()` tells the two apart.
+- **`find_units` orders units by path text,** so `week 10` comes before `week 3`; the model's numeric order is the correct one, and step 4 retires the path order.
+- **Artifacts can name units nobody declared** (quizzes from readings added after `propose` last ran); `Course.undeclared_units` lists them — the census already counts them, and the model neither drops nor invents them.
+
 ## 6. Decisions (all four recommendations accepted, 2026-10-23)
 
 1. **A unit with no number.**
