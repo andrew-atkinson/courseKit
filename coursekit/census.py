@@ -140,67 +140,63 @@ def _bump(w: "WeekCensus", artifact: str) -> None:
 
 
 def build_census(course_path) -> Census:
-    """Walk the course once and assemble the Census. Inputs come from the declared structure
-    (`CourseStructure`); outputs from a light scan of the generated IR files (no rendering)."""
-    root = courseconfig.find_root(Path(course_path)) or Path(course_path).expanduser().resolve()
-    struct = coursestructure.CourseStructure.load(course_path)
+    """Assemble the Census from the course model (`coursekit.course`) — the one place the course is
+    walked. Inputs are the model's units (declared sources + each unit's doc); outputs its artifact
+    index, read lightly here for the details the census reports (a page's type, a quiz's EU group, an
+    assignment's slug) — no rendering."""
+    from coursekit.course import Course
+    course = Course.load(course_path)
+    struct = coursestructure.CourseStructure.load(course_path)     # labels + grading/expectations
+    root = course.root
 
     weeks: dict[str, WeekCensus] = {}
     placed: list[tuple[str, str]] = []   # (kind, slug) per graded item — for grading-group resolution
     unreadable: list[str] = []
 
-    def wk(num: str) -> WeekCensus:
-        if num not in weeks:
-            weeks[num] = WeekCensus(week=num, label=struct.week_label(num))
-        return weeks[num]
+    def wk(uid: str) -> WeekCensus:
+        if uid not in weeks:
+            weeks[uid] = WeekCensus(week=uid, label=struct.week_label(uid))
+        return weeks[uid]
 
-    # declared inputs
-    for num, _entry in struct.iter_weeks():
-        w = wk(num)
-        for s in struct.sources_for(num):
-            w.materials.append(Material(kind=s.kind, title=s.title))
+    # inputs: each unit's declared sources, its doc first — the SOURCE text generation reads
+    for u in course.units:
+        w = wk(u.id)
+        w.materials.extend(Material(kind=s.kind, title=s.title) for s in u.sources)
+    docs = {u.id: u.doc for u in course.units if u.doc} | course.undeclared_docs
+    for uid, doc in docs.items():
+        w = wk(uid)
+        if not any(m.kind == "week doc" for m in w.materials):
+            w.materials.insert(0, Material(kind="week doc", title=doc.name))
 
-    # generated outputs — a cheap scan of each IR file for its week (no rendering). `actual` also records
-    # SUBTYPES (Layer B): a page's `page_type`, and `quiz:eu` when a bank carries an open-response group.
-    # The grading `slug` mirrors how the emitter resolves a group: a quiz by its DIR name, assignment by `slug`.
+    # outputs: `actual` also records SUBTYPES (Layer B) — a page's `page_type`, and `quiz:eu` when a bank
+    # carries an open-response group. The grading `slug` mirrors how the emitter resolves a group: a quiz
+    # by its folder name, an assignment by its `slug`.
     _PAGE_SUBTYPE = {"glossary": "page:glossary", "week_recap": "page:recap", "week_intro": "page:teaching",
                      "week_overview": "page:overview", "module_overview": "page:overview"}
-    for pj in sorted(root.glob("pages/*/page.json")):
-        d = _load_json(pj, unreadable)
-        num = courseconfig.week_key(d.get("week_ref") or pj.parent.name)
-        if num:
-            w = wk(num); w.pages += 1; _bump(w, "page")
+    for a in course.artifacts_for(kind="page"):
+        d = _load_json(a.path, unreadable)
+        if a.unit:
+            w = wk(a.unit); w.pages += 1; _bump(w, "page")
             sub = _PAGE_SUBTYPE.get(d.get("page_type"))
             if sub:
                 _bump(w, sub)
-    for bj in sorted(root.glob("quizzes/*/bank.json")):      # quizzes key off the dir (targeted dirs included)
-        num = courseconfig.week_key(bj.parent.name)
-        if num:
-            w = wk(num); w.quizzes += 1; _bump(w, "quiz")
-            groups = _load_json(bj, unreadable).get("groups") or {}
+    for a in course.artifacts_for(kind="quiz"):
+        if a.unit:
+            w = wk(a.unit); w.quizzes += 1; _bump(w, "quiz")
+            groups = _load_json(a.path, unreadable).get("groups") or {}
             if any(isinstance(g, dict) and g.get("question_type") == "open_response" for g in groups.values()):
                 _bump(w, "quiz:eu")                          # the EU performance question (ASMT-3)
-            placed.append(("quiz", bj.parent.name))
-    for aj in sorted(root.glob("assignments/*/assignment.json")):
-        d = _load_json(aj, unreadable)
-        num = courseconfig.week_key(d.get("week_ref") or aj.parent.name)
-        if num:
-            w = wk(num); w.assignments += 1; _bump(w, "assignment")
-            placed.append(("assignment", d.get("slug") or aj.parent.name))
-    for cm in sorted(root.glob(".vtconfig/concepts/week-*.yaml")):
-        num = courseconfig.week_key(cm.stem)
-        if num:
-            w = wk(num); w.concept_map = True; _bump(w, "concept-map")
-    # the consolidated week doc is the SOURCE text generation reads — the key input material. Glob the
-    # real layouts: `output/week-N.md` (ingest) and `output/<folder>/week-N.md` (transcriber).
-    for md in sorted(root.glob("output/**/week-*.md")):
-        num = courseconfig.week_key(md.stem)
-        if num:
-            w = wk(num)
-            if not any(m.kind == "week doc" for m in w.materials):
-                w.materials.insert(0, Material(kind="week doc", title=md.name))
+            placed.append(("quiz", a.slug))
+    for a in course.artifacts_for(kind="assignment"):
+        d = _load_json(a.path, unreadable)
+        if a.unit:
+            w = wk(a.unit); w.assignments += 1; _bump(w, "assignment")
+            placed.append(("assignment", d.get("slug") or a.slug))
+    for a in course.artifacts_for(kind="concept_map"):
+        if a.unit:
+            w = wk(a.unit); w.concept_map = True; _bump(w, "concept-map")
 
-    census = Census(course_title=struct.course_title or root.name,   # fall back to the folder name
+    census = Census(course_title=course.title or root.name,   # fall back to the folder name
                     weeks=sorted((w for w in weeks.values()), key=lambda w: _wsort(w.week)),
                     unreadable=[str(Path(u).relative_to(root)) if Path(u).is_relative_to(root) else u
                                 for u in unreadable])

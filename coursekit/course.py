@@ -55,6 +55,7 @@ class Course:
     units: list[Unit]
     artifacts: list[Artifact]
     strays: list[Path] = field(default_factory=list)       # IR files outside the layout — recorded, not used
+    undeclared_docs: dict[str, Path] = field(default_factory=dict)   # unit docs for units nobody declared
     unreadable: list[Path] = field(default_factory=list)   # IR files whose unit field couldn't be read
 
     def unit(self, id: str) -> Unit:
@@ -69,8 +70,8 @@ class Course:
         """Unit ids that only artifacts refer to (e.g. a quiz in `quizzes/week-5-essay/` when no unit 5
         is declared or has a doc) — surfaced, never silently dropped or silently invented as units."""
         known = {u.id for u in self.units}
-        return sorted({a.unit for a in self.artifacts if a.unit and a.unit not in known},
-                      key=coursestructure._week_sort)
+        refs = {a.unit for a in self.artifacts if a.unit} | set(self.undeclared_docs)
+        return sorted((u for u in refs if u not in known), key=coursestructure._week_sort)
 
     def artifacts_for(self, *, kind: str | None = None, unit: str | None = ...) -> list[Artifact]:
         """Artifacts filtered by kind and/or unit (`unit=None` selects course/module-scope ones)."""
@@ -82,7 +83,7 @@ class Course:
         start = Path(path).expanduser().resolve()
         root = courseconfig.find_root(start) or start
         struct = coursestructure.CourseStructure.load(start)
-        units = _units(root, struct)
+        units, undeclared_docs = _units(root, struct)
         ids = {u.id for u in units}
         artifacts, unreadable = _artifacts(root, ids)
         strays = _strays(root, {a.path for a in artifacts})
@@ -90,11 +91,11 @@ class Course:
             outcomes.warn("course.stray_artifact", f"  {p}: an artifact outside the course layout "
                           f"(<kind>/<slug>/<file>) — not used; move it or delete it.", path=str(p))
         return cls(root=root, title=struct.course_title, units=units, artifacts=artifacts,
-                   strays=strays, unreadable=unreadable)
+                   strays=strays, unreadable=unreadable, undeclared_docs=undeclared_docs)
 
 
 # --------------------------------------------------------------- units
-def _units(root: Path, struct) -> list[Unit]:
+def _units(root: Path, struct) -> tuple[list[Unit], dict[str, Path]]:
     """Every unit, in order. With a declared structure (units naming a `doc`/`sources`) it is
     authoritative, as discovery has always treated it; otherwise unit docs found on disk (`week-*.md`)
     join the declared ones. ORDER is stored data once coursekit's overlay declares units (the file a
@@ -115,23 +116,25 @@ def _units(root: Path, struct) -> list[Unit]:
         units.append(Unit(id=uid, order=len(units), label=label, module=module,
                           doc=doc.resolve() if doc is not None and doc.is_file() else None,
                           sources=tuple(sources)))
-    if struct.has_declared_structure():
-        return units if struct.declares_order() else _numbered(units)
-    known = {u.id for u in units}
+    # The one scan for unit docs: `output/week-N.md` (ingest) and `output/<folder>/week-N.md` (transcriber).
     base = root / "output" if (root / "output").is_dir() else root
     found: dict[str, Path] = {}
     for p in sorted(base.glob("**/week-*.md")):
         uid = courseconfig.week_key(p.stem) or p.stem
         found.setdefault(uid, p.resolve())
-    for i, u in enumerate(units):                          # a declared (title-only) unit gets its doc
+    for i, u in enumerate(units):                          # a declared unit without its own doc gets the found one
         if u.doc is None and u.id in found:
             units[i] = Unit(**{**u.__dict__, "doc": found[u.id]})
+    known = {u.id for u in units}
+    if struct.has_declared_structure():                    # authoritative: other docs are reported, not units
+        undeclared = {uid: p for uid, p in found.items() if uid not in known}
+        return (units if struct.declares_order() else _numbered(units)), undeclared
     extra = sorted((uid for uid in found if uid not in known), key=coursestructure._week_sort)
     for uid in extra:
         num = courseconfig.week_key(uid)
         units.append(Unit(id=uid, order=len(units), label=struct.week_label(num) if num else uid,
                           module=struct.week_module(num) if num else None, doc=found[uid]))
-    return units if struct.declares_order() else _numbered(units)
+    return (units if struct.declares_order() else _numbered(units)), {}
 
 
 def _numbered(units: list[Unit]) -> list[Unit]:

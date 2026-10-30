@@ -113,3 +113,21 @@ def test_an_unknown_unit_is_an_error_and_loading_writes_nothing(root):
     assert sorted(p for p in root.rglob("*")) == before                  # read-only
     with pytest.raises(CoursekitError, match="no unit '4'"):
         c.unit("4")
+
+
+def test_a_declared_unit_finds_its_doc_in_the_transcribers_folder_layout(root):
+    # Declared units default to output/week-N.md; the transcriber writes output/week N/week-N.md.
+    settings.write(root, "structure", {"weeks": {"week 3": {"sources": [{"path": "a.pdf"}]}}})
+    doc = _doc(root, 3)                                                  # output/week 3/week-3.md
+    assert Course.load(root).unit("3").doc == doc.resolve()
+
+
+def test_a_doc_for_an_undeclared_unit_is_reported_and_reaches_the_census(root):
+    from coursekit import census
+    settings.write(root, "structure", {"weeks": {"week 1": {"sources": [{"path": "a.pdf"}]}}})
+    (root / "output").mkdir()
+    (root / "output" / "week-9.md").write_text("unit 9", encoding="utf-8")   # nobody declared unit 9
+    c = Course.load(root)
+    assert [u.id for u in c.units] == ["1"] and c.undeclared_units == ["9"]
+    w9 = next(w for w in census.build_census(root).weeks if w.week == "9")
+    assert [m.kind for m in w9.materials] == ["week doc"]                # material, nothing generated: a gap

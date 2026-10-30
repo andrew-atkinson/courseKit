@@ -135,6 +135,11 @@ Found on the way, each now a rule in the model:
 - **`find_units` orders units by path text,** so `week 10` comes before `week 3`; the model's numeric order is the correct one, and step 4 retires the path order.
 - **Artifacts can name units nobody declared** (quizzes from readings added after `propose` last ran); `Course.undeclared_units` lists them — the census already counts them, and the model neither drops nor invents them.
 
+**Step 2 — done 2026-10-25** (the census reads the model).
+`census.json` and `census.md` are byte-identical before and after on both real courses, and `census.py` no longer walks the folder.
+To get there the model took over two things only the census's own walker did: a declared unit finds its doc in the transcriber's per-unit folder (`output/week N/week-N.md`), and a doc for a unit nobody declared is kept (`undeclared_docs`, counted in `undeclared_units`) so the census still reports it as material with nothing generated.
+The census does not count overview pages yet — doing so changes its output, so it is a separate, visible change, not part of a byte-identical step.
+
 ## 6. Decisions (all four recommendations accepted, 2026-10-23)
 
 1. **A unit with no number.**
