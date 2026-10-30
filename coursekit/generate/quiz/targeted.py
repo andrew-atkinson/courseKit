@@ -10,10 +10,12 @@ on it. The course's `domain.md` / voice / `quiz.yaml` still apply — they resol
     → quizzes/week-3-barrett/{source.md, bank.json, bank.gift, quiz.json}
 """
 
+from dataclasses import replace
 from pathlib import Path
 
-from coursekit import courseconfig, coursestructure
-from coursekit.discover import Unit, slugify
+from coursekit import courseconfig, coursestructure, outcomes
+from coursekit.course import Course
+from coursekit.discover import slugify
 from coursekit.ingest.extract import SUPPORTED_SUFFIXES, extract_text, is_supported
 from coursekit.ingest.ingest import _week_of
 from coursekit.outcomes import CoursekitError
@@ -85,12 +87,14 @@ def generate_targeted_quiz(source, provider, model, *, output_root=None, max_ite
     material = out_dir / "source.md"
     material.write_text(text, encoding="utf-8")
 
-    course_slug = slugify(cfg.course_title or (root.name if root else source.parent.name))
-    # The unit number lets unit-keyed lookups (its concept map's enduring understanding, for
+    # A run over the unit the document is filed under, scoped to the document: its own slug, label and
+    # folder. The unit number lets unit-keyed lookups (its concept map's enduring understanding, for
     # `eu_question`) find the unit (ASMT-19 layer 1). The quiz's SHAPE stays the document's own:
     # concept_shape=False keeps the unit's concept list out of a single reading's brief.
-    unit = Unit(transcript_path=material, week_slug=slug, output_dir=out_dir,
-                course_slug=course_slug, week_label=source.stem, week_num=unit_of(source, struct),
-                course_title=cfg.course_title, module=None, course_root=root, config=cfg)
+    wk = unit_of(source, struct)
+    with outcomes.capture(sink=lambda n: None):
+        course = Course.load(source.parent)
+    unit = replace(course.run_target(course.target_unit(wk or slug)), transcript_path=material,
+                   week_slug=slug, output_dir=out_dir, week_label=source.stem, week_num=wk, module=None)
     kw = {} if max_iters is None else {"max_iters": max_iters}
     return pipeline.run_unit(unit, provider, model, QuizGenerator(concept_shape=False), **kw)

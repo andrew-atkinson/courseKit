@@ -14,7 +14,7 @@ week-numbered unit, the declared key otherwise); `label` is for display and neve
 """
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Literal
 
@@ -57,6 +57,7 @@ class Course:
     strays: list[Path] = field(default_factory=list)       # IR files outside the layout — recorded, not used
     undeclared_docs: dict[str, Path] = field(default_factory=dict)   # unit docs for units nobody declared
     unreadable: list[Path] = field(default_factory=list)   # IR files whose unit field couldn't be read
+    duplicate_docs: dict[str, list[Path]] = field(default_factory=dict)   # unit id → every doc found for it
 
     def unit(self, id: str) -> Unit:
         for u in self.units:
@@ -64,6 +65,29 @@ class Course:
                 return u
         raise CoursekitError(f"no unit {id!r} in this course (units: {', '.join(u.id for u in self.units)})",
                              code="unit.unknown", details={"unit": str(id)})
+
+    def target_unit(self, id: str) -> Unit:
+        """The unit `id`, or — for an id no unit declares (a reading filed under an undeclared unit 5, a
+        loose `lecture-notes.md`) — a plain one with no doc, so a run over it still knows its unit."""
+        for u in self.units:
+            if u.id == str(id):
+                return u
+        num = courseconfig.week_key(str(id))
+        return Unit(id=str(id), order=len(self.units), label=f"Week {num}" if num else str(id))
+
+    def run_target(self, unit: Unit, *, subdir: str = "quizzes", output_root=None):
+        """One generation run over `unit` — a `discover.Unit`, built here and only here. Artifacts go to
+        `<root>/<subdir>/<slug>` (or `<output_root>/<course>/<slug>`); the slug keeps today's on-disk names."""
+        from coursekit import discover
+        num = courseconfig.week_key(unit.id)
+        slug = f"week-{num}" if num else discover.slugify(unit.id)
+        course_slug = discover.slugify(self.title or self.root.name)
+        out = Path(output_root) / course_slug / slug if output_root else self.root / subdir / slug
+        has_root = (self.root / courseconfig.VTCONFIG_DIR_NAME).is_dir()
+        return discover.Unit(transcript_path=unit.doc, week_slug=slug, output_dir=out, course_slug=course_slug,
+                             week_label=unit.label, week_num=num, course_title=self.title, module=unit.module,
+                             course_root=self.root if has_root else None,
+                             config=courseconfig.load(unit.doc or self.root, config_name="quiz.yaml"))
 
     @property
     def undeclared_units(self) -> list[str]:
@@ -83,7 +107,7 @@ class Course:
         start = Path(path).expanduser().resolve()
         root = courseconfig.find_root(start) or start
         struct = coursestructure.CourseStructure.load(start)
-        units, undeclared_docs = _units(root, struct)
+        units, undeclared_docs, duplicate_docs = _units(root, struct)
         ids = {u.id for u in units}
         artifacts, unreadable = _artifacts(root, ids)
         strays = _strays(root, {a.path for a in artifacts})
@@ -91,7 +115,8 @@ class Course:
             outcomes.warn("course.stray_artifact", f"  {p}: an artifact outside the course layout "
                           f"(<kind>/<slug>/<file>) — not used; move it or delete it.", path=str(p))
         return cls(root=root, title=struct.course_title, units=units, artifacts=artifacts,
-                   strays=strays, unreadable=unreadable, undeclared_docs=undeclared_docs)
+                   strays=strays, unreadable=unreadable, undeclared_docs=undeclared_docs,
+                   duplicate_docs=duplicate_docs)
 
 
 def ir_files(path, kind: str) -> list[Path]:
@@ -111,7 +136,7 @@ def ir_files(path, kind: str) -> list[Path]:
 
 
 # --------------------------------------------------------------- units
-def _units(root: Path, struct) -> tuple[list[Unit], dict[str, Path]]:
+def _units(root: Path, struct) -> tuple[list[Unit], dict[str, Path], dict[str, list[Path]]]:
     """Every unit, in order. With a declared structure (units naming a `doc`/`sources`) it is
     authoritative, as discovery has always treated it; otherwise unit docs found on disk (`week-*.md`)
     join the declared ones. ORDER is stored data once coursekit's overlay declares units (the file a
@@ -135,22 +160,24 @@ def _units(root: Path, struct) -> tuple[list[Unit], dict[str, Path]]:
     # The one scan for unit docs: `output/week-N.md` (ingest) and `output/<folder>/week-N.md` (transcriber).
     base = root / "output" if (root / "output").is_dir() else root
     found: dict[str, Path] = {}
+    dupes: dict[str, list[Path]] = {}                      # two docs for one unit: kept, never silently dropped
     for p in sorted(base.glob("**/week-*.md")):
-        uid = courseconfig.week_key(p.stem) or p.stem
-        found.setdefault(uid, p.resolve())
+        uid, rp = courseconfig.week_key(p.stem) or p.stem, p.resolve()
+        if found.setdefault(uid, rp) != rp:
+            dupes.setdefault(uid, [found[uid]]).append(rp)
     for i, u in enumerate(units):                          # a declared unit without its own doc gets the found one
         if u.doc is None and u.id in found:
-            units[i] = Unit(**{**u.__dict__, "doc": found[u.id]})
+            units[i] = replace(u, doc=found[u.id])
     known = {u.id for u in units}
     if struct.has_declared_structure():                    # authoritative: other docs are reported, not units
         undeclared = {uid: p for uid, p in found.items() if uid not in known}
-        return (units if struct.declares_order() else _numbered(units)), undeclared
+        return (units if struct.declares_order() else _numbered(units)), undeclared, dupes
     extra = sorted((uid for uid in found if uid not in known), key=coursestructure._week_sort)
     for uid in extra:
         num = courseconfig.week_key(uid)
         units.append(Unit(id=uid, order=len(units), label=struct.week_label(num) if num else uid,
                           module=struct.week_module(num) if num else None, doc=found[uid]))
-    return (units if struct.declares_order() else _numbered(units)), {}
+    return (units if struct.declares_order() else _numbered(units)), {}, dupes
 
 
 def _numbered(units: list[Unit]) -> list[Unit]:

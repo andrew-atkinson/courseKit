@@ -144,6 +144,17 @@ On copies of both real courses, all sixteen emit commands produce the same packa
 Decision 3 now shows: an IR file outside `<kind>/<slug>/<ir>.json` — a leftover `pages-decomposed/` tree, a bank in a loose folder with no `quizzes/` — is warned about once per emit and not packaged, where it used to be packaged (or collide).
 The QTI tests' fixtures moved into `quizzes/` for that reason; no real course was affected.
 
+**Step 4 — done 2026-10-30** (generation runs come from the model).
+`find_units` asks the `Course` for its units and `Course.run_target` builds each run, so `_make_unit` and `_units_from_manifest` are gone, and the targeted quiz's run is `run_target` scoped to its one document (its own slug, label, and folder).
+No existing test changed.
+On both real courses every field of every run (doc, slug, label, module, output folder, config) is identical before and after, for the course, its `output/`, single docs, `--pages`, and `--output-root`; the targeted quiz builds the same run for a declared unit, an undeclared one, and an off-unit reading.
+What did change, each a rule the model already had:
+
+- **Runs follow the unit order,** so the creative-coding course now runs 3 → 10 instead of starting at 10.
+- **A file that is a declared unit's doc runs as that unit,** whatever it is named (`docs/exposure.md` → unit 4), where it used to run as a unit named after the file.
+- **A unit with no number and a doc is a run,** where discovery used to skip it.
+- **Two docs for one unit are kept by the model** (`Course.duplicate_docs`), and `find_units` still refuses to run both into one folder.
+
 ## 6. Decisions (all four recommendations accepted, 2026-10-23)
 
 1. **A unit with no number.**
