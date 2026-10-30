@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from coursekit import outcomes
 from coursekit.emit import cartridge
 from coursekit.emit.cartridge import CartridgeItem
 from coursekit.generate.page import page as P
@@ -125,15 +126,25 @@ def test_empty_course_returns_none(tmp_path):
 def test_duplicate_slug_raises_a_collision_that_names_both_sources(course):
     """Two page.json with the same slug (e.g. a decomposed AND a monolithic page for one week) both
     map to wiki_content/<slug>.html — that must be a clear, sourced error, not a bare traceback."""
-    # a second week-3 page, same slug, in a parallel tree — exactly the leftover-copy case
-    _write_page(course / "pages-decomposed", "week-3", "Week 3: Repetition", "week-3-repetition")
+    # a second week-3 page, same slug, in a sibling folder — the leftover-copy case
+    _write_page(course, "week-3-old", "Week 3: Repetition", "week-3-repetition")
     with pytest.raises(cartridge.CartridgeCollision) as ei:
         cartridge.write_course_imscc(course, out_path=course / "dup.imscc")
     msg = str(ei.value)
     assert "week-3-repetition.html" in msg                  # the colliding file
     assert str((course / "pages" / "week-3" / "page.json")) in msg          # source A named
-    assert "pages-decomposed" in msg                        # source B named
+    assert "week-3-old" in msg                              # source B named
     assert not (course / "dup.imscc").exists()              # nothing written on the error path
+
+
+def test_a_copy_outside_the_layout_is_warned_once_and_not_packaged(course):
+    # CORE-2 step 3: emitters read the course index, so a parallel tree is a stray, not a second page
+    _write_page(course / "pages-decomposed", "week-3", "Week 3: Repetition", "week-3-repetition")
+    with outcomes.capture(sink=lambda n: None) as report:
+        out = cartridge.write_course_imscc(course, out_path=course / "c.imscc")
+    assert [w.code for w in report.warnings] == ["course.stray_artifact"]      # once, not once per source
+    assert "pages-decomposed" in report.warnings[0].message
+    assert zipfile.ZipFile(out).namelist().count("wiki_content/week-3-repetition.html") == 1
 
 
 # ---------------------------------------------------- the extensibility seam

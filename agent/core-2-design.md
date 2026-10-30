@@ -1,8 +1,6 @@
 # CORE-2 design — one course model (2026-10-23)
 
-The second step of [structure-review.md](structure-review.md): a `Course` loaded once by the only folder walker, with units as first-class objects.
-This is a design for review; nothing here is built yet.
-Facts below were read from `main` at `a8825b9` and from both real courses (read only); counts are snapshots.
+The second step of [structure-review.md](structure-review.md): a `Course` loaded once by the only folder walker, with units as first-class objects. This is a design for review; nothing here is built yet. Facts below were read from `main` at `a8825b9` and from both real courses (read only); counts are snapshots.
 
 ## 1. What exists today
 
@@ -14,13 +12,13 @@ A unit's identity is its week number throughout.
 
 *Outputs — the artifacts.* Every consumer finds generated files its own way, and they disagree:
 
-| Consumer | Finds artifacts by | Assigns a unit by |
-|---|---|---|
-| cartridge — pages | `rglob("page.json")`, any depth | `page.week_ref`, else the folder name |
-| cartridge — quizzes, QTI | `glob("**/bank.json")` | the folder name |
-| cartridge — assignments | `rglob("assignment.json")` | `week_ref`, else the folder name |
-| census | `pages/*/page.json`, `quizzes/*/bank.json`, `assignments/*/…` (one level) | per kind, its own copy of the rules |
-| quiz evaluate | `quizzes/*/bank.json` | the folder name |
+| Consumer                 | Finds artifacts by                                                        | Assigns a unit by                     |
+|--------------------------|---------------------------------------------------------------------------|---------------------------------------|
+| cartridge — pages        | `rglob("page.json")`, any depth                                           | `page.week_ref`, else the folder name |
+| cartridge — quizzes, QTI | `glob("**/bank.json")`                                                    | the folder name                       |
+| cartridge — assignments  | `rglob("assignment.json")`                                                | `week_ref`, else the folder name      |
+| census                   | `pages/*/page.json`, `quizzes/*/bank.json`, `assignments/*/…` (one level) | per kind, its own copy of the rules   |
+| quiz evaluate            | `quizzes/*/bank.json`                                                     | the folder name                       |
 
 That disagreement is how the census and the emitter once resolved grading groups differently.
 
@@ -139,6 +137,12 @@ Found on the way, each now a rule in the model:
 `census.json` and `census.md` are byte-identical before and after on both real courses, and `census.py` no longer walks the folder.
 To get there the model took over two things only the census's own walker did: a declared unit finds its doc in the transcriber's per-unit folder (`output/week N/week-N.md`), and a doc for a unit nobody declared is kept (`undeclared_docs`, counted in `undeclared_units`) so the census still reports it as material with nothing generated.
 The census does not count overview pages yet — doing so changes its output, so it is a separate, visible change, not part of a byte-identical step.
+
+**Step 3 — done 2026-10-29** (the emitters read the model).
+Every emit command — the cartridge's page, quiz, and assignment sources, `emit cc`, `emit qti` (per quiz and `--bundle`), `emit assignments`, `emit html` — now asks `course.ir_files(path, kind)` for the indexed artifacts under the path it was given, and no emitter walks the folder.
+On copies of both real courses, all sixteen emit commands produce the same package entries, in the same order, with byte-identical contents, and the same HTML (zips are compared entry by entry because they carry write timestamps).
+Decision 3 now shows: an IR file outside `<kind>/<slug>/<ir>.json` — a leftover `pages-decomposed/` tree, a bank in a loose folder with no `quizzes/` — is warned about once per emit and not packaged, where it used to be packaged (or collide).
+The QTI tests' fixtures moved into `quizzes/` for that reason; no real course was affected.
 
 ## 6. Decisions (all four recommendations accepted, 2026-10-23)
 

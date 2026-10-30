@@ -56,12 +56,13 @@ def reemit(path) -> list[tuple[Path, Path]]:
     walking up to the `.vtconfig/` root, and rewrites `<slug>.html`. This is how you iterate on a
     supplements file or switch themes without paying for a model run.
     """
+    from coursekit.course import ir_files
     from coursekit.courseconfig import find_root
     from coursekit.generate.page.page import Page
     from coursekit.generate.page.style import load_style
 
     out = []
-    for pj in sorted(Path(path).rglob("page.json")):
+    for pj in ir_files(path, "page"):
         page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
         root = find_root(pj)
         supplements = load_supplements(root, page.week_ref or page.slug)

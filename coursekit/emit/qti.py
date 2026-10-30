@@ -15,6 +15,8 @@ import textwrap
 import zipfile
 from pathlib import Path
 
+from coursekit.course import ir_files
+
 QTI_NS = ('xmlns="http://www.imsglobal.org/xsd/ims_qtiasiv1p2" '
           'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"')
 QTI_SCHEMA = ("http://www.imsglobal.org/xsd/ims_qtiasiv1p2 "
@@ -840,10 +842,8 @@ def _quiz_bank_mismatch(bank, quiz: dict) -> str | None:
 def _load_banks(path) -> tuple[list[tuple], list[tuple]]:
     """(entries, skipped) for every bank.json under path. entries are (bank, quiz, bank_json)."""
     from coursekit.generate.quiz.bank import Bank
-    path = Path(path)
-    jsons = [path] if path.is_file() else sorted(path.glob("**/bank.json"))
     entries, skipped = [], []
-    for bj in jsons:
+    for bj in ir_files(path, "quiz"):
         b = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
         reason = _incomplete_reason(b)
         if reason:
@@ -897,10 +897,8 @@ def reemit(path) -> list[tuple]:
     skipped with a reason rather than aborting the whole walk.
     """
     from coursekit.generate.quiz.bank import Bank
-    path = Path(path)
-    jsons = [path] if path.is_file() else sorted(path.glob("**/bank.json"))
     results = []
-    for bj in jsons:
+    for bj in ir_files(path, "quiz"):
         b = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
         reason = _incomplete_reason(b)
         if reason:

@@ -145,7 +145,7 @@ def test_quiz_introduction_gives_a_reason_not_just_grading():
 
 def test_imscc_is_a_valid_zip_with_manifest_at_root(tmp_path):
     b, quiz = _mc_bank()
-    out = qti.write_imscc(b, quiz, tmp_path / "week-3")
+    out = qti.write_imscc(b, quiz, tmp_path / "quizzes" / "week-3")
     assert out.suffix == ".zip"
     with zipfile.ZipFile(out) as z:
         assert z.testzip() is None
@@ -156,7 +156,7 @@ def test_imscc_is_a_valid_zip_with_manifest_at_root(tmp_path):
 
 def test_written_package_round_trips_through_the_zip(tmp_path):
     b, quiz = _mc_bank()
-    out = qti.write_imscc(b, quiz, tmp_path / "week-3")
+    out = qti.write_imscc(b, quiz, tmp_path / "quizzes" / "week-3")
     with zipfile.ZipFile(out) as z:
         for name in z.namelist():
             ET.fromstring(z.read(name))  # every entry parses
@@ -177,8 +177,8 @@ def test_same_bank_yields_identical_package():
 
 def test_reemit_writes_imscc_beside_an_mc_bank(tmp_path):
     b, quiz = _mc_bank()
-    wk = tmp_path / "week-3"
-    wk.mkdir()
+    wk = tmp_path / "quizzes" / "week-3"
+    wk.mkdir(parents=True)
     (wk / "bank.json").write_text(b.model_dump_json(), encoding="utf-8")
     import json
     (wk / "quiz.json").write_text(json.dumps(quiz), encoding="utf-8")
@@ -193,8 +193,8 @@ def test_reemit_writes_imscc_beside_an_mc_bank(tmp_path):
 
 def test_reemit_synthesises_quiz_when_quiz_json_missing(tmp_path):
     b, _ = _mc_bank()
-    wk = tmp_path / "week-3"
-    wk.mkdir()
+    wk = tmp_path / "quizzes" / "week-3"
+    wk.mkdir(parents=True)
     (wk / "bank.json").write_text(b.model_dump_json(), encoding="utf-8")
     # no quiz.json
     _, imscc, reason = qti.reemit(tmp_path)[0]
@@ -206,8 +206,8 @@ def test_reemit_skips_a_bank_with_an_empty_group(tmp_path):
     # emit must skip it with a reason, not package a partial bank
     _mc_bank(n_groups=2)
     bankmod.create_group("c3", "Unfinished concept", "multiple_choice")   # opened, no variants
-    wk = tmp_path / "week-9"
-    wk.mkdir()
+    wk = tmp_path / "quizzes" / "week-9"
+    wk.mkdir(parents=True)
     (wk / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
 
     bank_json, imscc, reason = qti.reemit(tmp_path)[0]
@@ -222,8 +222,8 @@ def test_reemit_skips_a_bank_whose_quiz_references_a_missing_group(tmp_path):
     import json
     b2, quiz2 = _mc_bank(n_groups=2)            # quiz2 references c1 AND c2
     b1, _ = _mc_bank(run_id="run", n_groups=1)  # a one-group bank (c1 only)
-    wk = tmp_path / "week-7"
-    wk.mkdir()
+    wk = tmp_path / "quizzes" / "week-7"
+    wk.mkdir(parents=True)
     (wk / "bank.json").write_text(b1.model_dump_json(), encoding="utf-8")   # bank: c1 only
     (wk / "quiz.json").write_text(json.dumps(quiz2), encoding="utf-8")      # quiz: c1 + c2 (stale)
 
@@ -235,12 +235,12 @@ def test_reemit_skips_a_bank_whose_quiz_references_a_missing_group(tmp_path):
 
 def test_bundle_skips_the_incomplete_bank_but_keeps_the_rest(tmp_path):
     good, _ = _mc_bank(run_id="good")
-    (tmp_path / "week-3").mkdir()
-    (tmp_path / "week-3" / "bank.json").write_text(good.model_dump_json(), encoding="utf-8")
+    (tmp_path / "quizzes" / "week-3").mkdir(parents=True)
+    (tmp_path / "quizzes" / "week-3" / "bank.json").write_text(good.model_dump_json(), encoding="utf-8")
     _mc_bank(run_id="bad", n_groups=2)
     bankmod.create_group("c3", "Unfinished", "multiple_choice")
-    (tmp_path / "week-9").mkdir()
-    (tmp_path / "week-9" / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
+    (tmp_path / "quizzes" / "week-9").mkdir(parents=True)
+    (tmp_path / "quizzes" / "week-9" / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
 
     out, included, skipped = qti.bundle(tmp_path)
     assert out is not None and len(included) == 1        # the good week bundled
@@ -255,8 +255,8 @@ def test_reemit_skips_unsupported_types_without_aborting(tmp_path, monkeypatch):
 
     bankmod.reset()
     mc, mcq = _mc_bank(run_id="mc")
-    (tmp_path / "week-3").mkdir()
-    (tmp_path / "week-3" / "bank.json").write_text(mc.model_dump_json(), encoding="utf-8")
+    (tmp_path / "quizzes" / "week-3").mkdir(parents=True)
+    (tmp_path / "quizzes" / "week-3" / "bank.json").write_text(mc.model_dump_json(), encoding="utf-8")
 
     bankmod.reset()
     bankmod.init("mx", None, title="Numerical week")
@@ -265,14 +265,14 @@ def test_reemit_skips_unsupported_types_without_aborting(tmp_path, monkeypatch):
         bankmod.put_variant(bankmod.NumVariant(
             group_id="c1", label=lbl, variant_summary=f"Count {lbl}",
             question_text="How many sides does the shape have?", answer=a))
-    (tmp_path / "week-4").mkdir()
-    (tmp_path / "week-4" / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
+    (tmp_path / "quizzes" / "week-4").mkdir(parents=True)
+    (tmp_path / "quizzes" / "week-4" / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
 
     results = {bj.parent.name: (imscc, reason) for bj, imscc, reason in qti.reemit(tmp_path)}
     assert results["week-3"][0] is not None          # MC emitted
     assert results["week-4"][0] is None               # numerical skipped
     assert "numerical" in results["week-4"][1]
-    assert not (tmp_path / "week-4" / "week-4.zip").exists()  # no partial file
+    assert not (tmp_path / "quizzes" / "week-4" / "week-4.zip").exists()  # no partial file
 
 
 # ---------------------------------------------------- multi-quiz bundle
@@ -280,8 +280,8 @@ def test_reemit_skips_unsupported_types_without_aborting(tmp_path, monkeypatch):
 def _write_week(tmp_path, name, run_id, n_groups=2):
     bankmod.reset()
     b, quiz = _mc_bank(run_id=run_id, n_groups=n_groups)
-    wk = tmp_path / name
-    wk.mkdir()
+    wk = tmp_path / "quizzes" / name
+    wk.mkdir(parents=True)
     (wk / "bank.json").write_text(b.model_dump_json(), encoding="utf-8")
     import json
     (wk / "quiz.json").write_text(json.dumps(quiz), encoding="utf-8")
@@ -334,8 +334,8 @@ def test_bundle_skips_unsupported_without_losing_the_rest(tmp_path, monkeypatch)
         bankmod.put_variant(bankmod.NumVariant(
             group_id="c1", label=lbl, variant_summary=f"Count {lbl}",
             question_text="How many sides does the shape have?", answer=a))
-    wk = tmp_path / "week-4"
-    wk.mkdir()
+    wk = tmp_path / "quizzes" / "week-4"
+    wk.mkdir(parents=True)
     (wk / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
 
     out, included, skipped = qti.bundle(tmp_path)

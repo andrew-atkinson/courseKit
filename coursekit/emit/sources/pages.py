@@ -4,8 +4,7 @@ Reuses the page emitter (`cc.render_page` / `cc.page_resource`) verbatim, so a p
 cartridge is byte-identical to one in a pages-only `.imscc`.
 """
 
-from pathlib import Path
-
+from coursekit.course import ir_files
 from coursekit.courseconfig import find_root, week_key
 from coursekit.emit import cc
 from coursekit.emit.cartridge import CartridgeItem
@@ -19,10 +18,8 @@ class PagesSource:
         from coursekit.generate.page.renderer import load_supplements
         from coursekit.generate.page.style import load_style
 
-        p = Path(course_path)
-        jsons = [p] if (p.is_file() and p.name == "page.json") else sorted(p.rglob("page.json"))
         items = []
-        for pj in jsons:
+        for pj in ir_files(course_path, "page"):
             page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
             root = find_root(pj)
             supp = load_supplements(root, page.week_ref or page.slug)

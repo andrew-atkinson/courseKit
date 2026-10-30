@@ -291,13 +291,14 @@ def _load_pages(path) -> list[tuple]:
     Mirrors `emit/html.reemit`: supplements and style are resolved at package time by walking up to
     the `.vtconfig/` root, so the cartridge carries the same styled body a re-render would.
     """
+    from coursekit.course import ir_files
     from coursekit.courseconfig import find_root
     from coursekit.generate.page.page import Page
     from coursekit.generate.page.renderer import load_supplements
     from coursekit.generate.page.style import load_style
 
     entries = []
-    for pj in sorted(Path(path).rglob("page.json")):
+    for pj in ir_files(path, "page"):
         page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
         root = find_root(pj)
         supp = load_supplements(root, page.week_ref or page.slug)

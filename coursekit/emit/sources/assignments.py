@@ -8,6 +8,7 @@ week module exactly like a page or quiz (and imports the same way).
 
 from pathlib import Path
 
+from coursekit.course import ir_files
 from coursekit.courseconfig import week_key
 from coursekit.emit import assignment as ae
 from coursekit.emit import cc
@@ -18,7 +19,7 @@ from coursekit.generate.assignment.assignment import Assignment
 def _load(course_path):
     """(Assignment, source_path) for every assignment.json under the course, in stable order."""
     out = []
-    for f in sorted(Path(course_path).rglob("assignment.json")):
+    for f in ir_files(course_path, "assignment"):
         out.append((Assignment.model_validate_json(f.read_text(encoding="utf-8")), f))
     return out
 

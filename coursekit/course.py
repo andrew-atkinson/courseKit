@@ -94,6 +94,22 @@ class Course:
                    strays=strays, unreadable=unreadable, undeclared_docs=undeclared_docs)
 
 
+def ir_files(path, kind: str) -> list[Path]:
+    """The `kind` IR files an emit command given `path` packages: one file, or every indexed artifact
+    under a course or any folder in it. Emitters filter the index; they never walk the folder."""
+    p = Path(path).expanduser().resolve()
+    name = _IR[kind][1]
+    if p.is_file():
+        return [p] if p.name == name else []
+    with outcomes.capture(sink=lambda n: None):            # warn only about the strays this emit skips,
+        course = Course.load(p)                            # once each, not once per cartridge source
+    for s in course.strays:
+        if s.name == name and s.is_relative_to(p):
+            outcomes.warn("course.stray_artifact", f"  {s}: outside the course layout (<kind>/<slug>/{name})"
+                          f" — not packaged; move it or delete it.", path=str(s))
+    return [a.path for a in course.artifacts_for(kind=kind) if a.path.is_relative_to(p)]
+
+
 # --------------------------------------------------------------- units
 def _units(root: Path, struct) -> tuple[list[Unit], dict[str, Path]]:
     """Every unit, in order. With a declared structure (units naming a `doc`/`sources`) it is
