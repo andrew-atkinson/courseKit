@@ -2,7 +2,8 @@
 
 Turns a course's own material (transcripts, readings, slides) into Canvas/Moodle-ready quizzes, pages, and assignments via a local tool-calling LLM.
 It also evaluates what it made (the critics) and inventories the whole course (the census).
-See [agent/architecture.md](agent/architecture.md) for the structural map — it is the source of truth for how the pieces fit; don't duplicate its diagrams here.
+The structural map is in two files, each the only home of its diagrams: [docs/architecture.md](docs/architecture.md) (the user guide: the key, the four layers, what each command reads and writes) and [agent/architecture.md](agent/architecture.md) (the internals: the course model, the generator seam, structure, dependencies).
+They are the source of truth for how the pieces fit; don't duplicate their diagrams here or in each other.
 The forward plan and dated history live in [agent/roadmap.md](agent/roadmap.md).
 
 **The one load-bearing idea:** every artifact has a canonical intermediate form — `bank.json` (quizzes), `page.json` (pages), `assignment.json` (assignments), `census.json` (the census).

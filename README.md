@@ -30,7 +30,7 @@ On the roadmap (not yet): refreshing and updating existing content in place, bui
 
 Every input converges on one **canonical form** (`bank.json` for quizzes, `page.json` for pages) that the emitters read — so adding a platform is one emitter, not a rewrite.
 Two generators sit on a shared spine (`coursekit/`), and the model _commits_ each piece through a tool call rather than free text, so a revision overwrites rather than piling up drafts.
-See [agent/architecture.md](agent/architecture.md) for the map.
+See [How coursekit works](docs/architecture.md) for the map.
 
 ## Requirements
 
@@ -76,6 +76,7 @@ The full command surface — every verb, flag, and what uses the model — is th
 
 The README is the high-level read; the detail lives in [`docs/`](docs/):
 
+- **[How coursekit works](docs/architecture.md)** — the map: the four layers (your material, the course folder, coursekit's commands, delivery), what each command reads and writes, and where a model is involved, in two diagrams with a key.
 - **[Command reference](docs/commands.md)** — every CLI verb and flag, and which use the model.
 - **[Evaluating and fixing](docs/evaluating.md)** — the audit → repair loop: `analyze` (the concept map), `evaluate` (the cold-read checks), and `fix` (regenerate flagged items in place). The part that makes a local model trustworthy.
 - **[Generating quizzes](docs/quizzes.md)** — the quiz workflow end to end: dry-run, generate, where output lands, and exporting to Canvas as a QTI `.zip`. Plus the six question types and how the hardened loop copes with an unreliable local model.
@@ -85,4 +86,4 @@ The README is the high-level read; the detail lives in [`docs/`](docs/):
 - **[Configuration](docs/configuration.md)** — the `.env` environment, choosing a provider, the RAM pre-flight, and the per-course `.vtconfig/` files (`quiz.yaml` / `page.yaml`, prompt overrides).
 - **[Canvas QTI format](docs/canvasQuizStructure.md)** — the internals behind `qti.py`: the package layout, namespaces, and the "imports empty" trap that cost two rounds to find. Read this before touching the QTI emitter.
 
-For the architecture, the shared-spine design, and the roadmap, see [`agent/architecture.md`](agent/architecture.md).
+For the internals (the course model, the generator seam, the shared spine) and the roadmap, see [`agent/architecture.md`](agent/architecture.md).
