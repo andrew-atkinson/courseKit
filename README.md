@@ -28,9 +28,11 @@ On the roadmap (not yet): refreshing and updating existing content in place, bui
 
 ## How it works
 
-Every input converges on one **canonical form** (`bank.json` for quizzes, `page.json` for pages) that the emitters read — so adding a platform is one emitter, not a rewrite.
-Two generators sit on a shared spine (`coursekit/`), and the model _commits_ each piece through a tool call rather than free text, so a revision overwrites rather than piling up drafts.
-See [How coursekit works](docs/architecture.md) for the map.
+Every input converges on one **canonical form** per artifact (`bank.json` for quizzes, `page.json` for pages, `assignment.json` for assignments), and the emitters build the Canvas packages from it with no model — so adding a platform is one emitter, not a rewrite.
+Generation, packaging, and the census all read the course through one loader, the course model: its units in order, and an index of every artifact already made.
+The model _commits_ each piece through a tool call rather than free text, so a revision overwrites its slot instead of piling up drafts.
+`evaluate` cold-reads what was generated and `fix` repairs the flagged items in place, so the whole flow is generate → audit → repair → emit.
+See [How coursekit works](docs/architecture.md) for the map, in two diagrams with a key.
 
 ## Requirements
 
