@@ -11,7 +11,7 @@ root, which loads every session. `agent/` is the deeper material that `CLAUDE.md
 
 | Doc | What it is | Read it when |
 | --- | --- | --- |
-| [`architecture.md`](architecture.md) | The structural map — data flow, the shared spine, the dependency direction, and the migration plan. Mermaid source; also published as an artifact. | You need to see how quizbot, `coursekit`, and the videotranscriber fit, or you're weighing a structural change (the rename, a new generator, the transcriber migration). |
+| [`architecture.md`](architecture.md) | The structural map — the four layers (faculty input, the course folder, coursekit's commands, delivery), what each `coursekit` command reads and writes, the course model, the one-writer-per-file structure rule, and the dependency direction; model calls are marked. Mermaid source, render-checked; also published as an artifact. | You need to see how `coursekit` and the videotranscriber fit, which command touches which file, or you're weighing a structural change (a new command or generator, a new emitter, the transcriber migration). |
 | [`todo.md`](todo.md) | The ideas dump and forward plan — feature ideas (not all to be built), the quizbot→coursekit restructure rationale, and housekeeping. Some entries carry investigation notes (e.g. why per-video Panopto links won't work). | You're picking the next thing to do, or about to propose something that may already have been thought through and parked here. |
 | [`GIFT_format_compact.md`](GIFT_format_compact.md) | A token-efficient, rigorous reference for the GIFT quiz format, derived from Moodle's own parser. The spec behind `gift.py`. | You're touching `gift.py` or reasoning about GIFT escaping, type detection, or question syntax. |
 

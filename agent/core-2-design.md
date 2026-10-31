@@ -1,6 +1,8 @@
 # CORE-2 design — one course model (2026-10-23)
 
-The second step of [structure-review.md](structure-review.md): a `Course` loaded once by the only folder walker, with units as first-class objects. This is a design for review; nothing here is built yet. Facts below were read from `main` at `a8825b9` and from both real courses (read only); counts are snapshots.
+The second step of [structure-review.md](structure-review.md): a `Course` loaded once by the only folder walker, with units as first-class objects.
+All five increments are built (2026-10-24 → 10-30); the step notes below record what each found.
+Facts below were read from `main` at `a8825b9` and from both real courses (read only); counts are snapshots.
 
 ## 1. What exists today
 
@@ -154,6 +156,10 @@ What did change, each a rule the model already had:
 - **A file that is a declared unit's doc runs as that unit,** whatever it is named (`docs/exposure.md` → unit 4), where it used to run as a unit named after the file.
 - **A unit with no number and a doc is a run,** where discovery used to skip it.
 - **Two docs for one unit are kept by the model** (`Course.duplicate_docs`), and `find_units` still refuses to run both into one folder.
+
+**Step 5 — done 2026-10-30** ([architecture.md](architecture.md) re-verified against `main`).
+It gains a course-model section (the loader, the index, the rules, and the two `Unit` classes), the census and assignments in both system diagrams, the built proposer and the real overlay name (`structure.coursekit.yaml`), and `settings.py` as the one writer of coursekit's files.
+Its "not yet closed" list records what CORE-2 left on purpose: evaluate and fix still look beside each run's folder, the code still says `week`, and the census does not count overview pages.
 
 ## 6. Decisions (all four recommendations accepted, 2026-10-23)
 

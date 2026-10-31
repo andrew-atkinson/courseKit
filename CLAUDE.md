@@ -8,6 +8,7 @@ The forward plan and dated history live in [agent/roadmap.md](agent/roadmap.md).
 **The one load-bearing idea:** every artifact has a canonical intermediate form — `bank.json` (quizzes), `page.json` (pages), `assignment.json` (assignments), `census.json` (the census).
 Every input converges on the IR; every emitter (`gift.py`, `qti.py`, the cartridge, the census report) reads only it.
 Adding a platform is one emitter, not one converter per input — which is why emitting needs no model.
+One exception to re-emitting: GIFT has no `emit` command — `bank.finalize` writes the `.gift` files from the in-memory bank beside `bank.json`, so a `.gift` changes only with a generation run or a `fix` (`emit gift` is parked as SHIP-8).
 
 ## Working here
 
