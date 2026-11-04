@@ -1,7 +1,7 @@
 # CORE-3 design — generator state in instances (2026-11-04)
 
 The third step of [structure-review.md](structure-review.md): the artifact being built lives in an object a job owns, not in a module every job shares.
-Nothing is built yet; the decisions in §6 were settled with the user on 2026-11-04.
+The decisions in §6 were settled with the user on 2026-11-04; the step notes in §5 record what each increment found.
 Facts below were read from `main` at `b816b8e` and from both real courses (read only); counts are snapshots.
 
 ## 1. What exists today
@@ -135,6 +135,7 @@ Every step must also keep the **test guard**: no test removed, and the number of
 1. **`core-3-assignment` — the pattern, on the smallest builder.**
    `AssignmentDraft` and the shared `dispatch.ToolSession`, with `build.py` and `tests/test_assignment_gen.py` moved.
    *Pass:* G0 for assignments; a scripted assignment run is byte-identical to `main` (assignments have no recorded logs); two interleaved assignments each come out correct; the guards hold.
+   **Done 2026-11-04.** All goldens identical to `main`, and the only assert change is the new tests. `dispatch.ToolSession` is the shared base; the error-text fix is `dispatch._without_class`, and both a test and the goldens catch its removal. The pattern held with no changes to the design.
 2. **`core-3-page` — pages.**
    `PageDraft` and `PageTools`, with the generator, decompose, glossary, fix, and their tests moved; `page.py` loses its globals.
    *Pass:* G0, G1, G2, and G3 for pages; one generator reused for two units keeps them separate, and that test fails if a helper keeps the first unit's draft; the guards hold.

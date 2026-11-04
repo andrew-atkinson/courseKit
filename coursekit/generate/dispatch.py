@@ -25,6 +25,13 @@ def fmt_errors(e: ValidationError) -> str:
     return "; ".join(out)
 
 
+def _without_class(e: TypeError, fn) -> str:
+    """A method's TypeError names its class (`QuizTools.add_x() missing…`). The model knows the tool,
+    not our class, so what it reads stays `add_x() missing…`."""
+    owner = getattr(fn, "__self__", None)
+    return str(e) if owner is None else str(e).replace(f"{type(owner).__name__}.", "", 1)
+
+
 def dispatch_one(registry: dict[str, Callable[..., str]], name: str, raw_args: str | None) -> str:
     """Run one tool call. Never raises — returns an actionable ERROR string instead."""
     fn = registry.get(name)
@@ -42,7 +49,7 @@ def dispatch_one(registry: dict[str, Callable[..., str]], name: str, raw_args: s
     except ValidationError as e:
         return f"ERROR: {fmt_errors(e)}"
     except TypeError as e:
-        return f"ERROR: wrong arguments for '{name}': {e}"
+        return f"ERROR: wrong arguments for '{name}': {_without_class(e, fn)}"
     except Exception as e:
         return f"ERROR: {name} failed: {type(e).__name__}: {e}"
 
@@ -85,3 +92,22 @@ def replay(registry, path) -> list[str]:
             rec = json.loads(line)
             out.append(dispatch_one(registry, rec["name"], rec["arguments"]))
     return out
+
+
+class ToolSession:
+    """One run's tools, bound to one draft, so two runs can never write to each other's artifact. A
+    subclass writes its tools as methods and lists them in SCHEMAS (name → schema, in the order they
+    are offered), with its finishing tool in TERMINAL; dispatch, the call log, and replay live here."""
+
+    SCHEMAS: dict[str, dict] = {}
+    TERMINAL: frozenset[str] = frozenset()
+
+    def __init__(self, call_log: Path | None = None):
+        self.call_log = Path(call_log) if call_log else None
+        self.registry = {name: getattr(self, name) for name in self.SCHEMAS}
+
+    def run_tool_calls(self, tool_calls) -> list[tuple[str, str]]:
+        return run_tool_calls(self.registry, tool_calls, self.call_log, terminal_tools=self.TERMINAL)
+
+    def replay(self, path) -> list[str]:
+        return replay(self.registry, path)
