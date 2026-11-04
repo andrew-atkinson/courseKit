@@ -21,13 +21,12 @@ from coursekit.generate.quiz import bank as B
 
 
 def _write_page(root, week, title, slug):
-    P.reset()
-    P.init(f"c-{week}", title=title, slug=slug, week_ref=week)
-    P.put_block(P.build_block(kind="heading", block_id="h", text="Loops", level=2, role="concept"))
-    P.put_block(P.build_block(kind="bullets", block_id="b", items=["for loops repeat"]))
-    d = root / "pages" / week
-    d.mkdir(parents=True)
-    (d / "page.json").write_text(P.get().model_dump_json(), encoding="utf-8")
+    d = P.PageDraft.new(f"c-{week}", title=title, slug=slug, week_ref=week)
+    d.put_block(P.build_block(kind="heading", block_id="h", text="Loops", level=2, role="concept"))
+    d.put_block(P.build_block(kind="bullets", block_id="b", items=["for loops repeat"]))
+    pdir = root / "pages" / week
+    pdir.mkdir(parents=True)
+    (pdir / "page.json").write_text(d.page.model_dump_json(), encoding="utf-8")
 
 
 def _write_quiz(root, week, title):

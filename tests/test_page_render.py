@@ -8,34 +8,27 @@ from coursekit.generate.page import page as P
 from coursekit.generate.page.renderer import load_supplements, render_body
 
 
-@pytest.fixture
-def fresh():
-    P.reset()
-    yield
-    P.reset()
-
-
 def _page_with(*blocks):
-    P.reset()
+    d = P.PageDraft.new("test")
     for b in blocks:
-        P.put_block(P.build_block(**b))
-    return P.get()
+        d.put_block(P.build_block(**b))
+    return d.page
 
 
 # ------------------------------------------------------------- block HTML
 
-def test_heading_matches_canvas_grammar(fresh):
+def test_heading_matches_canvas_grammar():
     body = render_body(_page_with(dict(kind="heading", block_id="h", text="REVIEW", level=4)))
     import re as _re
     assert _re.search(r"<h4[^>]*>.*REVIEW.*</h4>", body, _re.S)   # styled now; structure + text hold
 
 
-def test_bullets_use_li_span(fresh):
+def test_bullets_use_li_span():
     body = render_body(_page_with(dict(kind="bullets", block_id="b", items=["one", "two"])))
     assert "<ul" in body and "<span>one</span>" in body   # li/ul carry theme styles now
 
 
-def test_inline_markdown_in_prose(fresh):
+def test_inline_markdown_in_prose():
     body = render_body(_page_with(
         dict(kind="paragraph", block_id="p", text="a **bold** and `code` and *em*")))
     assert "<strong>bold</strong>" in body
@@ -45,7 +38,7 @@ def test_inline_markdown_in_prose(fresh):
 
 # --------------------------------------------- inline math (LaTeX → Unicode)
 
-def test_latex_arrow_becomes_a_unicode_glyph(fresh):
+def test_latex_arrow_becomes_a_unicode_glyph():
     # the real bug: the model emitted `$\rightarrow$`, which Canvas ships as literal source.
     body = render_body(_page_with(
         dict(kind="bullets", block_id="b", items=[r"Rotate $\rightarrow$ Translate"])))
@@ -53,21 +46,21 @@ def test_latex_arrow_becomes_a_unicode_glyph(fresh):
     assert r"\rightarrow" not in body and "$" not in body
 
 
-def test_latex_resolves_inside_columns_too(fresh):
+def test_latex_resolves_inside_columns_too():
     body = render_body(_page_with(dict(kind="columns", block_id="c", columns=[
         {"title": "Correct", "items": [r"Translate $\rightarrow$ Rotate", r"$a \leq b$"]},
         {"title": "Wrong", "items": [r"Rotate $\rightarrow$ Translate"]}])))
     assert "→" in body and "≤" in body
     assert "$" not in body
 
-def test_bare_dollar_amounts_are_not_treated_as_math(fresh):
+def test_bare_dollar_amounts_are_not_treated_as_math():
     # "$5 and $10" has no LaTeX command between the dollars — leave the prose alone.
     body = render_body(_page_with(
         dict(kind="paragraph", block_id="p", text="it costs $5 and $10 total")))
     assert "$5 and $10" in body
 
 
-def test_bare_equation_sheds_its_dollar_delimiters(fresh):
+def test_bare_equation_sheds_its_dollar_delimiters():
     # the real regression: the model wrote "$5 - 10 = -5$" (an equation it delimited), and with no
     # LaTeX command inside, the old passes left it literal — dollar signs and all — in the output.
     body = render_body(_page_with(
@@ -75,14 +68,14 @@ def test_bare_equation_sheds_its_dollar_delimiters(fresh):
     assert "5 - 10 = -5" in body and "$5" not in body and "-5$" not in body
 
 
-def test_a_dollar_range_without_a_relation_stays_prose(fresh):
+def test_a_dollar_range_without_a_relation_stays_prose():
     # "$5 - $10" is a price range, not an equation — no relation between the dollars, leave it be.
     body = render_body(_page_with(
         dict(kind="paragraph", block_id="p", text="the fee ranges $5 - $10 per seat")))
     assert "$5 - $10" in body
 
 
-def test_unresolved_latex_is_left_intact_for_mathjax_later(fresh):
+def test_unresolved_latex_is_left_intact_for_mathjax_later():
     # a command we don't map (\frac) is preserved as a delimited span — the seam a future
     # MathJax strategy targets; nothing is silently mangled or dropped.
     body = render_body(_page_with(
@@ -92,7 +85,7 @@ def test_unresolved_latex_is_left_intact_for_mathjax_later(fresh):
 
 # --------------------------------------------- the escaping round-trip
 
-def test_hostile_code_is_escaped_and_survives(fresh):
+def test_hostile_code_is_escaped_and_survives():
     code = "for (let x = 0; x < 10 && y > 2; x++){\n  print(a & b);\n}"
     body = render_body(_page_with(dict(kind="code", block_id="c", code=code, language="js")))
     # angle brackets and ampersands escaped, newlines become <br> — the Canvas <pre> convention
@@ -106,7 +99,7 @@ def test_hostile_code_is_escaped_and_survives(fresh):
     assert recovered == code
 
 
-def test_text_is_escaped_not_injected(fresh):
+def test_text_is_escaped_not_injected():
     body = render_body(_page_with(
         dict(kind="heading", block_id="h", text="a < b & c > d", level=2)))
     assert "&lt; b &amp; c &gt;" in body
@@ -115,7 +108,7 @@ def test_text_is_escaped_not_injected(fresh):
 
 # ------------------------------------------------------- supplements
 
-def test_references_render_as_links(fresh):
+def test_references_render_as_links():
     page = _page_with(dict(kind="heading", block_id="h", text="X"))
     supp = {"references": [{"label": "Reas — Process", "url": "https://example.com/reas"}]}
     body = render_body(page, supp)
@@ -124,7 +117,7 @@ def test_references_render_as_links(fresh):
     assert ">References</h4>" in body   # heading weight is font-weight now, not <strong>
 
 
-def test_allowlisted_embed_becomes_iframe(fresh):
+def test_allowlisted_embed_becomes_iframe():
     page = _page_with(dict(kind="heading", block_id="h", text="X"))
     supp = {"examples": [{"label": "sketch", "url": "https://editor.p5js.org/a/full/xyz",
                           "embed": True}]}
@@ -132,7 +125,7 @@ def test_allowlisted_embed_becomes_iframe(fresh):
     assert '<iframe src="https://editor.p5js.org/a/full/xyz"' in body
 
 
-def test_non_allowlisted_embed_degrades_to_link(fresh):
+def test_non_allowlisted_embed_degrades_to_link():
     page = _page_with(dict(kind="heading", block_id="h", text="X"))
     supp = {"examples": [{"label": "sketchy", "url": "https://evil.example.com/x", "embed": True}]}
     body = render_body(page, supp)
@@ -151,7 +144,7 @@ _DARK_PANEL = {
 }
 
 
-def test_dark_surface_frames_heading_less_blocks(fresh):
+def test_dark_surface_frames_heading_less_blocks():
     # A hook paragraph BEFORE any heading, and a standalone pullquote — heading-less groups that used
     # to render light ink onto the white gap between panels. On a dark surface they must be panelled.
     page = _page_with(
@@ -169,14 +162,14 @@ def test_dark_surface_frames_heading_less_blocks(fresh):
     assert body.rfind("background-color: #12333d", 0, pq_at) != -1
 
 
-def test_no_supplements_renders_only_blocks(fresh):
+def test_no_supplements_renders_only_blocks():
     body = render_body(_page_with(dict(kind="heading", block_id="h", text="X")))
     assert "References" not in body and "Examples" not in body
 
 
 # ------------------------------------------------- supplements loader
 
-def test_image_block_resolves_supplement_ref(fresh):
+def test_image_block_resolves_supplement_ref():
     page = _page_with(dict(kind="heading", block_id="h", text="X"),
                       dict(kind="image", block_id="fig1", ref="coord", alt="the coordinate system"))
     supp = {"images": [{"ref": "coord", "url": "https://ex.test/coord.png", "caption": "Coordinates"}]}
@@ -186,7 +179,7 @@ def test_image_block_resolves_supplement_ref(fresh):
     assert "Coordinates" in body                       # caption rendered
 
 
-def test_image_block_placeholder_when_unsupplied(fresh):
+def test_image_block_placeholder_when_unsupplied():
     page = _page_with(dict(kind="heading", block_id="h", text="X"),
                       dict(kind="image", block_id="fig1", ref="coord", alt="the coordinate system"))
     body = render_body(page)                            # no supplements yet
@@ -194,7 +187,7 @@ def test_image_block_placeholder_when_unsupplied(fresh):
     assert "<img" not in body                           # no broken image, a placeholder instead
 
 
-def test_refd_image_is_inline_only_not_in_the_gallery(fresh):
+def test_refd_image_is_inline_only_not_in_the_gallery():
     page = _page_with(dict(kind="heading", block_id="h", text="X"),
                       dict(kind="image", block_id="fig1", ref="coord", alt="a diagram"))
     supp = {"images": [{"ref": "coord", "url": "https://ex.test/c.png", "alt": "a diagram"},
@@ -204,7 +197,7 @@ def test_refd_image_is_inline_only_not_in_the_gallery(fresh):
     assert "https://ex.test/loose.png" in body          # a ref-less image still lands in the gallery
 
 
-def test_image_block_rejects_url_and_requires_alt(fresh):
+def test_image_block_rejects_url_and_requires_alt():
     from coursekit.generate.page import page as P
     from coursekit.generate.page.page import ValidationError
     with pytest.raises(ValidationError):
@@ -229,7 +222,7 @@ def test_load_supplements_absent_is_empty(tmp_path):
 
 # --------------------------------------- standalone document + emitter
 
-def test_write_html_produces_a_document(fresh, tmp_path):
+def test_write_html_produces_a_document(tmp_path):
     page = _page_with(dict(kind="heading", block_id="h", text="REVIEW", level=4))
     path = html_emit.write_html(page, tmp_path)
     assert path.name == "page.html"    # default slug
@@ -264,9 +257,9 @@ def test_reemit_rerenders_page_json_with_current_supplements(tmp_path):
         "references:\n  - label: Later Ref\n    url: https://late.io\n", encoding="utf-8")
     pdir = course / "pages" / "week-3"
     pdir.mkdir(parents=True)
-    P.reset()
-    P.load(P.Page(page_id="c-week-3", title="Week 3", slug="week-3", week_ref="week-3"), pdir)
-    P.put_block(P.build_block(kind="heading", block_id="h", text="REVIEW", level=4))
+    d = P.PageDraft.new("test")
+    d = P.PageDraft.adopt(P.Page(page_id="c-week-3", title="Week 3", slug="week-3", week_ref="week-3"), pdir)
+    d.put_block(P.build_block(kind="heading", block_id="h", text="REVIEW", level=4))
     # (page.json now on disk: an adopted page saves in place)
 
     results = reemit(course)
@@ -280,7 +273,7 @@ def test_reemit_rerenders_page_json_with_current_supplements(tmp_path):
 
 # ------------------------------- pasted <iframe> snippets (slideshows etc.)
 
-def test_pasted_iframe_snippet_is_parsed_and_re_emitted(fresh):
+def test_pasted_iframe_snippet_is_parsed_and_re_emitted():
     page = _page_with(dict(kind="heading", block_id="h", text="X"))
     supp = {"examples": [{
         "label": "Lecture slides",
@@ -294,7 +287,7 @@ def test_pasted_iframe_snippet_is_parsed_and_re_emitted(fresh):
     assert "allowfullscreen" not in body and "frameborder" not in body
 
 
-def test_pasted_iframe_from_disallowed_host_degrades_to_link(fresh):
+def test_pasted_iframe_from_disallowed_host_degrades_to_link():
     page = _page_with(dict(kind="heading", block_id="h", text="X"))
     supp = {"examples": [{"label": "sketchy",
                           "iframe": '<iframe src="https://evil.example.com/x" width="600"></iframe>'}]}
@@ -303,13 +296,13 @@ def test_pasted_iframe_from_disallowed_host_degrades_to_link(fresh):
     assert '<a href="https://evil.example.com/x"' in body
 
 
-def test_malformed_iframe_snippet_is_dropped(fresh):
+def test_malformed_iframe_snippet_is_dropped():
     page = _page_with(dict(kind="heading", block_id="h", text="X"))
     body = render_body(page, {"examples": [{"label": "broken", "iframe": "<iframe no src here>"}]})
     assert "broken" not in body   # nothing usable, so nothing emitted
 
 
-def test_columns_render_code_as_pre_and_prose_as_rows_not_bullets(fresh):
+def test_columns_render_code_as_pre_and_prose_as_rows_not_bullets():
     # Per-item (RICH-1): a multi-line item is CODE → a <pre> that keeps its line breaks + indent; a
     # plain item is a prose ROW, never a bulleted <li> (bullets read poorly for comparisons).
     body = render_body(_page_with(dict(kind="columns", block_id="c", columns=[
@@ -321,7 +314,7 @@ def test_columns_render_code_as_pre_and_prose_as_rows_not_bullets(fresh):
     assert "<li" not in body and "<ul" not in body                     # …as clean rows, NOT bullets
 
 
-def test_columns_mix_code_and_prose_in_one_column(fresh):
+def test_columns_mix_code_and_prose_in_one_column():
     # A single column may carry both; each item is decided on its own (robust to mixed content).
     body = render_body(_page_with(dict(kind="columns", block_id="c", columns=[
         {"title": "A", "items": ["intro point", "x = 1\ny = 2"]},

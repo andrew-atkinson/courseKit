@@ -129,11 +129,10 @@ def test_domain_reaches_the_quiz_critic(tmp_path):
 
 def test_domain_reaches_the_page_critic(tmp_path):
     unit = _course(tmp_path, domain="This course teaches p5.js; `width` is a global.")
-    pagemod.reset()
-    pagemod.init("p1", None)
-    pagemod.put_block(pagemod.build_block("paragraph", block_id="b1", text="A loop repeats a block."))
+    d = pagemod.PageDraft.new("p1", None)
+    d.put_block(pagemod.build_block("paragraph", block_id="b1", text="A loop repeats a block."))
     rec = _RecordingCritic()
-    pev.evaluate_page(pagemod.get(), "transcript", rec, "m", project_root=unit.course_root)
+    pev.evaluate_page(d.page, "transcript", rec, "m", project_root=unit.course_root)
     assert "COURSE DOMAIN" in rec.system and "p5.js" in rec.system
 
 

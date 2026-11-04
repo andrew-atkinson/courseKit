@@ -79,15 +79,15 @@ def test_material_chunks_splits_oversized_on_paragraph_boundaries_losing_nothing
 
 def test_run_pass_tallies_errors_into_stats(capsys):
     from coursekit.generate.page import page as P
+    from coursekit.generate.page import tools as T
 
     class _Boom:                                     # a provider that times out on every call
         def chat_with_tools(self, **_):
             raise TimeoutError("model call timed out")
 
-    P.reset()
-    P.init("p", None)
+    session = T.PageTools(P.PageDraft.new("p", None))
     stats: dict = {}
-    added = decompose._run_pass(_Boom(), "m", "sys", "user", stats=stats)
+    added = decompose._run_pass(session, _Boom(), "m", "sys", "user", stats=stats)
     assert added == 0                                # nothing committed
     assert stats["errors"] == 1                      # …but the error is counted (not swallowed)
     assert stats["error_types"] == ["TimeoutError"]  # …and typed, so timeouts are visible

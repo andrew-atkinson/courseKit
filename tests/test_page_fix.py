@@ -15,12 +15,8 @@ from coursekit.providers.base import Reply, ToolCall
 
 
 @pytest.fixture
-def fresh():
-    pageir.reset()
-    tools.reset_state()
-    yield
-    pageir.reset()
-    tools.reset_state()
+def s():
+    return tools.PageTools(pageir.PageDraft.new("test"))
 
 
 class FixProvider:
@@ -62,41 +58,41 @@ def test_fix_tool_specs_are_only_add_tools():
 
 # ------------------------------------------------------------- fix_one_block
 
-def test_fix_one_block_replaces_and_verifies(fresh):
-    tools.add_code("realtime-code", code="sound.play();", language="js")   # flawed: sound undeclared
+def test_fix_one_block_replaces_and_verifies(s):
+    s.add_code("realtime-code", code="sound.play();", language="js")   # flawed: sound undeclared
     corrected = {"block_id": "realtime-code",
                  "code": "let sound; // FIXED\nfunction preload(){ sound = loadSound('a.mp3'); }",
                  "language": "js"}
-    out = pfix.fix_one_block(_finding(), "material", FixProvider("add_code", corrected), "m",
+    out = pfix.fix_one_block(s, _finding(), "material", FixProvider("add_code", corrected), "m",
                              critic="CRITIC")
     assert out.replaced is True and out.now_passes is True
-    assert "let sound" in pageir.get().blocks["realtime-code"].code
+    assert "let sound" in s.draft.page.blocks["realtime-code"].code
 
 
-def test_fix_one_block_gives_up_on_persistent_error(fresh):
-    tools.add_code("realtime-code", code="sound.play();", language="js")
+def test_fix_one_block_gives_up_on_persistent_error(s):
+    s.add_code("realtime-code", code="sound.play();", language="js")
     # wrong block_id in the payload won't match; but add_code creates a NEW block, not replaces the
     # flagged one — so the flagged block is untouched and never "replaced".
     bad = {"block_id": "somethingelse", "code": "x // FIXED", "language": "js"}
-    out = pfix.fix_one_block(_finding(), "material", FixProvider("add_code", bad), "m",
+    out = pfix.fix_one_block(s, _finding(), "material", FixProvider("add_code", bad), "m",
                              critic="CRITIC", max_turns=2)
     assert out.replaced is False and out.now_passes is None
-    assert pageir.get().blocks["realtime-code"].code == "sound.play();"     # untouched
+    assert s.draft.page.blocks["realtime-code"].code == "sound.play();"     # untouched
 
 
 # ------------------------------------------------------------- fix_course_pages (integration)
 
-def test_fix_course_pages_updates_page_on_disk(tmp_path, fresh):
+def test_fix_course_pages_updates_page_on_disk(tmp_path):
     pytest.importorskip("yaml")
     (tmp_path / ".vtconfig").mkdir()
     (tmp_path / "week-9.md").write_text("Load the file into a variable you declare in preload().")
     outd = tmp_path / "pages" / "week-9"
     outd.mkdir(parents=True)
-    pageir.load(pageir.Page(page_id="c-week-9", title="Week 9", week_ref="week-9", slug="week-9"),
-                out_dir=outd)                               # adopted → saves in place to page.json
-    tools.add_heading("h", "Realtime")
-    tools.add_code("realtime-code", code="sound.play();", language="js")
-    pageir.reset()                                          # page.json now on disk at outd
+    s = tools.PageTools(pageir.PageDraft.adopt(
+        pageir.Page(page_id="c-week-9", title="Week 9", week_ref="week-9", slug="week-9"),
+        out_dir=outd))                                      # adopted → saves in place to page.json
+    s.add_heading("h", "Realtime")
+    s.add_code("realtime-code", code="sound.play();", language="js")   # page.json now on disk at outd
 
     corrected = {"block_id": "realtime-code",
                  "code": "let sound; // FIXED\nfunction preload(){ sound = loadSound('a.mp3'); }",
@@ -110,11 +106,29 @@ def test_fix_course_pages_updates_page_on_disk(tmp_path, fresh):
     assert "let sound" in saved.blocks["realtime-code"].code                # fix persisted
 
 
-def test_fix_one_block_aborts_on_a_model_load_error(fresh):
+def test_fix_course_pages_fixes_each_page_in_its_own_draft(tmp_path):
+    (tmp_path / ".vtconfig").mkdir()
+    for wk in ("week-8", "week-9"):
+        (tmp_path / f"{wk}.md").write_text("Load the file into a variable you declare in preload().")
+        outd = tmp_path / "pages" / wk
+        s = tools.PageTools(pageir.PageDraft.adopt(pageir.Page(page_id=f"c-{wk}", week_ref=wk, slug=wk), outd))
+        s.add_heading("h", wk)
+        s.add_code("realtime-code", code="sound.play();", language="js")
+
+    corrected = {"block_id": "realtime-code", "code": "let sound; // FIXED", "language": "js"}
+    outcomes = pfix.fix_course_pages(tmp_path, provider=FixProvider("add_code", corrected), model="m")
+
+    assert [o.replaced for o in outcomes] == [True, True]
+    for wk in ("week-8", "week-9"):
+        saved = pageir.Page.model_validate_json((tmp_path / "pages" / wk / "page.json").read_text())
+        assert saved.page_id == f"c-{wk}" and "let sound" in saved.blocks["realtime-code"].code
+
+
+def test_fix_one_block_aborts_on_a_model_load_error(s):
     # A not-loaded / unreachable model is INFRA — abort the whole run, never report per-block
     # "could not fix" (the OPS-6 bug that sent a whole session down a false trail).
     from coursekit.pipeline import ModelLoadError
-    tools.add_code("realtime-code", code="sound.play();", language="js")
+    s.add_code("realtime-code", code="sound.play();", language="js")
 
     class _Down:
         def chat_with_tools(self, **_):
@@ -123,4 +137,4 @@ def test_fix_one_block_aborts_on_a_model_load_error(fresh):
             return (False, "model too big for the budget")
 
     with pytest.raises(ModelLoadError):
-        pfix.fix_one_block(_finding(), "material", _Down(), "m", critic="C")
+        pfix.fix_one_block(s, _finding(), "material", _Down(), "m", critic="C")

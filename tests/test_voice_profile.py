@@ -131,9 +131,8 @@ def test_voice_does_not_reach_the_quiz_critic(tmp_path):
 
 def test_voice_does_not_reach_the_page_critic(tmp_path):
     unit = _course(tmp_path, voice=VOICE)
-    pagemod.reset()
-    pagemod.init("p1", None)
-    pagemod.put_block(pagemod.build_block("paragraph", block_id="b1", text="A loop repeats a block."))
+    d = pagemod.PageDraft.new("p1", None)
+    d.put_block(pagemod.build_block("paragraph", block_id="b1", text="A loop repeats a block."))
     rec = _RecordingCritic()
-    pev.evaluate_page(pagemod.get(), "transcript", rec, "m", project_root=unit.course_root)
+    pev.evaluate_page(d.page, "transcript", rec, "m", project_root=unit.course_root)
     assert "INSTRUCTOR VOICE" not in rec.system

@@ -15,82 +15,6 @@ from pathlib import Path
 from coursekit.generate import dispatch
 from coursekit.generate.page import page
 
-_call_log: Path | None = None
-
-
-def set_call_log(path: Path | None) -> None:
-    global _call_log
-    _call_log = Path(path) if path else None
-
-
-def reset_state() -> None:
-    """Reset tool-local state only. The page IR is reset by page.init(), exactly as the quiz
-    tools leave bank.init() to own the bank — so this must NOT clobber the out_dir a caller
-    just set on the page."""
-    set_call_log(None)
-
-
-# ------------------------------------------------------------- block tools
-
-def add_heading(block_id: str, text: str, level: int = 2, role: str = "") -> str:
-    return page.put_block(page.build_block("heading", block_id=block_id, text=text, level=level,
-                                           role=role or None))
-
-
-def add_paragraph(block_id: str, text: str) -> str:
-    return page.put_block(page.build_block("paragraph", block_id=block_id, text=text))
-
-
-def add_bullets(block_id: str, items: list[str]) -> str:
-    return page.put_block(page.build_block("bullets", block_id=block_id, items=items))
-
-
-def add_code(block_id: str, code: str = "", language: str = "", text: str = "") -> str:
-    # `text` is a lenient alias: the model sometimes sends the code under `text` (the arg name it uses
-    # for prose blocks). Silently dropping a rejected code block is how a section ends up all bullets and
-    # no nuts-and-bolts, so accept either.
-    return page.put_block(page.build_block("code", block_id=block_id, code=code or text, language=language))
-
-
-def add_glossary(block_id: str, entries: list[dict]) -> str:
-    return page.put_block(page.build_block("glossary", block_id=block_id, entries=entries))
-
-
-def add_callout(block_id: str, text: str, tone: str = "note") -> str:
-    return page.put_block(page.build_block("callout", block_id=block_id, text=text, tone=tone))
-
-
-def add_columns(block_id: str, columns: list[dict]) -> str:
-    return page.put_block(page.build_block("columns", block_id=block_id, columns=columns))
-
-
-def add_pullquote(block_id: str, text: str, attribution: str = "") -> str:
-    return page.put_block(page.build_block("pullquote", block_id=block_id, text=text,
-                                           attribution=attribution or None))
-
-
-def add_card(block_id: str, title: str, text: str, card_kind: str = "concept") -> str:
-    return page.put_block(page.build_block("card", block_id=block_id, title=title, text=text,
-                                           card_kind=card_kind))
-
-
-def add_details(block_id: str, summary: str, text: str) -> str:
-    return page.put_block(page.build_block("details", block_id=block_id, summary=summary, text=text))
-
-
-def add_image(block_id: str, ref: str, alt: str, caption: str = "") -> str:
-    return page.put_block(page.build_block("image", block_id=block_id, ref=ref, alt=alt,
-                                           caption=caption or None))
-
-
-def get_page_report() -> str:
-    return page.report()
-
-
-def finalize_page() -> str:
-    return page.finalize()
-
-
 # ------------------------------------------------------------- schemas
 
 _ID = {"type": "string",
@@ -251,25 +175,6 @@ finalize_page_json = {
                    "additionalProperties": False},
 }
 
-
-# ------------------------------------------------------------- dispatch
-
-TOOL_REGISTRY = {
-    "add_heading": add_heading,
-    "add_paragraph": add_paragraph,
-    "add_bullets": add_bullets,
-    "add_code": add_code,
-    "add_glossary": add_glossary,
-    "add_callout": add_callout,
-    "add_columns": add_columns,
-    "add_pullquote": add_pullquote,
-    "add_card": add_card,
-    "add_details": add_details,
-    "add_image": add_image,
-    "get_page_report": get_page_report,
-    "finalize_page": finalize_page,
-}
-
 _SCHEMAS = {
     "add_heading": add_heading_json,
     "add_paragraph": add_paragraph_json,
@@ -286,14 +191,64 @@ _SCHEMAS = {
     "finalize_page": finalize_page_json,
 }
 
-TOOL_SPECS = [_SCHEMAS[name] for name in TOOL_REGISTRY]
+TOOL_SPECS = list(_SCHEMAS.values())
 tools = [{"type": "function", "function": spec} for spec in TOOL_SPECS]
 
 
-def run_tool_calls(tool_calls) -> list[tuple[str, str]]:
-    return dispatch.run_tool_calls(TOOL_REGISTRY, tool_calls, _call_log,
-                                   terminal_tools={"finalize_page"})
+# ------------------------------------------------------------- the tools
 
+class PageTools(dispatch.ToolSession):
+    """The tools the model calls to build one page."""
 
-def replay(path) -> list[str]:
-    return dispatch.replay(TOOL_REGISTRY, path)
+    SCHEMAS = _SCHEMAS
+    TERMINAL = frozenset({"finalize_page"})
+
+    def __init__(self, draft: page.PageDraft, call_log: Path | None = None):
+        self.draft = draft
+        super().__init__(call_log)
+
+    def add_heading(self, block_id: str, text: str, level: int = 2, role: str = "") -> str:
+        return self.draft.put_block(page.build_block("heading", block_id=block_id, text=text, level=level,
+                                                     role=role or None))
+
+    def add_paragraph(self, block_id: str, text: str) -> str:
+        return self.draft.put_block(page.build_block("paragraph", block_id=block_id, text=text))
+
+    def add_bullets(self, block_id: str, items: list[str]) -> str:
+        return self.draft.put_block(page.build_block("bullets", block_id=block_id, items=items))
+
+    def add_code(self, block_id: str, code: str = "", language: str = "", text: str = "") -> str:
+        # `text` is a lenient alias: the model sometimes sends the code under `text` (the arg name it uses
+        # for prose blocks). Silently dropping a rejected code block is how a section ends up all bullets and
+        # no nuts-and-bolts, so accept either.
+        return self.draft.put_block(page.build_block("code", block_id=block_id, code=code or text, language=language))
+
+    def add_glossary(self, block_id: str, entries: list[dict]) -> str:
+        return self.draft.put_block(page.build_block("glossary", block_id=block_id, entries=entries))
+
+    def add_callout(self, block_id: str, text: str, tone: str = "note") -> str:
+        return self.draft.put_block(page.build_block("callout", block_id=block_id, text=text, tone=tone))
+
+    def add_columns(self, block_id: str, columns: list[dict]) -> str:
+        return self.draft.put_block(page.build_block("columns", block_id=block_id, columns=columns))
+
+    def add_pullquote(self, block_id: str, text: str, attribution: str = "") -> str:
+        return self.draft.put_block(page.build_block("pullquote", block_id=block_id, text=text,
+                                                     attribution=attribution or None))
+
+    def add_card(self, block_id: str, title: str, text: str, card_kind: str = "concept") -> str:
+        return self.draft.put_block(page.build_block("card", block_id=block_id, title=title, text=text,
+                                                     card_kind=card_kind))
+
+    def add_details(self, block_id: str, summary: str, text: str) -> str:
+        return self.draft.put_block(page.build_block("details", block_id=block_id, summary=summary, text=text))
+
+    def add_image(self, block_id: str, ref: str, alt: str, caption: str = "") -> str:
+        return self.draft.put_block(page.build_block("image", block_id=block_id, ref=ref, alt=alt,
+                                                     caption=caption or None))
+
+    def get_page_report(self) -> str:
+        return self.draft.report()
+
+    def finalize_page(self) -> str:
+        return self.draft.finalize()

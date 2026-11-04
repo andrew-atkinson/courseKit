@@ -1,8 +1,8 @@
 """The page IR: the canonical, platform-neutral form of a course page.
 
-Mirrors `bank.py` exactly in shape — a module-level singleton, autosave after every write, per-type
-builders, guardrails written as steering — because a generator is the quiz pattern with a different
-IR. A page is an ordered set of typed **blocks**; the renderer turns blocks into Canvas-safe HTML,
+Mirrors `bank.py` exactly in shape — a draft that owns the artifact being built, autosave after every
+write, per-type builders, guardrails written as steering — because a generator is the quiz pattern with
+a different IR. A page is an ordered set of typed **blocks**; the renderer turns blocks into Canvas-safe HTML,
 and platform emitters wrap that HTML.
 
 Two rules are load-bearing:
@@ -220,58 +220,6 @@ class Page(BaseModel):
     finalized: bool = False
 
 
-# ---- module state (mirrors bank.py) ----
-
-_page = Page(page_id="unsaved")
-_out_dir: Path | None = None
-_staged = False   # a fresh build (init) stages until finalize; an adopted page (load) saves in place
-
-
-def init(page_id: str, out_dir: Path | None = None, *, title: str = "Untitled page",
-         page_type: str = "week_intro", week_ref: str | None = None, slug: str = "page") -> None:
-    """Start an empty page. It autosaves to `page.partial.json` and is promoted over `page.json` only
-    on finalize, so a re-run that fails leaves the last good page untouched."""
-    global _page, _out_dir, _staged
-    _page = Page(page_id=page_id, title=title, page_type=page_type, week_ref=week_ref, slug=slug)
-    _out_dir = Path(out_dir) if out_dir else None
-    _staged = True
-
-
-def reset() -> None:
-    """Test hook."""
-    init("test", None)
-
-
-def load(page_obj: "Page", out_dir: Path | None = None) -> None:
-    """Adopt an EXISTING page as the working singleton — for editing a finished page in place (the
-    targeted-fix pass reloads a `page.json`, then a `put_block` overwrites just the flagged block and
-    autosaves). Distinct from `init`, which starts empty."""
-    global _page, _out_dir, _staged
-    _page = page_obj
-    _out_dir = Path(out_dir) if out_dir else None
-    _staged = False
-
-
-def get() -> Page:
-    return _page
-
-
-def is_finalized() -> bool:
-    return _page.finalized
-
-
-def _autosave() -> None:
-    """Persist after every write, exactly as bank.py does — a crash mid-build loses nothing, and a
-    staged build reaches `page.json` (atomically) only once finalized."""
-    if _out_dir is None:
-        return
-    _out_dir.mkdir(parents=True, exist_ok=True)
-    partial = _out_dir / "page.partial.json"
-    partial.write_text(json.dumps(_page.model_dump(), indent=2), encoding="utf-8")
-    if _page.finalized or not _staged:
-        os.replace(partial, _out_dir / "page.json")
-
-
 def build_block(kind: str, **kwargs) -> Block:
     """Construct a typed block, raising pydantic ValidationError on bad input (the tools layer
     turns that into an actionable message for the model)."""
@@ -280,78 +228,110 @@ def build_block(kind: str, **kwargs) -> Block:
     return _KINDS[kind](**kwargs)
 
 
-def put_block(block: Block) -> str:
-    """Store a block, REPLACING any block already at block_id (revision without pile-up)."""
-    replacing = block.block_id in _page.blocks
-    _page.blocks[block.block_id] = block
-    _autosave()
-    verb = "replaced" if replacing else "added"
-    return (f"OK {verb} block '{block.block_id}' ({block.kind}). "
-            f"Page now has {len(_page.blocks)} block(s).")
-
-
-def report() -> str:
-    if not _page.blocks:
-        return "Page is empty."
-    lines = [f"Page '{_page.title}' ({_page.page_type}) — {len(_page.blocks)} block(s):"]
-    for bid, b in _page.blocks.items():
-        lines.append(f"  [{bid}] {b.kind}")
-    return "\n".join(lines)
-
-
 # Page FUNCTIONS whose job is reference/orientation, not a teaching arc — they carry no retrieval
 # foldout (see the retrieval check below). The teaching page (`week_intro`) is deliberately absent.
 _REFERENCE_PAGE_TYPES = {"glossary", "week_overview", "module_overview", "week_recap", "reference"}
 
 
-def validate_final() -> list[str]:
-    """Reasons the page is not ready. Empty list means finalizable."""
-    problems = []
-    if not _page.blocks:
-        problems.append("the page has no blocks")
-    # A teaching page needs a heading to structure it; a reference page (a glossary companion, an
-    # overview) is self-structuring — its glossary/overview block carries its own label — so a
-    # redundant heading is not required (and would just repeat the block's label).
-    if _page.page_type not in _REFERENCE_PAGE_TYPES and \
-            not any(b.kind == "heading" for b in _page.blocks.values()):
-        problems.append("the page has no heading block to structure it")
-    # A page must ask the student to RETRIEVE — the testing effect is core pedagogy, and this device
-    # is the first to get dropped as the prompt grows. So gate it structurally (unlike the hook /
-    # pullquote / summary, which stay prompt-guidance): at least one predict/recall `details` foldout —
-    # the recap's recall questions or the closing "Predict: …" prompt both count.
-    # PROVISIONAL (2026-07-31): this is really a stopgap for local-model ATTENTION crowding, not a
-    # universal pedagogical invariant — retrieval isn't right for every page type (a pure reference or
-    # intro page), and forcing it can yield a hollow foldout. A candidate for removal / making it
-    # page-type-aware once composable generation manages attention properly (see roadmap "Composable
-    # generation"). NOW page-type-aware (2026-08-06): a page whose FUNCTION is reference/orientation
-    # (a glossary companion, a week/module overview) has no teaching arc to retrieve from, so the
-    # foldout is skipped for those types; a teaching page still requires it.
-    if _page.page_type not in _REFERENCE_PAGE_TYPES and \
-            not any(b.kind == "details" for b in _page.blocks.values()):
-        problems.append("the page has no retrieval prompt — add a predict/recall `details` block "
-                        "(the closing 'Predict: …' or the recap's questions) so students retrieve "
-                        "before they leave")
-    # A heading introduces the blocks beneath it, and the renderer runs a section from one heading to
-    # the next — so a heading with no content before the next heading (or the page end) renders as an
-    # empty titled panel while its content piles into the previous section. This happens when the model
-    # writes all the prose first and appends the section headings last (a crowding failure). It is
-    # unambiguously broken structure, so refuse to finalize it — deterministically, because the critics
-    # read block text and never SEE the page.
-    ordered = list(_page.blocks.values())
-    empty = [b for i, b in enumerate(ordered) if b.kind == "heading"
-             and (i + 1 == len(ordered) or ordered[i + 1].kind == "heading")]
-    if empty:
-        problems.append(
-            f"{len(empty)} heading(s) have no content under them ({', '.join(b.text for b in empty)}) — "
-            "every heading must be immediately followed by the blocks it introduces, before the next "
-            "heading; place each section heading directly above its own content, not all at the end")
-    return problems
+class PageDraft:
+    """A page being built, and where it saves. `new` starts empty and stages to `page.partial.json`, so a
+    re-run that fails leaves the last good `page.json` untouched; `adopt` takes an existing page for
+    editing (the targeted-fix pass reloads a `page.json`, then a `put_block` overwrites just the flagged
+    block), and saves in place."""
 
+    def __init__(self, page: Page, out_dir: Path | None = None, *, staged: bool = False):
+        self.page = page
+        self.out_dir = Path(out_dir) if out_dir else None
+        self.staged = staged
 
-def finalize() -> str:
-    problems = validate_final()
-    if problems:
-        return "ERROR: cannot finalize — " + "; ".join(problems)
-    _page.finalized = True
-    _autosave()
-    return f"OK page finalized with {len(_page.blocks)} block(s)."
+    @classmethod
+    def new(cls, page_id: str, out_dir: Path | None = None, *, title: str = "Untitled page",
+            page_type: str = "week_intro", week_ref: str | None = None, slug: str = "page") -> "PageDraft":
+        return cls(Page(page_id=page_id, title=title, page_type=page_type, week_ref=week_ref, slug=slug),
+                   out_dir, staged=True)
+
+    @classmethod
+    def adopt(cls, page: Page, out_dir: Path | None = None) -> "PageDraft":
+        return cls(page, out_dir)
+
+    def is_finalized(self) -> bool:
+        return self.page.finalized
+
+    def _autosave(self) -> None:
+        """Persist after every write, exactly as bank.py does — a crash mid-build loses nothing, and a
+        staged build reaches `page.json` (atomically) only once finalized."""
+        if self.out_dir is None:
+            return
+        self.out_dir.mkdir(parents=True, exist_ok=True)
+        partial = self.out_dir / "page.partial.json"
+        partial.write_text(json.dumps(self.page.model_dump(), indent=2), encoding="utf-8")
+        if self.page.finalized or not self.staged:
+            os.replace(partial, self.out_dir / "page.json")
+
+    def put_block(self, block: Block) -> str:
+        """Store a block, REPLACING any block already at block_id (revision without pile-up)."""
+        replacing = block.block_id in self.page.blocks
+        self.page.blocks[block.block_id] = block
+        self._autosave()
+        verb = "replaced" if replacing else "added"
+        return (f"OK {verb} block '{block.block_id}' ({block.kind}). "
+                f"Page now has {len(self.page.blocks)} block(s).")
+
+    def report(self) -> str:
+        if not self.page.blocks:
+            return "Page is empty."
+        lines = [f"Page '{self.page.title}' ({self.page.page_type}) — {len(self.page.blocks)} block(s):"]
+        for bid, b in self.page.blocks.items():
+            lines.append(f"  [{bid}] {b.kind}")
+        return "\n".join(lines)
+
+    def validate_final(self) -> list[str]:
+        """Reasons the page is not ready. Empty list means finalizable."""
+        problems = []
+        if not self.page.blocks:
+            problems.append("the page has no blocks")
+        # A teaching page needs a heading to structure it; a reference page (a glossary companion, an
+        # overview) is self-structuring — its glossary/overview block carries its own label — so a
+        # redundant heading is not required (and would just repeat the block's label).
+        if self.page.page_type not in _REFERENCE_PAGE_TYPES and \
+                not any(b.kind == "heading" for b in self.page.blocks.values()):
+            problems.append("the page has no heading block to structure it")
+        # A page must ask the student to RETRIEVE — the testing effect is core pedagogy, and this device
+        # is the first to get dropped as the prompt grows. So gate it structurally (unlike the hook /
+        # pullquote / summary, which stay prompt-guidance): at least one predict/recall `details` foldout —
+        # the recap's recall questions or the closing "Predict: …" prompt both count.
+        # PROVISIONAL (2026-07-31): this is really a stopgap for local-model ATTENTION crowding, not a
+        # universal pedagogical invariant — retrieval isn't right for every page type (a pure reference or
+        # intro page), and forcing it can yield a hollow foldout. A candidate for removal / making it
+        # page-type-aware once composable generation manages attention properly (see roadmap "Composable
+        # generation"). NOW page-type-aware (2026-08-06): a page whose FUNCTION is reference/orientation
+        # (a glossary companion, a week/module overview) has no teaching arc to retrieve from, so the
+        # foldout is skipped for those types; a teaching page still requires it.
+        if self.page.page_type not in _REFERENCE_PAGE_TYPES and \
+                not any(b.kind == "details" for b in self.page.blocks.values()):
+            problems.append("the page has no retrieval prompt — add a predict/recall `details` block "
+                            "(the closing 'Predict: …' or the recap's questions) so students retrieve "
+                            "before they leave")
+        # A heading introduces the blocks beneath it, and the renderer runs a section from one heading to
+        # the next — so a heading with no content before the next heading (or the page end) renders as an
+        # empty titled panel while its content piles into the previous section. This happens when the model
+        # writes all the prose first and appends the section headings last (a crowding failure). It is
+        # unambiguously broken structure, so refuse to finalize it — deterministically, because the critics
+        # read block text and never SEE the page.
+        ordered = list(self.page.blocks.values())
+        empty = [b for i, b in enumerate(ordered) if b.kind == "heading"
+                 and (i + 1 == len(ordered) or ordered[i + 1].kind == "heading")]
+        if empty:
+            problems.append(
+                f"{len(empty)} heading(s) have no content under them ({', '.join(b.text for b in empty)}) — "
+                "every heading must be immediately followed by the blocks it introduces, before the next "
+                "heading; place each section heading directly above its own content, not all at the end")
+        return problems
+
+    def finalize(self) -> str:
+        problems = self.validate_final()
+        if problems:
+            return "ERROR: cannot finalize — " + "; ".join(problems)
+        self.page.finalized = True
+        self._autosave()
+        return f"OK page finalized with {len(self.page.blocks)} block(s)."

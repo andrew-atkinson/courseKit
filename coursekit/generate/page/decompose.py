@@ -118,15 +118,16 @@ def _material_chunks(material: str, budget: int) -> list[str]:
     return chunks
 
 
-def _run_pass(provider, model, system: str, user: str, *, max_turns: int = 8,
+def _run_pass(session, provider, model, system: str, user: str, *, max_turns: int = 8,
               max_nudges: int = 3, stats: dict | None = None, specs: list | None = None) -> int:
-    """Drive one bounded tool-call pass that writes blocks into the shared page IR. Returns the number
+    """Drive one bounded tool-call pass that writes blocks into the session's page. Returns the number
     of blocks it added. The model calls `add_*` tools; when it replies in PROSE without having produced
     anything, nudge it back to tool calls (the small model narrates instead of calling tools) — the same
     remedy the monolithic loop and the fix loop use. A prose reply AFTER blocks exist means the section
     is simply done. `specs` restricts the offered tools (default: every `add_*`)."""
     specs = specs or _ADD_SPECS
-    before = len(pageir.get().blocks)
+    blocks = session.draft.page.blocks
+    before = len(blocks)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     nudges = 0
     for _ in range(max_turns):
@@ -141,16 +142,16 @@ def _run_pass(provider, model, system: str, user: str, *, max_turns: int = 8,
             break
         if reply.wants_tools:
             provider.append_assistant(messages, reply)
-            provider.append_tool_results(messages, tools.run_tool_calls(reply.tool_calls))
+            provider.append_tool_results(messages, session.run_tool_calls(reply.tool_calls))
             continue
-        if len(pageir.get().blocks) > before or nudges >= max_nudges:
+        if len(blocks) > before or nudges >= max_nudges:
             break                                   # produced its blocks then stopped, or gave up
         nudges += 1
         provider.append_assistant(messages, Reply(finish_reason=reply.finish_reason,
                                                   content=reply.content))
         provider.append_user(messages, "Record this section now by CALLING the add_* tools; "
                                         "do not reply in prose.")
-    return len(pageir.get().blocks) - before
+    return len(blocks) - before
 
 
 def _brief(concept) -> str:
@@ -192,11 +193,10 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     slug = slugify(unit.week_label) if unit.week_label else unit.week_slug
-    pageir.init(page_id=f"{unit.course_slug}-{unit.week_slug}", out_dir=out_dir,
-                title=unit.week_label or unit.week_slug, page_type="week_intro",
-                week_ref=unit.week_slug, slug=slug)
-    tools.reset_state()
-    tools.set_call_log(out_dir / "calls.jsonl")
+    draft = pageir.PageDraft.new(f"{unit.course_slug}-{unit.week_slug}", out_dir,
+                                 title=unit.week_label or unit.week_slug, page_type="week_intro",
+                                 week_ref=unit.week_slug, slug=slug)
+    session = tools.PageTools(draft, call_log=out_dir / "calls.jsonl")
 
     dpre, vpre = courseconfig.domain_preface(cfg.domain), courseconfig.voice_preface(cfg.voice)
     # A concept pass fills a section BODY, so it composes from fewer components than a whole page —
@@ -213,7 +213,7 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
     stats: dict = {}                                   # tallies pass errors (candidate timeouts) across the run
     empties: list[str] = []
 
-    n = _run_pass(provider, model, sysmsg("frame"),
+    n = _run_pass(session, provider, model, sysmsg("frame"),
                   f"Topic: {unit.week_label or unit.week_slug}\nEnduring understanding: {eu}\n"
                   f"Concepts this week: {names}", stats=stats)
     outcomes.info("page.frame", f"  frame: +{n} block(s)", blocks=n)
@@ -228,7 +228,7 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
     for i, c in enumerate(cm.concepts):
         # The heading text IS the concept name — place it deterministically (in order), so every
         # concept becomes its own titled section and the model only has to fill the content beneath it.
-        pageir.put_block(pageir.build_block("heading", block_id=f"sec-{i}", text=c.name, role="concept"))
+        draft.put_block(pageir.build_block("heading", block_id=f"sec-{i}", text=c.name, role="concept"))
         material = materials.get(c.name) or slice_material(transcript, c)
         src = "map" if materials.get(c.name) else "slice"
         chunks = _material_chunks(material, budget)   # oversized span → bounded sub-passes, nothing dropped
@@ -241,7 +241,7 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
                 cont = ("" if len(chunks) == 1 else
                         f"\n\nThis is part {k + 1} of {len(chunks)} of this concept's material — CONTINUE "
                         f"the same section: do not add a heading and do not re-introduce the concept.")
-                got += _run_pass(provider, model, sysmsg("concept_section"),
+                got += _run_pass(session, provider, model, sysmsg("concept_section"),
                                  f"{_brief(c)}{window}{cont}\n\nThe material for this part:\n"
                                  f"<material>\n{chunk}\n</material>", stats=stats)
             return got
@@ -259,9 +259,9 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
 
     # Same deterministic-heading treatment as the concepts — place the summary heading first so the
     # close pass can only add content beneath it (last run it emitted the heading last → empty section).
-    pageir.put_block(pageir.build_block("heading", block_id="sec-summary", text="Wrapping Up",
-                                        role="summary"))
-    n = _run_pass(provider, model, sysmsg("close"),
+    draft.put_block(pageir.build_block("heading", block_id="sec-summary", text="Wrapping Up",
+                                       role="summary"))
+    n = _run_pass(session, provider, model, sysmsg("close"),
                   f"Concepts this week: {names}\nEnduring understanding: {eu}", stats=stats)
     outcomes.info("page.close", f"  close: +{n} content block(s)", blocks=n)
 
@@ -274,27 +274,27 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
         outcomes.warn("page.empty_sections", f"  ⚠ {len(empties)} section(s) still empty after "
                       f"{RETRY_EMPTY} retries: {', '.join(empties)}", sections=empties)
 
-    problems = pageir.validate_final()
+    problems = draft.validate_final()
     if not problems:
-        pageir.finalize()
+        draft.finalize()
     else:
         outcomes.warn("page.not_finalized", "  (did not finalize: " + "; ".join(problems) + ")",
                       problems=problems)
-    _render(unit, out_dir, project_root)
-    return pageir.get(), problems
+    _render(draft.page, unit, out_dir, project_root)
+    return draft.page, problems
 
 
-def _render(unit, out_dir, project_root) -> None:
+def _render(pg, unit, out_dir, project_root) -> None:
     """Best-effort HTML render beside page.json — mirrors the monolithic generator + fix loop. Only a
     finalized page renders: an unfinished build must not overwrite the last good HTML."""
-    if not pageir.is_finalized():
+    if not pg.finalized:
         return
     try:
         from coursekit.emit import html as html_emit
         from coursekit.generate.page.renderer import load_supplements
         from coursekit.generate.page.style import load_style
         supplements = load_supplements(project_root, unit.week_slug)
-        html_emit.write_html(pageir.get(), Path(out_dir), supplements, load_style(project_root))
+        html_emit.write_html(pg, Path(out_dir), supplements, load_style(project_root))
     except Exception as e:
         outcomes.warn("page.render_skipped", f"  (render skipped: {type(e).__name__}: {e})",
                       error_type=type(e).__name__)
@@ -348,9 +348,12 @@ def main() -> int:
             print(f"  [{f.verdict}] {f.group_id}: {f.concern}")
 
     if args.fix and flagged:
-        # The page is still loaded in the IR; repair each flagged block in place against the FULL week
+        # Keep editing the page just built, still staged if it never finalized (so an unfinished page
+        # can't replace the last good page.json). Repair each flagged block in place against the FULL week
         # transcript (so a correction that lives outside a concept's own segment is reachable), then
         # re-verify and re-render — the same fix loop the production pages use.
+        session = tools.PageTools(pageir.PageDraft(pg, out_dir, staged=not pg.finalized),
+                                  call_log=out_dir / "calls.jsonl")
         from coursekit.generate.page import evaluate as pev
         from coursekit.generate.page import fix as pfix
         from coursekit.generate.quiz.evaluate import _critic_body
@@ -358,10 +361,10 @@ def main() -> int:
         critic = _critic_body(pev.PAGE_CATEGORY, unit.course_root)
         print("\nfix loop:")
         for f in flagged:
-            o = pfix.fix_one_block(f, material, provider, model, critic=critic,
+            o = pfix.fix_one_block(session, f, material, provider, model, critic=critic,
                                    project_root=unit.course_root)
             print(f"  {f.group_id} ({f.label}): {_outcome_word(o)}")
-        _render(unit, out_dir, unit.course_root)
+        _render(pg, unit, out_dir, unit.course_root)
     return 0
 
 

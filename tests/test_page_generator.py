@@ -191,3 +191,27 @@ def test_page_slug_comes_from_the_week_title(tmp_path):
 
     assert (unit.output_dir / "week-3-repetition.html").exists()
     assert not (unit.output_dir / "week-3.html").exists()
+
+
+def test_one_generator_reused_for_two_units_keeps_them_separate(tmp_path):
+    # run_course reuses one generator: the second unit must not inherit the first's draft or call log.
+    def script(tag):
+        return [[("add_heading", {"block_id": f"{tag}-h", "text": tag}),
+                 ("add_details", {"block_id": f"{tag}-d", "summary": "Predict?", "text": "Yes."})],
+                [("finalize_page", {})]]
+
+    gen = PageGenerator()
+    (tmp_path / "week-3.md").write_text("loops", encoding="utf-8")
+    (tmp_path / "week-4.md").write_text("arrays", encoding="utf-8")
+    first, second = find_units(tmp_path)[:2]
+
+    a = run_unit(first, _client(script("a")), "m", gen)
+    b = run_unit(second, _client(script("b")), "m", gen)
+
+    assert a.finalized and b.finalized and a.counts == b.counts == {"blocks": 2}
+    saved_a = json.loads((first.output_dir / "page.json").read_text())
+    saved_b = json.loads((second.output_dir / "page.json").read_text())
+    assert list(saved_a["blocks"]) == ["a-h", "a-d"] and saved_a["week_ref"] == first.week_slug
+    assert list(saved_b["blocks"]) == ["b-h", "b-d"] and saved_b["week_ref"] == second.week_slug
+    logged = [json.loads(l)["arguments"] for l in (second.output_dir / "calls.jsonl").read_text().splitlines()]
+    assert "a-h" not in " ".join(logged) and "b-h" in " ".join(logged)

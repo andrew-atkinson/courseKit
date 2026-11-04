@@ -7,22 +7,10 @@ neither a teaching arc nor the retrieval foldout a teaching page requires.
 
 import json
 
-import pytest
-
 from coursekit.discover import find_units
 from coursekit.generate.page import glossary
 from coursekit.generate.page import page as pageir
-from coursekit.generate.page import tools
 from coursekit.providers.base import Reply, ToolCall
-
-
-@pytest.fixture
-def fresh():
-    pageir.reset()
-    tools.reset_state()
-    yield
-    pageir.reset()
-    tools.reset_state()
 
 
 class GlossaryProvider:
@@ -73,7 +61,7 @@ def test_glossary_pass_offers_only_add_glossary():
 
 # --------------------------------------------------------------- the function
 
-def test_glossary_page_finalizes_without_a_retrieval_foldout(fresh, tmp_path):
+def test_glossary_page_finalizes_without_a_retrieval_foldout(tmp_path):
     unit = _unit(tmp_path)
     prov = GlossaryProvider([{"term": "Loop", "definition": "Repeats a block of code."},
                              {"term": "Array", "definition": "An ordered collection of items."}])
@@ -87,7 +75,7 @@ def test_glossary_page_finalizes_without_a_retrieval_foldout(fresh, tmp_path):
     assert not any(b.kind == "details" for b in pg.blocks.values())   # a reference page has no foldout
 
 
-def test_glossary_dedups_terms_across_chunks(fresh, tmp_path):
+def test_glossary_dedups_terms_across_chunks(tmp_path):
     # tiny budget forces two chunks; the two passes share "Loop" (dedup) and add distinct terms (union)
     unit = _unit(tmp_path, "Loops repeat a block of code many times over.\n\n"
                            "Arrays store ordered data you can index into.",
@@ -105,7 +93,7 @@ def test_glossary_dedups_terms_across_chunks(fresh, tmp_path):
     assert terms["loop"] == "first-wins definition"          # first definition wins
 
 
-def test_empty_glossary_does_not_finalize(fresh, tmp_path):
+def test_empty_glossary_does_not_finalize(tmp_path):
     unit = _unit(tmp_path)
     pg, problems = glossary.build_glossary_page(unit, GlossaryProvider([]), "m",
                                                 unit.output_dir.parent / "g")
@@ -114,18 +102,18 @@ def test_empty_glossary_does_not_finalize(fresh, tmp_path):
 
 # --------------------------------------------------------------- page-type-aware validate_final
 
-def test_reference_page_types_skip_the_retrieval_requirement(fresh):
-    pageir.init(page_id="p", out_dir=None, title="T", page_type="glossary", slug="t")
-    pageir.put_block(pageir.build_block("heading", block_id="h", text="Key Terms", role="review"))
-    pageir.put_block(pageir.build_block("glossary", block_id="g",
+def test_reference_page_types_skip_the_retrieval_requirement():
+    d = pageir.PageDraft.new(page_id="p", out_dir=None, title="T", page_type="glossary", slug="t")
+    d.put_block(pageir.build_block("heading", block_id="h", text="Key Terms", role="review"))
+    d.put_block(pageir.build_block("glossary", block_id="g",
                                         entries=[{"term": "X", "definition": "a thing"}]))
-    assert pageir.validate_final() == []                     # glossary: no foldout required
+    assert d.validate_final() == []                     # glossary: no foldout required
 
 
-def test_teaching_page_still_requires_the_retrieval_foldout(fresh):
-    pageir.init(page_id="p", out_dir=None, title="T", page_type="week_intro", slug="t")
-    pageir.put_block(pageir.build_block("heading", block_id="h", text="Loops", role="concept"))
-    pageir.put_block(pageir.build_block("glossary", block_id="g",
+def test_teaching_page_still_requires_the_retrieval_foldout():
+    d = pageir.PageDraft.new(page_id="p", out_dir=None, title="T", page_type="week_intro", slug="t")
+    d.put_block(pageir.build_block("heading", block_id="h", text="Loops", role="concept"))
+    d.put_block(pageir.build_block("glossary", block_id="g",
                                         entries=[{"term": "X", "definition": "a thing"}]))
-    problems = pageir.validate_final()
+    problems = d.validate_final()
     assert any("retrieval" in p for p in problems)           # a teaching page must still retrieve

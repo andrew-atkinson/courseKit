@@ -14,23 +14,16 @@ from coursekit.generate.page.renderer import render_body
 from coursekit.outcomes import CoursekitError
 
 
-@pytest.fixture
-def fresh():
-    P.reset()
-    yield
-    P.reset()
-
-
 def _full_page():
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="h", text="REVIEW", level=4))
-    P.put_block(P.build_block(kind="paragraph", block_id="p", text="Some **prose** here."))
-    P.put_block(P.build_block(kind="bullets", block_id="b", items=["one", "two"]))
-    P.put_block(P.build_block(kind="code", block_id="c", code="let x = 0;\nx++;", language="js"))
-    P.put_block(P.build_block(kind="glossary", block_id="g",
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="h", text="REVIEW", level=4))
+    d.put_block(P.build_block(kind="paragraph", block_id="p", text="Some **prose** here."))
+    d.put_block(P.build_block(kind="bullets", block_id="b", items=["one", "two"]))
+    d.put_block(P.build_block(kind="code", block_id="c", code="let x = 0;\nx++;", language="js"))
+    d.put_block(P.build_block(kind="glossary", block_id="g",
                               entries=[{"term": "loop", "definition": "repeats"}]))
-    P.put_block(P.build_block(kind="callout", block_id="w", text="mind the gap", tone="warning"))
-    return P.get()
+    d.put_block(P.build_block(kind="callout", block_id="w", text="mind the gap", tone="warning"))
+    return d.page
 
 
 _SUPP = {
@@ -56,7 +49,7 @@ def _properties_used(html: str) -> set[str]:
 # ------------------------------------ the property-allowlist guardrail
 
 @pytest.mark.parametrize("theme_name", ["terminal", "bauhaus", "plotter"])
-def test_every_emitted_property_survives_canvas(fresh, theme_name):
+def test_every_emitted_property_survives_canvas(theme_name):
     theme = S.load_theme(theme_name)
     theme["_name"] = theme_name
     html = render_body(_full_page(), _SUPP, theme)
@@ -130,7 +123,7 @@ def test_unreadable_accent_override_rejected_with_warning(tmp_path):
 
 # --------------------------------------------- identity distinctness
 
-def test_the_three_identities_actually_differ(fresh):
+def test_the_three_identities_actually_differ():
     page = _full_page()
     rendered = {n: render_body(page, style=dict(S.load_theme(n), _name=n))
                 for n in ("terminal", "bauhaus", "plotter")}
@@ -143,29 +136,29 @@ def test_the_three_identities_actually_differ(fresh):
 
 # --------------------------------------------- topic frames + images
 
-def test_card_frame_wraps_heading_to_next_heading(fresh):
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="h1", text="Topic One", level=3))
-    P.put_block(P.build_block(kind="paragraph", block_id="p1", text="about one"))
-    P.put_block(P.build_block(kind="heading", block_id="h2", text="Topic Two", level=3))
-    P.put_block(P.build_block(kind="code", block_id="c2", code="x = 1", language="js"))
-    framed = render_body(P.get(), style=dict(S.load_theme("plotter"), _name="plotter"))
-    unframed = render_body(P.get(), style=dict(S.load_theme("terminal"), _name="terminal"))
+def test_card_frame_wraps_heading_to_next_heading():
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="h1", text="Topic One", level=3))
+    d.put_block(P.build_block(kind="paragraph", block_id="p1", text="about one"))
+    d.put_block(P.build_block(kind="heading", block_id="h2", text="Topic Two", level=3))
+    d.put_block(P.build_block(kind="code", block_id="c2", code="x = 1", language="js"))
+    framed = render_body(d.page, style=dict(S.load_theme("plotter"), _name="plotter"))
+    unframed = render_body(d.page, style=dict(S.load_theme("terminal"), _name="terminal"))
 
     # plotter frames each topic with its dashed registration hairline
     assert framed.count('border: 1px dashed #b9c2c9') == 2   # two topics, two cards
     assert "dashed" not in unframed                          # terminal stays flat
 
 
-def test_frame_is_render_time_only(fresh):
+def test_frame_is_render_time_only():
     # page.json is identical either way — the frame never touches the IR
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="h", text="T", level=3))
-    dumped = P.get().model_dump()
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="h", text="T", level=3))
+    dumped = d.page.model_dump()
     assert "frame" not in str(dumped)
 
 
-def test_images_supplement_renders_figures(fresh):
+def test_images_supplement_renders_figures():
     page = _full_page()
     supp = {"images": [{"url": "https://x.io/photo.jpg", "caption": "f/2.8 — shallow depth",
                         "alt": "portrait"}]}
@@ -177,7 +170,7 @@ def test_images_supplement_renders_figures(fresh):
 
 
 @pytest.mark.parametrize("theme_name", ["terminal", "bauhaus", "plotter", "studio"])
-def test_allowlist_holds_with_frames_and_images(fresh, theme_name):
+def test_allowlist_holds_with_frames_and_images(theme_name):
     theme = dict(S.load_theme(theme_name), _name=theme_name)
     supp = dict(_SUPP, images=[{"url": "https://x.io/a.jpg", "caption": "c"}])
     html = render_body(_full_page(), supp, theme)
@@ -193,16 +186,16 @@ def test_studio_theme_valid_and_quiet():
 
 # ------------------------------------ role-based framing + surface + a11y
 
-def test_review_is_a_recap_container_of_question_accordions(fresh):
+def test_review_is_a_recap_container_of_question_accordions():
     # a review section is a block-level Recap CONTAINER (a bordered box in the theme's idiom) holding
     # one accordion per recall question — the container is not itself collapsible.
     for name, rborder in (("bauhaus", "#d4d4d4"), ("terminal", "#3f6b78"),
                           ("plotter", "#c9d1d6"), ("studio", "#ddd9d6")):
-        P.reset()
-        P.put_block(P.build_block(kind="heading", block_id="r", text="Recap", level=2, role="review"))
-        P.put_block(P.build_block(kind="details", block_id="q1", summary="What is X?", text="X is a thing."))
-        P.put_block(P.build_block(kind="details", block_id="q2", summary="What is Y?", text="Y is another."))
-        html = render_body(P.get(), style=dict(S.load_theme(name), _name=name))
+        d = P.PageDraft.new("test")
+        d.put_block(P.build_block(kind="heading", block_id="r", text="Recap", level=2, role="review"))
+        d.put_block(P.build_block(kind="details", block_id="q1", summary="What is X?", text="X is a thing."))
+        d.put_block(P.build_block(kind="details", block_id="q2", summary="What is Y?", text="Y is another."))
+        html = render_body(d.page, style=dict(S.load_theme(name), _name=name))
         assert rborder in html, name                 # the container's theme-idiom border
         assert html.count("<details") == 2, name     # one accordion per question, not one for the recap
         assert "What is X?" in html and "What is Y?" in html, name
@@ -212,31 +205,31 @@ def test_review_is_a_recap_container_of_question_accordions(fresh):
         assert f'color: {q_color}' in html and f'color: {a_color}' in html, name
 
 
-def test_terminal_recap_is_a_light_note_defined_by_a_linear_border(fresh):
+def test_terminal_recap_is_a_light_note_defined_by_a_linear_border():
     # terminal's recap is a pale box with DARK text (readable) set off from the dark page by a rule
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="r", text="Recap", level=2, role="review"))
-    P.put_block(P.build_block(kind="details", block_id="q", summary="Recall?", text="Yes."))
-    html = render_body(P.get(), style=dict(S.load_theme("terminal"), _name="terminal"))
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="r", text="Recap", level=2, role="review"))
+    d.put_block(P.build_block(kind="details", block_id="q", summary="Recall?", text="Yes."))
+    html = render_body(d.page, style=dict(S.load_theme("terminal"), _name="terminal"))
     assert "background-color: #dbe6e9" in html        # the pale recap ground
     assert "color: #12333d" in html                   # dark petrol question text (high contrast)
     assert "#3f6b78" in html                          # the linear border that defines the box
     assert "1px" in html.split("background-color: #dbe6e9")[1][:80]   # a thin (1px) border, not heavy
 
 
-def test_recap_header_names_the_prior_topic(fresh):
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="r", text="Still Life", level=2, role="review"))
-    P.put_block(P.build_block(kind="details", block_id="q", summary="Q?", text="A."))
-    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+def test_recap_header_names_the_prior_topic():
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="r", text="Still Life", level=2, role="review"))
+    d.put_block(P.build_block(kind="details", block_id="q", summary="Q?", text="A."))
+    html = render_body(d.page, style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
     assert "Still Life Recap" in html               # topic + label composed
 
 
-def test_recap_header_does_not_double_a_generic_topic(fresh):
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="r", text="Recap", level=2, role="review"))
-    P.put_block(P.build_block(kind="details", block_id="q", summary="Q?", text="A."))
-    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+def test_recap_header_does_not_double_a_generic_topic():
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="r", text="Recap", level=2, role="review"))
+    d.put_block(P.build_block(kind="details", block_id="q", summary="Q?", text="A."))
+    html = render_body(d.page, style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
     assert "Recap Recap" not in html                # a generic heading falls back to just the label
 
 
@@ -246,14 +239,14 @@ def _glossary_container_style(html):
     return m.group(1) if m else ""
 
 
-def test_standalone_glossary_is_a_framed_key_terms_block(fresh):
+def test_standalone_glossary_is_a_framed_key_terms_block():
     # a standalone glossary (its own block / the week's terms) reads as its own framed box, with a
     # per-theme glyph marking it
     for name in ("bauhaus", "terminal", "plotter", "studio"):
-        P.reset()
-        P.put_block(P.build_block(kind="glossary", block_id="g",
+        d = P.PageDraft.new("test")
+        d.put_block(P.build_block(kind="glossary", block_id="g",
                                   entries=[{"term": "Ha-ha", "definition": "a sunken wall"}]))
-        html = render_body(P.get(), style=dict(S.load_theme(name), _name=name))
+        html = render_body(d.page, style=dict(S.load_theme(name), _name=name))
         theme = S.load_theme(name)
         c = theme["color"]
         assert "Key Terms" in html and "Ha-ha" in html, name
@@ -262,31 +255,31 @@ def test_standalone_glossary_is_a_framed_key_terms_block(fresh):
         assert theme["glyphs"]["key_terms"] in html, name                # the graphic mark
 
 
-def test_glossary_folds_into_a_concept_section(fresh):
+def test_glossary_folds_into_a_concept_section():
     # key terms under a concept, with more page after them, are specific to it: they fold in as a
     # subsection — a top rule + label, no separate box
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="c", text="Landscape", level=2, role="concept"))
-    P.put_block(P.build_block(kind="bullets", block_id="b", items=["conflict on the land"]))
-    P.put_block(P.build_block(kind="glossary", block_id="g",
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="c", text="Landscape", level=2, role="concept"))
+    d.put_block(P.build_block(kind="bullets", block_id="b", items=["conflict on the land"]))
+    d.put_block(P.build_block(kind="glossary", block_id="g",
                               entries=[{"term": "Sublime", "definition": "awe"}]))
-    P.put_block(P.build_block(kind="heading", block_id="c2", text="Beauty", level=2, role="concept"))
-    P.put_block(P.build_block(kind="bullets", block_id="b2", items=["the picturesque"]))
-    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    d.put_block(P.build_block(kind="heading", block_id="c2", text="Beauty", level=2, role="concept"))
+    d.put_block(P.build_block(kind="bullets", block_id="b2", items=["the picturesque"]))
+    html = render_body(d.page, style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
     style = _glossary_container_style(html)
     assert "Landscape · Key Terms" in html and "Sublime" in html         # label names its concept
     assert "border-top" in style and "border-radius" not in style        # a rule, not a box
 
 
-def test_trailing_week_glossary_is_peeled_to_standalone(fresh):
+def test_trailing_week_glossary_is_peeled_to_standalone():
     # a glossary tacked onto the end of the last concept is the week's terms — it stands alone (a box),
     # it does not fold into that concept
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="c", text="Landscape", level=2, role="concept"))
-    P.put_block(P.build_block(kind="bullets", block_id="b", items=["conflict on the land"]))
-    P.put_block(P.build_block(kind="glossary", block_id="g",
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="c", text="Landscape", level=2, role="concept"))
+    d.put_block(P.build_block(kind="bullets", block_id="b", items=["conflict on the land"]))
+    d.put_block(P.build_block(kind="glossary", block_id="g",
                               entries=[{"term": "Sublime", "definition": "awe"}]))
-    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    html = render_body(d.page, style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
     assert "border-radius" in _glossary_container_style(html)            # framed, not folded
 
 
@@ -294,51 +287,51 @@ def test_glossary_label_is_configurable(tmp_path):
     (tmp_path / ".vtconfig").mkdir()
     (tmp_path / ".vtconfig" / "style.yaml").write_text(
         "theme: bauhaus\nglossary_label: Vocabulary\n", encoding="utf-8")
-    P.reset()
-    P.put_block(P.build_block(kind="glossary", block_id="g",
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="glossary", block_id="g",
                               entries=[{"term": "T", "definition": "d"}]))
-    html = render_body(P.get(), style=S.load_style(tmp_path))
+    html = render_body(d.page, style=S.load_style(tmp_path))
     assert "Vocabulary" in html and "Key Terms" not in html
 
 
-def test_terminal_glossary_sits_on_a_ground_for_legibility(fresh):
+def test_terminal_glossary_sits_on_a_ground_for_legibility():
     # in a dark identity the Key Terms frame carries its ground so the light ink stays readable
-    P.reset()
-    P.put_block(P.build_block(kind="glossary", block_id="g",
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="glossary", block_id="g",
                               entries=[{"term": "T", "definition": "d"}]))
-    html = render_body(P.get(), style=dict(S.load_theme("terminal"), _name="terminal"))
+    html = render_body(d.page, style=dict(S.load_theme("terminal"), _name="terminal"))
     assert "background-color: #12333d" in html               # the petrol ground under the terms
 
 
-def test_a_non_review_section_is_not_a_recap(fresh):
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="c", text="Core Idea", level=2, role="concept"))
-    P.put_block(P.build_block(kind="details", block_id="d", summary="Predict?", text="answer"))
-    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+def test_a_non_review_section_is_not_a_recap():
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="c", text="Core Idea", level=2, role="concept"))
+    d.put_block(P.build_block(kind="details", block_id="d", summary="Predict?", text="answer"))
+    html = render_body(d.page, style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
     assert "Recap" not in html                       # no recap label for a non-review section
 
 
-def test_role_glyph_renders_in_accent(fresh):
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="c", text="Loops", level=3, role="concept"))
-    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+def test_role_glyph_renders_in_accent():
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="c", text="Loops", level=3, role="concept"))
+    html = render_body(d.page, style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
     assert "■" in html                          # bauhaus's concept glyph
 
 
-def test_terminal_panels_each_section_on_petrol(fresh):
+def test_terminal_panels_each_section_on_petrol():
     # terminal breaks into per-section petrol panels (with white gaps), not one full-bleed slab
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="a", text="One", level=3, role="concept"))
-    P.put_block(P.build_block(kind="paragraph", block_id="pa", text="x"))
-    P.put_block(P.build_block(kind="heading", block_id="b", text="Two", level=3, role="concept"))
-    P.put_block(P.build_block(kind="paragraph", block_id="pb", text="y"))
-    html = render_body(P.get(), style=dict(S.load_theme("terminal"), _name="terminal"))
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="a", text="One", level=3, role="concept"))
+    d.put_block(P.build_block(kind="paragraph", block_id="pa", text="x"))
+    d.put_block(P.build_block(kind="heading", block_id="b", text="Two", level=3, role="concept"))
+    d.put_block(P.build_block(kind="paragraph", block_id="pb", text="y"))
+    html = render_body(d.page, style=dict(S.load_theme("terminal"), _name="terminal"))
     assert html.count("background-color: #12333d") == 2       # two separate petrol panels
     assert html.count("margin: 0 0 22px 0") == 2              # …each with a gap after it (breathing room)
     assert "border-left: 12px solid" in html                  # the CSS powerline chevron
 
 
-def test_images_without_alt_or_caption_are_dropped(fresh):
+def test_images_without_alt_or_caption_are_dropped():
     page = _full_page()
     supp = {"images": [
         {"url": "https://x.io/good.jpg", "alt": "a portrait"},
@@ -349,7 +342,7 @@ def test_images_without_alt_or_caption_are_dropped(fresh):
     assert "bad.jpg" not in html
 
 
-def test_every_img_has_nonempty_alt_and_every_iframe_a_title(fresh):
+def test_every_img_has_nonempty_alt_and_every_iframe_a_title():
     page = _full_page()
     supp = {
         "images": [{"url": "https://x.io/a.jpg", "caption": "used as alt"}],
@@ -364,11 +357,11 @@ def test_every_img_has_nonempty_alt_and_every_iframe_a_title(fresh):
             assert re.search(r'title="[^"]+"', m.group(0)), f"{name}: iframe without title"
 
 
-def test_terminal_segments_color_by_role(fresh):
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="c", text="Core", level=3, role="concept"))
-    P.put_block(P.build_block(kind="heading", block_id="p", text="Do", level=3, role="practice"))
-    html = render_body(P.get(), style=dict(S.load_theme("terminal"), _name="terminal"))
+def test_terminal_segments_color_by_role():
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="c", text="Core", level=3, role="concept"))
+    d.put_block(P.build_block(kind="heading", block_id="p", text="Do", level=3, role="practice"))
+    html = render_body(d.page, style=dict(S.load_theme("terminal"), _name="terminal"))
     assert "background-color: #1f6a86" in html    # concept chip = blue (the "path" segment)
     assert "background-color: #8a5a12" in html    # practice chip = amber (the "git" segment)
     assert "$" not in html                         # the literal prompt gimmick is gone
@@ -377,29 +370,29 @@ def test_terminal_segments_color_by_role(fresh):
 # --------------------------------------------- pedagogy devices, styled
 
 def _device_page():
-    P.reset()
-    P.put_block(P.build_block(kind="columns", block_id="c", columns=[
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="columns", block_id="c", columns=[
         {"title": "A", "items": ["a1", "a2"]}, {"title": "B", "items": ["b1"]}]))
-    P.put_block(P.build_block(kind="pullquote", block_id="pq", text="the one idea", attribution="src"))
-    P.put_block(P.build_block(kind="card", block_id="cd", card_kind="example", title="Ex", text="body"))
-    P.put_block(P.build_block(kind="details", block_id="dt", summary="predict?", text="answer"))
-    return P.get()
+    d.put_block(P.build_block(kind="pullquote", block_id="pq", text="the one idea", attribution="src"))
+    d.put_block(P.build_block(kind="card", block_id="cd", card_kind="example", title="Ex", text="body"))
+    d.put_block(P.build_block(kind="details", block_id="dt", summary="predict?", text="answer"))
+    return d.page
 
 
 @pytest.mark.parametrize("theme_name", ["terminal", "bauhaus", "plotter", "studio"])
-def test_devices_stay_within_the_allowlist(fresh, theme_name):
+def test_devices_stay_within_the_allowlist(theme_name):
     html = render_body(_device_page(), style=dict(S.load_theme(theme_name), _name=theme_name))
     rogue = _properties_used(html) - S.ALLOWED_CSS_PROPERTIES
     assert not rogue, f"{theme_name} devices emit stripped properties: {sorted(rogue)}"
 
 
-def test_columns_render_side_by_side(fresh):
+def test_columns_render_side_by_side():
     html = render_body(_device_page(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
     assert "display: flex" in html and "flex-wrap: wrap" in html
     assert ">A</div>" in html and ">B</div>" in html      # both column titles present
 
 
-def test_details_is_native_no_js(fresh):
+def test_details_is_native_no_js():
     html = render_body(_device_page(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
     assert "<details" in html and "<summary" in html
     assert "<script" not in html                          # progressive disclosure without JS
@@ -407,14 +400,14 @@ def test_details_is_native_no_js(fresh):
 
 # ------------------------- action affordances vs meaning icons (UI/UX rule)
 
-def test_disclosure_is_an_enclosed_control_not_a_bare_glyph(fresh):
+def test_disclosure_is_an_enclosed_control_not_a_bare_glyph():
     # An interactive affordance must read as a control: enclosed (border) + pointer cursor.
     # A descriptive role glyph must stay bare (no border, no pointer). This keeps "click me"
     # graphically distinct from "this is what this section is".
-    P.reset()
-    P.put_block(P.build_block(kind="heading", block_id="h", text="Concept", level=3, role="concept"))
-    P.put_block(P.build_block(kind="details", block_id="d", summary="reveal?", text="answer"))
-    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="heading", block_id="h", text="Concept", level=3, role="concept"))
+    d.put_block(P.build_block(kind="details", block_id="d", summary="reveal?", text="answer"))
+    html = render_body(d.page, style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
 
     import re as _re
     details = _re.search(r"<details[^>]*>", html).group(0)
@@ -427,23 +420,23 @@ def test_disclosure_is_an_enclosed_control_not_a_bare_glyph(fresh):
     assert "cursor: pointer" not in heading and "<details" not in heading  # meaning = bare, not a control
 
 
-def test_disclosure_uses_the_native_rotating_marker(fresh):
+def test_disclosure_uses_the_native_rotating_marker():
     # The native <details> marker is kept (not suppressed) — it's the only thing that can rotate on
     # open/close without JS or a stylesheet, both of which Canvas strips. The enclosing control bar
     # keeps it reading as an action, so it no longer needs a hand-drawn chevron.
-    P.reset()
-    P.put_block(P.build_block(kind="details", block_id="d", summary="q", text="a"))
-    html = render_body(P.get(), style=dict(S.load_theme("terminal"), _name="terminal"))
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="details", block_id="d", summary="q", text="a"))
+    html = render_body(d.page, style=dict(S.load_theme("terminal"), _name="terminal"))
     summary = html[html.index("<summary"):html.index("</summary>")]
     assert "list-style-type: none" not in summary   # marker NOT suppressed -> rotates natively
     assert "▾" not in summary                   # and no static hand-drawn chevron
 
 
-def test_answers_are_hidden_by_default(fresh):
+def test_answers_are_hidden_by_default():
     # retrieval practice = predict, then reveal. The answer is present (accessible) but collapsed.
-    P.reset()
-    P.put_block(P.build_block(kind="details", block_id="d", summary="predict?", text="the answer"))
-    html = render_body(P.get(), style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
+    d = P.PageDraft.new("test")
+    d.put_block(P.build_block(kind="details", block_id="d", summary="predict?", text="the answer"))
+    html = render_body(d.page, style=dict(S.load_theme("bauhaus"), _name="bauhaus"))
     assert "<details open" not in html and "<details  open" not in html   # no open attr -> collapsed
     assert "the answer" in html                                           # but present in the DOM
 
@@ -452,9 +445,9 @@ def test_inline_code_is_a_legible_chip_in_every_theme():
     # a bare <code> inherited the page ink and went light-on-white in the terminal panel gaps;
     # it now renders as a self-contained chip in the theme's validated code pair, AA on its own bg
     for name in ("bauhaus", "terminal", "plotter", "studio"):
-        P.reset()
-        P.put_block(P.build_block(kind="paragraph", block_id="p", text="Call `loadJSON()` first."))
-        html = render_body(P.get(), style=dict(S.load_theme(name), _name=name))
+        d = P.PageDraft.new("test")
+        d.put_block(P.build_block(kind="paragraph", block_id="p", text="Call `loadJSON()` first."))
+        html = render_body(d.page, style=dict(S.load_theme(name), _name=name))
         style = re.search(r'<code style="([^"]*)">', html).group(1)
         bg = re.search(r"background-color: (#[0-9a-fA-F]+)", style).group(1)
         fg = re.search(r"(?:^|; )color: (#[0-9a-fA-F]+)", style).group(1)

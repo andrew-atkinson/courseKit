@@ -27,11 +27,10 @@ from coursekit.generate.page import tools
 _GLOSSARY_SPECS = [s for s in tools.TOOL_SPECS if s["name"] == "add_glossary"]
 
 
-def _harvest_new_glossary() -> list[dict]:
-    """Pull every glossary block currently in the IR out into plain term/definition dicts and REMOVE
+def _harvest_new_glossary(pg) -> list[dict]:
+    """Pull every glossary block currently in the page out into plain term/definition dicts and REMOVE
     the blocks. Called after each chunk pass so the next pass's (often same-block_id) glossary can't
     overwrite this chunk's terms — accumulation lives here, deterministically, not in the IR."""
-    pg = pageir.get()
     out = []
     for bid in [bid for bid, b in list(pg.blocks.items()) if b.kind == "glossary"]:
         out += [{"term": e.term, "definition": e.definition} for e in pg.blocks[bid].entries]
@@ -50,11 +49,10 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     base = slugify(unit.week_label) if unit.week_label else unit.week_slug
-    pageir.init(page_id=f"{unit.course_slug}-{unit.week_slug}-glossary", out_dir=out_dir,
-                title=f"{unit.week_label or unit.week_slug} — Key Terms", page_type="glossary",
-                week_ref=unit.week_slug, slug=f"{base}-glossary")
-    tools.reset_state()
-    tools.set_call_log(out_dir / "calls.jsonl")
+    draft = pageir.PageDraft.new(f"{unit.course_slug}-{unit.week_slug}-glossary", out_dir,
+                                 title=f"{unit.week_label or unit.week_slug} — Key Terms", page_type="glossary",
+                                 week_ref=unit.week_slug, slug=f"{base}-glossary")
+    session = tools.PageTools(draft, call_log=out_dir / "calls.jsonl")
 
     # No heading block: the glossary block is self-labeling (a framed "Key Terms" box), so a separate
     # heading would just repeat that label — and once carried role="review", which mis-rendered the
@@ -71,10 +69,10 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
             cont = ("" if len(chunks) == 1 else
                     f"\n\n(This is part {k + 1} of {len(chunks)} of the material; add any NEW terms it "
                     f"introduces — do not repeat terms already covered.)")
-            decompose._run_pass(provider, model, system,
+            decompose._run_pass(session, provider, model, system,
                                 f"The week's material:\n<material>\n{chunk}\n</material>{cont}",
                                 specs=_GLOSSARY_SPECS, stats=stats)
-            collected += _harvest_new_glossary()
+            collected += _harvest_new_glossary(draft.page)
         return collected
 
     collected = _extract()
@@ -87,7 +85,7 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
     for e in collected:
         seen.setdefault(e["term"].strip().lower(), e)
     if seen:
-        pageir.put_block(pageir.build_block("glossary", block_id="terms", entries=list(seen.values())))
+        draft.put_block(pageir.build_block("glossary", block_id="terms", entries=list(seen.values())))
     outcomes.info("page.glossary_terms", f"  glossary: {len(seen)} term(s){f' (retry{retries})' if retries else ''}"
                   f"{f' over {len(chunks)} chunk(s)' if len(chunks) > 1 else ''}", terms=len(seen))
 
@@ -97,14 +95,14 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
         outcomes.warn("page.pass_errors", f"  ⚠ {stats['errors']} pass error(s) — candidate "
                       f"timeouts/overheating: {kinds}", errors=stats["errors"])
 
-    problems = pageir.validate_final()
+    problems = draft.validate_final()
     if not problems:
-        pageir.finalize()
+        draft.finalize()
     else:
         outcomes.warn("page.not_finalized", "  (did not finalize: " + "; ".join(problems) + ")",
                       problems=problems)
-    decompose._render(unit, out_dir, project_root)
-    return pageir.get(), problems
+    decompose._render(draft.page, unit, out_dir, project_root)
+    return draft.page, problems
 
 
 def main() -> int:

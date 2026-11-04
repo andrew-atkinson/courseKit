@@ -26,25 +26,17 @@ from coursekit.emit import cc
 from coursekit.generate.page import page as P
 
 
-@pytest.fixture
-def fresh():
-    P.reset()
-    yield
-    P.reset()
-
-
 def _page(page_id="c-week-3", title="Week 3: Repetition", slug="week-3-repetition",
           week_ref="week-3", blocks=None):
-    P.reset()
-    P.init(page_id, title=title, slug=slug, week_ref=week_ref)
+    d = P.PageDraft.new(page_id, title=title, slug=slug, week_ref=week_ref)
     for b in blocks or (dict(kind="heading", block_id="h", text="REVIEW", level=4),):
-        P.put_block(P.build_block(**b))
-    return P.get()
+        d.put_block(P.build_block(**b))
+    return d.page
 
 
 # --------------------------------------------------------- the wiki page html
 
-def test_page_html_has_the_canvas_meta_header(fresh):
+def test_page_html_has_the_canvas_meta_header():
     page = _page()
     doc = cc.render_page(page)
     # the exact head the real export carries
@@ -55,7 +47,7 @@ def test_page_html_has_the_canvas_meta_header(fresh):
     assert f'<meta name="identifier" content="{cc.page_ident(page)}"/>' in doc
 
 
-def test_page_html_parses_and_brackets_the_body(fresh):
+def test_page_html_parses_and_brackets_the_body():
     doc = cc.render_page(_page(
         page_id="c", title="X", slug="x", week_ref=None,
         blocks=[dict(kind="heading", block_id="h", text="A", level=4),
@@ -63,7 +55,7 @@ def test_page_html_parses_and_brackets_the_body(fresh):
     assert _parses_as_html(doc)
 
 
-def test_page_body_carries_the_rendered_blocks_not_the_title_as_h1(fresh):
+def test_page_body_carries_the_rendered_blocks_not_the_title_as_h1():
     doc = cc.render_page(_page(
         page_id="c", title="My Title", slug="s", week_ref=None,
         blocks=[dict(kind="heading", block_id="h", text="REVIEW", level=4)]))
@@ -73,7 +65,7 @@ def test_page_body_carries_the_rendered_blocks_not_the_title_as_h1(fresh):
     assert "<h1" not in doc
 
 
-def test_hostile_text_survives_into_the_page(fresh):
+def test_hostile_text_survives_into_the_page():
     doc = cc.render_page(_page(
         page_id="c", title="A < B & C", slug="s", week_ref=None,
         blocks=[dict(kind="heading", block_id="h", text="x < y & z", level=4)]))
@@ -84,7 +76,7 @@ def test_hostile_text_survives_into_the_page(fresh):
 
 # -------------------------------------------------------------- the manifest
 
-def test_manifest_namespaces_match_the_export(fresh):
+def test_manifest_namespaces_match_the_export():
     body = cc.emit_manifest([_page()], "A Course")
     assert 'xmlns="http://www.imsglobal.org/xsd/imsccv1p1/imscp_v1p1"' in body
     assert 'xmlns:lomimscc="http://ltsc.ieee.org/xsd/imsccv1p1/LOM/manifest"' in body
@@ -93,7 +85,7 @@ def test_manifest_namespaces_match_the_export(fresh):
     ET.fromstring(body)
 
 
-def test_manifest_has_a_webcontent_resource_per_page(fresh):
+def test_manifest_has_a_webcontent_resource_per_page():
     p1 = _page(page_id="c-w1", title="W1", slug="week-1", week_ref="week-1")
     p2 = _page(page_id="c-w2", title="W2", slug="week-2", week_ref="week-2")
     body = cc.emit_manifest([p1, p2], "A Course")
@@ -105,7 +97,7 @@ def test_manifest_has_a_webcontent_resource_per_page(fresh):
         assert r.get("href").startswith("wiki_content/")
 
 
-def test_manifest_course_title_is_escaped(fresh):
+def test_manifest_course_title_is_escaped():
     body = cc.emit_manifest([_page()], "Art & Design < 101 >")
     assert "Art &amp; Design &lt; 101 &gt;" in body
     ET.fromstring(body)
@@ -113,7 +105,7 @@ def test_manifest_course_title_is_escaped(fresh):
 
 # --------------------------------------------- reference integrity + packaging
 
-def test_every_resource_href_is_a_packaged_file(fresh):
+def test_every_resource_href_is_a_packaged_file():
     entries = [(_page(page_id="c-w1", title="W1", slug="week-1", week_ref="week-1"), {}, None),
                (_page(page_id="c-w2", title="W2", slug="week-2", week_ref="week-2"), {}, None)]
     files = cc.package_files(entries, "A Course")
@@ -130,7 +122,7 @@ def test_every_resource_href_is_a_packaged_file(fresh):
 
 # ------------------------------------------- the Canvas-importer trigger + modules
 
-def test_package_ships_the_canvas_export_marker(fresh):
+def test_package_ships_the_canvas_export_marker():
     # the presence of this file is what makes Canvas import wiki_content as Pages, not Files
     files = cc.package_files([(_page(), {}, None)], "A Course")
     assert "course_settings/canvas_export.txt" in files
@@ -138,7 +130,7 @@ def test_package_ships_the_canvas_export_marker(fresh):
     assert 'href="course_settings/canvas_export.txt"' in files["imsmanifest.xml"]
 
 
-def test_module_meta_lists_each_page_as_a_wikipage(fresh):
+def test_module_meta_lists_each_page_as_a_wikipage():
     p1 = _page(page_id="c-w1", title="Week 1", slug="week-1", week_ref="week-1")
     p2 = _page(page_id="c-w2", title="Week 2", slug="week-2", week_ref="week-2")
     body = cc.emit_module_meta([p1, p2], "A Course")
@@ -152,7 +144,7 @@ def test_module_meta_lists_each_page_as_a_wikipage(fresh):
         assert item.find("c:identifierref", ns).text == cc.page_ident(page)
 
 
-def test_organizations_reference_every_page_resource(fresh):
+def test_organizations_reference_every_page_resource():
     p1 = _page(page_id="c-w1", title="W1", slug="week-1", week_ref="week-1")
     p2 = _page(page_id="c-w2", title="W2", slug="week-2", week_ref="week-2")
     manifest = ET.fromstring(cc.emit_manifest([p1, p2], "A Course"))
@@ -162,13 +154,13 @@ def test_organizations_reference_every_page_resource(fresh):
     assert refs == {cc.page_ident(p1), cc.page_ident(p2)}
 
 
-def test_no_course_settings_xml_is_shipped(fresh):
+def test_no_course_settings_xml_is_shipped():
     # shipping course_settings.xml would mutate the target course's title/settings — never do it
     files = cc.package_files([(_page(), {}, None)], "A Course")
     assert "course_settings/course_settings.xml" not in files
 
 
-def test_resource_identifier_matches_the_page_meta(fresh):
+def test_resource_identifier_matches_the_page_meta():
     page = _page(page_id="c-w1", title="W1", slug="week-1", week_ref="week-1")
     files = cc.package_files([(page, {}, None)], "A Course")
     manifest = ET.fromstring(files["imsmanifest.xml"])
@@ -180,7 +172,7 @@ def test_resource_identifier_matches_the_page_meta(fresh):
     assert f'content="{res_id}"' in files["wiki_content/week-1.html"]
 
 
-def test_a_slug_collision_is_rejected_not_silently_dropped(fresh):
+def test_a_slug_collision_is_rejected_not_silently_dropped():
     same = [(_page(page_id="c-a", title="A", slug="dup", week_ref="week-1"), {}, None),
             (_page(page_id="c-b", title="B", slug="dup", week_ref="week-2"), {}, None)]
     with pytest.raises(ValueError, match="same file"):
@@ -198,10 +190,10 @@ def _course_tree(tmp_path):
     for wk, slug in (("week-1", "week-1-intro"), ("week-3", "week-3-repetition")):
         pdir = course / "pages" / wk
         pdir.mkdir(parents=True)
-        P.reset()
-        P.load(P.Page(page_id=f"c-{wk}", title=f"{wk.title()}", slug=slug, week_ref=wk), pdir)
-        P.put_block(P.build_block(kind="heading", block_id="h", text="REVIEW", level=4))
-    P.reset()
+        d = P.PageDraft.new("test")
+        d = P.PageDraft.adopt(P.Page(page_id=f"c-{wk}", title=f"{wk.title()}", slug=slug, week_ref=wk), pdir)
+        d.put_block(P.build_block(kind="heading", block_id="h", text="REVIEW", level=4))
+    d = P.PageDraft.new("test")
     return course
 
 

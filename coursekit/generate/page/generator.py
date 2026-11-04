@@ -27,17 +27,16 @@ class PageGenerator:
         # The page slug comes from the week *title* (Week 3: Repetition -> week-3-repetition), so it
         # matches how the page is named in Canvas, falling back to the bare week slug when untitled.
         slug = slugify(unit.week_label) if unit.week_label else unit.week_slug
-        page.init(page_id=f"{unit.course_slug}-{unit.week_slug}", out_dir=out_dir,
-                  title=unit.week_label or unit.week_slug, page_type="week_intro",
-                  week_ref=unit.week_slug, slug=slug)
-        tools.reset_state()
-        tools.set_call_log(out_dir / "calls.jsonl")
+        self.draft = page.PageDraft.new(f"{unit.course_slug}-{unit.week_slug}", out_dir,
+                                        title=unit.week_label or unit.week_slug, page_type="week_intro",
+                                        week_ref=unit.week_slug, slug=slug)
+        self.tools = tools.PageTools(self.draft, call_log=out_dir / "calls.jsonl")
 
     def tool_specs(self) -> list:
         return tools.TOOL_SPECS
 
     def run_tool_calls(self, calls):
-        return tools.run_tool_calls(calls)
+        return self.tools.run_tool_calls(calls)
 
     def build_messages(self, unit: Unit, transcript: str, cfg) -> list[dict]:
         return build_messages(
@@ -50,15 +49,14 @@ class PageGenerator:
         )
 
     def is_finalized(self) -> bool:
-        return page.is_finalized()
+        return self.draft.is_finalized()
 
     def postprocess(self, unit, provider, model, cfg, transcript) -> None:
         return   # pages have no post-generation pass
 
     def nudge(self, *, stalled: bool) -> str:
-        pg = page.get()
-        n_blocks = len(pg.blocks)
-        problems = page.validate_final()
+        n_blocks = len(self.draft.page.blocks)
+        problems = self.draft.validate_final()
         head = ("Several tool calls in a row failed; stop repeating the same call. "
                 if stalled else
                 "You stopped before the page was finalized. ")
@@ -70,19 +68,19 @@ class PageGenerator:
         return head + state + tail
 
     def result(self, unit: Unit, out_dir: Path, reply: str) -> RunResult:
-        pg = page.get()
+        pg = self.draft.page
         # Emit the reviewable standalone HTML beside page.json, merging the course's supplements
         # (references, examples, embeds) at render time. Local import keeps the generator decoupled
         # from the emitter at module load — the same way bank.finalize reaches gift.
         from coursekit.emit import html as html_emit
         from coursekit.generate.page.renderer import load_supplements
         from coursekit.generate.page.style import load_style
-        if page.is_finalized():   # an unfinished build must not overwrite the last good HTML either
+        if self.draft.is_finalized():   # an unfinished build must not overwrite the last good HTML either
             supplements = load_supplements(unit.course_root, unit.week_slug)
             html_emit.write_html(pg, out_dir, supplements, load_style(unit.course_root))
 
         return RunResult(
-            unit=unit, finalized=page.is_finalized(), output_dir=out_dir,
+            unit=unit, finalized=self.draft.is_finalized(), output_dir=out_dir,
             counts={"blocks": len(pg.blocks)},
-            problems=page.validate_final(), reply=reply,
+            problems=self.draft.validate_final(), reply=reply,
         )

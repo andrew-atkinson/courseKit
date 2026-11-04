@@ -33,12 +33,12 @@ def _fixer_body(project_root) -> str:
             + prompts.load(FIX_CATEGORY, "fix", project_root=project_root).body)
 
 
-def fix_one_block(finding, material: str, provider, model: str, *, critic: str,
+def fix_one_block(session, finding, material: str, provider, model: str, *, critic: str,
                   project_root=None, max_turns: int = 4) -> FixOutcome:
-    """Correct ONE flagged block in the loaded page (the singleton), then verify. The block must
-    already be present in `pageir.get()` (the caller loads the page first)."""
+    """Correct ONE flagged block in the session's page, then verify."""
     block_id, kind = finding.group_id, finding.label      # page Findings carry (block_id, kind)
-    b = pageir.get().blocks.get(block_id)
+    blocks = session.draft.page.blocks
+    b = blocks.get(block_id)
     if b is None:
         return FixOutcome(finding.week, block_id, kind, finding.concern, False, None)
 
@@ -61,9 +61,9 @@ def fix_one_block(finding, material: str, provider, model: str, *, critic: str,
             break                                        # content-level error → give up on this item
         if reply.wants_tools:
             provider.append_assistant(messages, reply)
-            results = tools.run_tool_calls(reply.tool_calls)
+            results = session.run_tool_calls(reply.tool_calls)
             provider.append_tool_results(messages, results)
-            now = pageir.get().blocks.get(block_id)
+            now = blocks.get(block_id)
             committed = any(not c.startswith("ERROR") for _, c in results)
             if committed and now is not None and now.model_dump() != before_dump:
                 replaced = True
@@ -76,7 +76,7 @@ def fix_one_block(finding, material: str, provider, model: str, *, critic: str,
 
     now_passes = None
     if replaced:
-        now = pageir.get().blocks.get(block_id)
+        now = blocks.get(block_id)
         verdict, _, _ = pev._one_read(critic, material, now, provider, model)
         now_passes = verdict == "PASS"
     return FixOutcome(finding.week, block_id, kind, finding.concern, replaced, now_passes)
@@ -103,21 +103,21 @@ def fix_course_pages(path, *, weeks=None, provider, model, reads: int = pev.DEFA
             flagged = [f for f in fnd if f.flagged]
         if not flagged:
             continue
-        pageir.load(page_obj, out_dir=pj.parent)          # adopt this page; put_block autosaves it
+        session = tools.PageTools(pageir.PageDraft.adopt(page_obj, pj.parent))   # put_block autosaves it
         critic = _critic_body(pev.PAGE_CATEGORY, proot)
         for f in flagged:
             if progress:
                 progress(f"fixing {label} {f.group_id} ({f.label})…")
-            o = fix_one_block(f, material, provider, model, critic=critic,
+            o = fix_one_block(session, f, material, provider, model, critic=critic,
                               project_root=proot, max_turns=max_turns)
             if progress:
                 progress(f"  → {_outcome_word(o)}")
             outcomes.append(o)
-        _rerender(pj.parent, proot, wk)
+        _rerender(page_obj, pj.parent, proot, wk)
     return outcomes
 
 
-def _rerender(out_dir, course_root, week_slug) -> None:
+def _rerender(page_obj, out_dir, course_root, week_slug) -> None:
     """Re-render the page HTML after the fixes, merging supplements + theme (mirrors the generator).
     A render failure must not lose the fixes (already saved to page.json), so it doesn't raise — but the
     HTML is now older than page.json, so it is recorded with how to catch up, never swallowed.
@@ -127,7 +127,7 @@ def _rerender(out_dir, course_root, week_slug) -> None:
         from coursekit.generate.page.renderer import load_supplements
         from coursekit.generate.page.style import load_style
         supplements = load_supplements(course_root, week_slug)
-        html_emit.write_html(pageir.get(), Path(out_dir), supplements, load_style(course_root))
+        html_emit.write_html(page_obj, Path(out_dir), supplements, load_style(course_root))
     except Exception as e:
         outcomes.warn("fix.html_stale", f"  {week_slug}: fixes saved to page.json, but the HTML wasn't "
                       f"re-rendered ({type(e).__name__}: {e}) — run `coursekit emit html` once that's "

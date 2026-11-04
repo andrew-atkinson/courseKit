@@ -168,12 +168,13 @@ def test_an_unreadable_artifact_is_counted_and_flagged_by_the_census(tmp_path):
 def test_a_failed_rerender_after_fix_is_recorded(tmp_path, monkeypatch):
     from coursekit.emit import html as html_emit
     from coursekit.generate.page import fix
+    from coursekit.generate.page.page import Page
 
     def _fail(*a, **k):
         raise OSError("disk full")
     monkeypatch.setattr(html_emit, "write_html", _fail)
     with _captured() as report:
-        fix._rerender(tmp_path, tmp_path, "week-3")
+        fix._rerender(Page(page_id="p"), tmp_path, tmp_path, "week-3")
     (w,) = report.warnings
     assert w.code == "fix.html_stale" and "emit html" in w.message
 

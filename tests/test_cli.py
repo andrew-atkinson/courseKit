@@ -191,12 +191,11 @@ def _write_page_course(tmp_path):
     (course / "output" / "week-3.md").write_text("loops and iteration", encoding="utf-8")
     pd = course / "pages" / "week-3"
     pd.mkdir(parents=True)
-    pagemod.reset()
-    pagemod.init("p1", None, title="Week 3", week_ref="week-3", slug="week-3")
-    pagemod.put_block(pagemod.build_block("heading", block_id="h1", text="Loops", level=2))
-    pagemod.put_block(pagemod.build_block(
+    d = pagemod.PageDraft.new("p1", None, title="Week 3", week_ref="week-3", slug="week-3")
+    d.put_block(pagemod.build_block("heading", block_id="h1", text="Loops", level=2))
+    d.put_block(pagemod.build_block(
         "paragraph", block_id="b2", text="Recursion OUTOFSCOPE is the tool this week."))
-    (pd / "page.json").write_text(pagemod.get().model_dump_json(), encoding="utf-8")
+    (pd / "page.json").write_text(d.page.model_dump_json(), encoding="utf-8")
     return course
 
 

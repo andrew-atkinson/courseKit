@@ -17,16 +17,15 @@ class _FakeCritic:
 
 
 def _page():
-    pagemod.reset()
-    pagemod.init("p1", None, title="Week 3", week_ref="week-3", slug="week-3")
-    pagemod.put_block(pagemod.build_block("heading", block_id="h1", text="Loops", level=2))
-    pagemod.put_block(pagemod.build_block(
+    d = pagemod.PageDraft.new("p1", None, title="Week 3", week_ref="week-3", slug="week-3")
+    d.put_block(pagemod.build_block("heading", block_id="h1", text="Loops", level=2))
+    d.put_block(pagemod.build_block(
         "paragraph", block_id="b1", text="A for loop repeats a block a set number of times."))
-    pagemod.put_block(pagemod.build_block(
+    d.put_block(pagemod.build_block(
         "paragraph", block_id="b2", text="Recursion OUTOFSCOPE is the tool this week."))
-    pagemod.put_block(pagemod.build_block(
+    d.put_block(pagemod.build_block(
         "glossary", block_id="b3", entries=[{"term": "loop", "definition": "a repeated block"}]))
-    return pagemod.get()
+    return d.page
 
 
 def test_format_block_renders_content_per_kind():
