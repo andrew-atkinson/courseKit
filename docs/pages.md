@@ -99,16 +99,16 @@ Refresh the page in your browser to see the change.
 
 ### The whole course in one cartridge
 
-To hand Canvas a single import that brings in **both pages and quizzes**, organised into week modules:
+To hand Canvas a single import that brings in **pages, quizzes, and assignments**, organised into unit modules:
 
 ```bash
 uv run coursekit emit course "/path/to/course export"
 ```
 
-This writes one `course.imscc` (model-free) — every week becomes a Canvas **module** holding that week's page and its quiz.
+This writes one `course.imscc` (model-free) — every unit becomes a Canvas **module** holding that unit's pages, quizzes, and assignments.
 Import via **Import Content → Canvas Course Export Package**.
-(`emit cc` stays the pages-only cartridge; `emit qti` the quizzes-only `.zip`.)
-The assembler is open to more content types — discussions, assignments, and rubrics are the next sources to add.
+(`emit cc` stays the pages-only cartridge, `emit qti` the quizzes-only `.zip`, and `emit assignments` the assignments-only cartridge.)
+The assembler is open to more content types; discussions are the next source to add.
 
 ## What makes a good page
 
@@ -137,7 +137,8 @@ Pick the function with `--function` (pages only):
 
 The functions are separate artifacts (they land beside each other in `pages/`), so a week can have all four.
 
-**`overview` and `recap` are assembled model-free** from the week's concept map (run `analyze` first so the map exists) — there's nothing for the model to write, so they generate instantly and **skip the post-run review** (no need for `--no-review`). `teaching` and `glossary` do use the model. Examples:
+**`overview` and `recap` are assembled model-free** from the week's concept map (run `analyze` first so the map exists) — there's nothing for the model to write, so they generate instantly and **skip the post-run review** (no need for `--no-review`). `teaching` and `glossary` do use the model.
+Without a concept map, `overview` and `recap` stop with a message saying to run `analyze`, rather than shipping a near-empty page. Examples:
 
 ```bash
 # the week's teaching page (the default) — uses the model

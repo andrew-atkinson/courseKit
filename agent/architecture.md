@@ -5,6 +5,7 @@ Presented version, combining this file and the docs guide (30 Oct 2026): <https:
 
 Verified 30 October 2026 against `main`; every diagram render-checked with mermaid-cli 12.
 The 30 Oct pass adds **[the course model](#the-course-model--one-loader-one-index)** (CORE-2: one loader, units with their own identity and stored order, one artifact index that the census, the emitters, and discovery all read), the **CORE-1 spine** (`outcomes` · `schemas` · `settings`, with `coursekit check` and `coursekit config`), the **census**, **assignments** as a third IR, and the built **proposer** (`coursekit propose`).
+The 4 Nov pass adds **[who owns the artifact being built](#who-owns-the-artifact-being-built)** (CORE-3, steps 1 and 2 of 5) and evaluate and fix reading the index (`course.review_items`).
 The 31 July pass (after 27 July's CLI subcommands + `emit course`) added the **analyze** phase (a per-week concept map), the **output-worth evaluator** (facticity · pedagogy · concept-delivery cold reads), and the targeted **fix** loop that regenerates flagged items in place.
 The 18 Aug pass adds **[the adapter architecture](#the-adapter-architecture--ingeststructure--ir--generation)** — the three-layer ingest/structure · IR · generation model, the one-writer-per-file rule, and the declared course-structure IR (FLOW-7 Phase 1: `coursestructure.py` + manifest-driven discovery).
 The videotranscriber (separate repo at `~/video_transcription`, last commit 18 Aug 2026) still imports nothing from coursekit; only its rows in the [spine table](#dependency-direction) were re-checked in this pass.
@@ -23,13 +24,24 @@ The quiz generator and the monolithic teaching page run through `run_unit` (a ta
 The assignment generator calls `loop` directly with its own tool set, one assignment per unit from `find_units`.
 Pages pass through a dispatcher first (`generate/page/build.py`): only a monolithic teaching page uses the seam; a decomposed teaching page and the glossary run their own per-section tool loop, and overview and recap pages are built from the concept map with no model.
 
+### Who owns the artifact being built
+
+A run owns what it builds ([CORE-3 design](core-3-design.md)).
+A **draft** is an artifact being built plus where it saves (`AssignmentDraft`, `PageDraft`); the IR models themselves stay plain.
+A **tool session** is one run's tools, written as methods and bound to one draft (`AssignmentTools`, `PageTools`, both on `dispatch.ToolSession`, which owns dispatch, the call log, the stop at the finishing tool, and replay).
+A generator builds both in `reset()`; decompose and glossary build one per page; `fix_course_pages` adopts each page into its own, and `fix_one_block` takes it as an argument.
+The schemas stay module constants beside the class, so the fix, decompose, and glossary subsets still come from one `TOOL_SPECS`, and `tests/test_page_tools.py` keeps each method and its schema from drifting apart.
+
+Two jobs therefore cannot write into each other's page or assignment.
+Quizzes still hold theirs in module state until step 3 (`bank._bank`, the checklist in `quiz/tools.py`), and so does the renderer's inline-code style until step 4.
+
 ### The output-worth layer — analyze, evaluate, fix
 
 Beyond generation, coursekit **understands, measures, and repairs** its own output — the layer the incumbents' generators don't have.
 
 - **analyze** (`generate/page/concept_map.py` + `consolidate.py`) builds a per-week **concept map** — the teaching concepts, their nested knowledge components, and the one enduring understanding — from the transcriber's `knowledge.json` when present, or the week text when not (same schema, swappable producer). It lands in `.vtconfig/concepts/week-N.yaml` (faculty-editable) and is read by the page generator (as an un-skippable teaching checklist) and by the evaluator (a fixed list to score against, rather than one re-derived each read).
 - **evaluate** is the *output-worth* gate — three cold reads over the committed IR, in a fresh conversation per item so it is not the generator grading itself: **facticity** (is each item correct?), **pedagogy** (does the page scan / signal / engage?), and **concept-delivery** (does it teach each concept?). Report-only.
-- **fix** closes the loop (`generate/quiz/fix.py`, `generate/page/fix.py`): for each flagged quiz variant or page block it hands the model the material, the flawed item, and the reviewer's concern, and takes a correction committed through the SAME tool with the SAME id — overwriting in place via `bank.load` / `page.load` — then cold-reads the fix to confirm it now passes.
+- **fix** closes the loop (`generate/quiz/fix.py`, `generate/page/fix.py`): for each flagged quiz variant or page block it hands the model the material, the flawed item, and the reviewer's concern, and takes a correction committed through the SAME tool with the SAME id — overwriting in place via `bank.load` / `PageDraft.adopt` — then cold-reads the fix to confirm it now passes.
 
 Evaluate and fix read the same IR the emitters do, so the whole flow is **generate → audit → repair → emit**, and only `emit` needs no model.
 
@@ -111,7 +123,7 @@ The *writer* half — the proposer (`coursekit propose`, writing `structure.cour
 Its job is **input-structure analysis** — read the real materials, declare what exists. Descriptive, grounded in the faculty's own files, low-risk.
 Two adjacent temptations are *separate* stations, deliberately not folded in: **output-structure proposal** (what the course *should* contain by pedagogical best practice) is a *prescriptive* course-design advisor (CRSE), grounded in best practice + domain rather than the file tree; **sequencing / pacing** across the term is a course-level planner (STRC).
 They chain — analyse inputs → propose output → sequence — but the chain is the *pipeline's* job, not one module's; fusing them would put a descriptive reader and a prescriptive designer behind one interface at one authority level, which is how a tool starts inventing structure and calling it analysis.
-Presented companion diagram: <https://claude.ai/code/artifact/74b690a9-4e17-46f4-bc42-c51a55cd555c>.
+The one-page picture of all this, including what is planned, is [architecture-diagram.html](architecture-diagram.html), presented at <https://claude.ai/code/artifact/74b690a9-4e17-46f4-bc42-c51a55cd555c>.
 
 ## Finding the course folder
 
@@ -136,7 +148,7 @@ flowchart LR
         PG["page generator"]
     end
 
-    CK["<b>coursekit spine</b><br/>providers · prompts · hardware<br/>courseconfig · Generator seam"]
+    CK["<b>coursekit spine</b><br/>providers · prompts<br/>hardware · courseconfig<br/>outcomes · schemas · settings<br/>Generator seam"]
 
     VT == "produces the documents<br/>they consume · data" ==> GENS
     QZ -- "imports" --> CK
@@ -212,19 +224,25 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
 7. ✅ **The whole-course cartridge + CLI shape** — `emit course` assembles pages *and* quizzes into one `.imscc` of week modules via a `CartridgeSource` per content type (extensible to discussions/ assignments); the CLI became phase subcommands (`ingest` / `generate` / `emit`) under a `coursekit` command. Import **confirmed in situ**.
 8. ✅ **The output-worth evaluator** — three cold-read checks (facticity · pedagogy · concept-delivery) over the committed IR, calibrated on synthetic sets and wired into `evaluate` / `evaluate --all`.
 9. ✅ **The analyze phase + concept map** — per-week `.vtconfig/concepts/week-N.yaml`, from the transcriber's `knowledge.json` or the week text, grounding page generation and evaluation.
-10. ✅ **The targeted fix loop** — `fix` regenerates each flagged quiz variant / page block in place and verifies (`bank.load` / `page.load` adopt a finished artifact for in-place edit).
+10. ✅ **The targeted fix loop** — `fix` regenerates each flagged quiz variant / page block in place and verifies (`bank.load` / `PageDraft.adopt` take a finished artifact for in-place edit).
 11. ✅ **Assignments** — the third IR (`assignment.json`), a generator with its own mode, and an `AssignmentSource` in the shared cartridge; Canvas import confirmed with a grading rubric attached.
 12. ✅ **The census** — `coursekit census`: an offline inventory of every unit's materials and artifacts, with gaps against declared and modal expectations.
 13. ✅ **The CORE-1 spine** — `outcomes` (one error type with a stable code, warnings as notices, no prints in library code), `schemas` + `coursekit check`, `settings` + `coursekit config`, and required inputs (a switched-on feature produces its artifact or records why not).
 14. ✅ **The course model** (CORE-2) — see [above](#the-course-model--one-loader-one-index).
-15. **Migrate the transcriber onto the spine** — providers first, taking the union of capabilities.
-16. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class.
+15. 🔶 **Generator state in instances** (CORE-3) — assignments and pages done; quizzes and the renderer next. See [above](#who-owns-the-artifact-being-built).
+16. **Migrate the transcriber onto the spine** — providers first, taking the union of capabilities.
+17. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class.
 
 ## Not yet closed
 
 - **The transcriber still carries its own copies** of provider, prompts, RAM check, and project-root logic (the diverged rows above). `courseconfig` is the surface it *can* adopt, but the adoption is its own increment in that repo — this side only built the target.
 - **Interactive prompt authoring** (`_author_new_prompt` / `_edit_existing_prompt`) lives only in `vt_prompts.py`.
   Persisting a choice back to config is no longer deferred on this side: `settings.py` writes coursekit's own files (never `context.yaml`).
+- **An unreadable `domain.md` or `voice.md` still counts as absent** (`CORE-1.6`), the one case left of a broken input being read as a missing one.
+- **Generator state is half moved.**
+  Quizzes and the renderer's inline-code style are still module state (CORE-3 steps 3 and 4), and the test that keeps it out for good arrives with step 5.
+- **A pass's tool subset is only a suggestion.**
+  The fix, EU, decompose, and glossary passes offer the model a subset of the tools, but dispatch runs any of them; closing that changes behaviour, so it is a follow-up to CORE-3.
 - **Three page critics read only each unit's teaching page.**
   Evaluate and fix take every quiz and page from the index (`course.review_items`), glossary and overview siblings included, but the pedagogy, concept-delivery, and page-groundedness critics (`evaluate --all`) still read one `page.json` per unit at its layout path.
   Moving them onto `review_items` would review the siblings too — more model calls and a visible change in their reports, so it is its own decision, not a cleanup.

@@ -10,7 +10,9 @@ The CLI is four phases, in the order work flows through them, plus a review verb
 - **`generate`** — turn that week text into quizzes and pages (the model-driven step).
 - **`emit`** — package the canonical JSON into Canvas files, model-free — up to a whole-course `.imscc`.
 
-`PATH` is a markdown file or a directory of per-week transcripts (`week-*.md`).
+`PATH` is a course folder, a folder inside it, or one unit's document.
+A folder inside the course narrows the command to what sits under it; coursekit finds the course itself by walking up to its `.vtconfig/`.
+A unit's document is `week-*.md` unless `structure.coursekit.yaml` declares another name, and units run in the course's unit order ([how it's set](configuration.md#per-course--vtconfig)).
 Artifacts land beside the course (`quizzes/` and `pages/` trees), never in this repo.
 `python app.py <verb> …` is equivalent to `coursekit <verb> …` everywhere below.
 
@@ -34,7 +36,7 @@ A document that names no week is skipped once any week-numbered content is prese
 | `coursekit propose PATH --grading`      | Draft a **grading-groups** block (assignment groups + weight placeholders) from the generated artifacts into the same overlay — STRC-2. Spans assignments + graded quizzes. | x        |
 | `coursekit propose PATH --expectations` | Draft an **expectations** block (what each scope SHOULD contain) from the course's own signals — modal induction + concept-map rules (EU → an EU assessment, dense week → a glossary). FLOW-9 Layer A. | x        |
 | `coursekit propose PATH --dry-run`      | Print the proposal without writing the overlay.                                                                                                                    | x        |
-| `coursekit propose PATH --force`        | Redraft an existing overlay (discards manual edits).                                                                                                               | x        |
+| `coursekit propose PATH --force`        | Redraft that section of an existing overlay (discards your edits to it; the overlay's other sections are kept).                                                    | x        |
 
 `propose` writes coursekit's **own** overlay file — never `context.yaml` — which the tools then read as authoritative (a week doc can be named anything; sources carry a `kind`).
 It's descriptive: it maps what exists and shows unassigned files rather than dropping them; you edit the overlay freely afterward.
@@ -61,18 +63,23 @@ It's descriptive: it maps what exists and shows unassigned files rather than dro
 | `coursekit generate PATH --no-review`                   | Skip the cold-read quiz review a `generate` runs by default.                                                                            | ✓        |
 | `coursekit generate PATH --assignments`                 | Draft one **assignment** (brief + rubric) per week → `assignments/<week>/`. `--scope "…"` names what it covers (default "this week").   | ✓        |
 
-**`PATH` vs `--source`.** `PATH` is a course directory or a `week-*.md` file, and it is **optional** — omitted, it falls back to `$TRANSCRIPTION`. Given a `PATH`, `generate` processes the whole course (every week, or the ones `--week` selects). Given `--source DOC` it quizzes that ONE document à la carte, and **`PATH` is ignored** — point `--source` at any supported file anywhere, even outside a course (output lands beside the doc, or in its course when it sits under one).
+**`PATH` vs `--source`.** `PATH` is a course directory or a unit's document, and it is **optional** — omitted, it falls back to `$TRANSCRIPTION`. Given a `PATH`, `generate` processes the whole course (every week, or the ones `--week` selects). Given `--source DOC` it quizzes that ONE document à la carte, and **`PATH` is ignored** — point `--source` at any supported file anywhere, even outside a course (output lands beside the doc, or in its course when it sits under one).
+
+`overview` and `recap` pages are built from the concept map, so a unit without one stops the command with a message saying to run `analyze`, rather than shipping a near-empty page.
 
 Whole-week generation ends with a cold-read review by default (`--no-review` skips it); a `--source` quiz does **not** review by default (you make many, one at a time) — add **`--review`** to cold-read that one quiz right after generating it.
 
 | Emit Commands                      | What it does                                                                      | Uses LLM |
 |------------------------------------|-----------------------------------------------------------------------------------|----------|
-| `coursekit emit qti PATH`          | One Canvas quiz `.zip` per week.                                                  | x        |
+| `coursekit emit qti PATH`          | One Canvas quiz `.zip` per quiz under PATH.                                       | x        |
 | `coursekit emit qti PATH --bundle` | One `.zip` for all quizzes.                                                       | x        |
 | `coursekit emit html PATH`         | Re-render pages from `page.json`.                                                 | x        |
 | `coursekit emit cc PATH`           | One Canvas `.imscc` of all pages.                                                 | x        |
-| `coursekit emit course PATH`       | One Canvas `.imscc` of the whole course — pages **and** quizzes, in week modules. | x        |
+| `coursekit emit course PATH`       | One Canvas `.imscc` of the whole course — pages, quizzes, and assignments, in unit modules. | x        |
 | `coursekit emit assignments PATH`  | One Canvas `.imscc` of all assignments (brief + rubric) under PATH.               | x        |
+
+Each `emit` packages the artifacts under the `PATH` it is given: the whole course, one of its trees, or a single artifact's folder.
+An artifact outside the course layout (`<kind>/<slug>/<file>.json`) is warned about once and not packaged.
 
 | Review Command                     | What it does                                                                                                            | Uses LLM |
 |------------------------------------|-------------------------------------------------------------------------------------------------------------------------|----------|

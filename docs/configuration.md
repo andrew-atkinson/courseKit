@@ -36,18 +36,24 @@ Only providers speaking the OpenAI tool-calling format are implemented today; An
 
 ## Per-course — `.vtconfig/`
 
-A course carries its own settings in a `.vtconfig/` folder at its root — the same folder the videotranscriber uses. coursekit reads from it but never writes to it.
+A course carries its own settings in a `.vtconfig/` folder at its root — the same folder the videotranscriber uses.
+coursekit writes only its own files there (below); `context.yaml` stays the transcriber's.
 
 | File                | Owner   | What it holds                                                          |
 | ------------------- | ------- | ---------------------------------------------------------------------- |
 | `context.yaml`      | shared  | course structure — title, weeks, modules (authored by the transcriber) |
 | `quiz.yaml`         | quizzes | the quiz generator's settings                                          |
 | `page.yaml`         | pages   | the page generator's settings                                          |
+| `evaluate.yaml` · `ingest.yaml` · `assignment.yaml` | those commands | their settings ([keys below](#generator-settings--quizyaml--pageyaml)) |
+| `structure.coursekit.yaml` | coursekit | the declared units and their order, typed sources, grading groups, expectations (drafted by `propose`, yours to edit) |
+| `concepts/week-N.yaml` | coursekit | a unit's concept map (written by `analyze`, [yours to edit](evaluating.md#analyze--the-concept-map-that-grounds-everything)) |
 | `domain.md`         | shared  | the [domain profile](domain-profile.md) — applies to every generator   |
 | `voice.md`          | shared  | the instructor [voice profile](#voice-profile--voicemd) — prose generators write in this voice |
 | `style.yaml`        | pages   | the page [theme](design.md) — visual identity + accent + density       |
 | `prompts/<gen>/…md` | shared  | per-course prompt overrides                                            |
 | `pages/<week>.yaml` | pages   | a page's [supplements](pages.md) — references, examples, embeds        |
+
+**Unit order.** Once `structure.coursekit.yaml` lists units, that listing is the order every command follows; until then units sort by number, so unit 3 runs before unit 10.
 
 ### Generator settings — `quiz.yaml` / `page.yaml`
 
@@ -93,6 +99,7 @@ Rewriting a file drops any comments you added by hand, so keep notes somewhere e
 
 A settings file that doesn't exist just means "use the defaults".
 A file that exists but can't be read, or holds a value coursekit can't use, stops the run with a message naming the file, the key, the value, and what's allowed — it is never quietly ignored.
+The one exception for now: an unreadable `domain.md` or `voice.md` is treated as if it weren't there, and `check` doesn't look at them.
 To check every file at once after editing (tool settings, `style.yaml`, page supplements, the structure overlay, concept maps):
 
 ```bash

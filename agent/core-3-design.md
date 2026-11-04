@@ -139,14 +139,19 @@ Every step must also keep the **test guard**: no test removed, and the number of
 2. **`core-3-page` — pages.**
    `PageDraft` and `PageTools`, with the generator, decompose, glossary, fix, and their tests moved; `page.py` loses its globals.
    *Pass:* G0, G1, G2, and G3 for pages; one generator reused for two units keeps them separate, and that test fails if a helper keeps the first unit's draft; the guards hold.
+   **Done 2026-11-04.** All goldens identical to `main`, and the only assert changes are the new tests.
+   The goldens turned out not to reach decompose, glossary, or `fix`, and no test runs a whole decompose, so this step added a scripted comparison against an extracted copy of `main`: decompose (finalized, with pass errors and empty sections, unfinished), glossary (one chunk, several), `fix_course_pages` over two pages, and `decompose.main --review --fix`. All byte-identical. Step 3 needs the same for the EU pass and quiz `fix`.
+   `decompose.main --fix` keeps an unfinished page staged, so it can't replace the last good `page.json`; the comparison catches that if it is changed to `adopt`.
+   One difference on purpose: on `main`, the call log outlived a run, so a `fix` in the same process as a generation appended to that generation's `calls.jsonl`. No CLI path does both, and now `fix` simply has no log.
 3. **`core-3-quiz` — quizzes.**
    `BankDraft` and `QuizTools`, including the checklist, with the generator, EU pass, fix, and their tests moved.
    *Pass:* G0, G1, and G2 for quizzes, including `.gift` and `quiz.json`; the same two-unit test; the guards hold.
+   The docs that name `bank.finalize` and `bank.load` (`CLAUDE.md`, both architecture files) move with it, and `dispatch.py`'s docstring loses its stale line about the quiz generator keeping its own copy.
 4. **`core-3-renderer` — the inline-code style.**
    *Pass:* G3 identical; a new test renders two themes alternating inside one template pass and each keeps its own colours.
 5. **`core-3-isolation` — the proof, and the docs.**
    The new tests that make this permanent: two quiz jobs and two page jobs on separate threads, forced to alternate at every tool call by a barrier, each byte-identical to the same job run alone; and the §4 guard.
-   `agent/architecture.md` and the seam's docstrings are refreshed; the roadmap closes CORE-3.
+   `agent/architecture.md` and the seam's docstrings are refreshed, the §4 rules join `CLAUDE.md`, and the roadmap closes CORE-3 with its Shipped line.
    *Pass:* the new tests pass, and fail when a global is put back (mutation check).
 
 ## 6. Decisions

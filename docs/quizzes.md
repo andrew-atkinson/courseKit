@@ -44,8 +44,8 @@ uv run coursekit generate "/path/to/course export" --weeks 3-8   # an inclusive 
 uv run coursekit generate "/path/to/course export"               # every week found
 ```
 
-`PATH` is a markdown file **or** a directory.
-Given a directory it picks up per-week transcripts (`week-*.md`).
+`PATH` is a course folder, a folder inside it, or one unit's document.
+Given a folder, it picks up each unit's document (`week-*.md`, or whatever name `structure.coursekit.yaml` declares) and runs them in the course's unit order.
 Expect a few minutes per week on a local model.
 
 **Input is decoupled** — any markdown works.
@@ -62,7 +62,7 @@ uv run coursekit generate "/path/to/course" \
 ```
 
 It extracts that document, writes it as `source.md`, and generates a quiz into a **distinct** slug — `quizzes/week-3-barrett/` — so a targeted quiz never overwrites the whole-week quiz or another document's.
-The week number comes from a `week-N` ancestor directory when there is one; otherwise the slug is just the document name.
+The unit comes from the declared structure when `structure.coursekit.yaml` lists the document as one of a unit's sources, then from its path (a `week-N` name or ancestor directory); with neither, the slug is just the document name.
 Targeted generation is **quizzes only**, and honours the course's `domain.md`, voice, and `quiz.yaml` exactly as a whole-week run does.
 The supported document types are the same as `ingest` (PDF, slides, docx, odt, txt, md).
 
@@ -117,6 +117,6 @@ Both the per-week `.zip` and the `--bundle` package have been imported into a li
 
 - **The model is an unreliable driver, and the loop expects it.** It sometimes stops before finishing or spins on a rejected call. `pipeline.loop` checks the bank rather than trusting the model, nudges it back within a bounded budget, and bails on a rejection spiral instead of burning every turn.
 - **Guardrails are steering, not just validation.** When the model reuses a correct-answer position, the rejection tells it which positions are still free — errors are written for the model to act on.
-- **Module placement isn't supported** yet: quizzes import into the Quizzes list, not into weekly modules. **GIFT output is unverified** against a live Moodle — it's there as readable plain text; Canvas QTI is the tested path.
+- **Module placement comes with `emit course`.** An `emit qti` import lands in the Quizzes list, not in modules; the whole-course cartridge puts each quiz in its unit's module. **GIFT output is unverified** against a live Moodle — it's there as readable plain text; Canvas QTI is the tested path.
 
 See also: [Configuration](configuration.md) (providers, per-course `quiz.yaml`, prompt overrides) and [the domain profile](domain-profile.md) (keeping the model in the right knowledge domain).

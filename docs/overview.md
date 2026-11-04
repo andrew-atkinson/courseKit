@@ -6,11 +6,11 @@ For the high-level product read see the [README](../README.md); for every CLI ve
 
 ## In one line
 
-coursekit turns a course's own material — lectures, readings, slides — into correct, well-taught, Canvas/Moodle-ready quizzes and pages, running on a language model you host yourself, so your content never leaves your machine.
+coursekit turns a course's own material — lectures, readings, slides — into correct, well-taught, Canvas/Moodle-ready quizzes, pages, and assignments, running on a language model you host yourself, so your content never leaves your machine.
 
 ## The one load-bearing idea
 
-Every input converges on one canonical form — `bank.json` for quizzes, `page.json` for pages — and every export reads only that form.
+Every input converges on one canonical form — `bank.json` for quizzes, `page.json` for pages, `assignment.json` for assignments — and every export reads only that form.
 Adding a new LMS or file format is therefore one new emitter, not a rewrite of the whole tool.
 The model *commits* each finished piece through a structured tool call rather than free text, so a revision overwrites its slot instead of piling up discarded drafts.
 
@@ -21,8 +21,11 @@ coursekit is a command-line tool organized as a small pipeline; each phase is a 
 - **`ingest`** — turns a week's documents (PDF, PowerPoint, Word, ODT, plain text, Markdown) into the consolidated week text the generators read. A folder of readings and slides becomes one source-tagged week document. `--raw` does deterministic extraction only, fully offline.
 - **`propose`** — scans a course tree and *declares* its structure (weeks plus typed sources) into an explicit manifest, instead of guessing structure from filenames. It surfaces any files it couldn't place rather than silently dropping them, and `--model` handles irregular trees that don't encode weeks in their names.
 - **`analyze`** — builds each week's concept map, an instructor-editable list of the concepts a week teaches, which grounds both generation and evaluation.
-- **`generate`** — the model step: turns week text into randomized quizzes and designed pages. It can target the whole course, selected weeks, or — with `--source` — a single document for an à-la-carte quiz. A run ends with a cold-read review of what it produced, by default.
-- **`emit`** — packages the canonical JSON into LMS files, with no model involved: a Canvas quiz `.zip` (QTI), standalone or re-rendered page HTML, a Common Cartridge `.imscc` of pages, or one whole-course `.imscc` of pages and quizzes together in weekly modules.
+- **`generate`** — the model step: turns week text into randomized quizzes and designed pages and, on request, assignments. It can target the whole course, selected weeks, or — with `--source` — a single document for an à-la-carte quiz. A run ends with a cold-read review of what it produced, by default.
+- **`emit`** — packages the canonical JSON into LMS files, with no model involved: a Canvas quiz `.zip` (QTI), standalone or re-rendered page HTML, a Common Cartridge `.imscc` of pages, an `.imscc` of assignments, or one whole-course `.imscc` of all three together in unit modules.
+
+Three offline commands sit alongside them: `check` validates every settings file at once, `config` changes one setting and refuses a value it can't use, and `census` inventories what exists for every unit and what's missing.
+A broken settings file or a bad value stops a run with a message naming the file, the key, and what's allowed; it is never quietly ignored.
 
 ## Quizzes
 
@@ -34,9 +37,15 @@ A hardened tool-calling loop copes with an unreliable local model — guardrails
 
 Pages are designed teaching artifacts, not plain text dumps.
 They compose from a catalog of typed content blocks — section headings, pull quotes, columns, cards, callouts, glossaries, code, and collapsible "predict-then-reveal" foldouts — each chosen for a documented pedagogical function (drawn from Cognitive Load Theory and Universal Design for Learning).
-A page can take one of three functions: a full teaching page, a glossary companion (terms beside the video), or an orientation/overview page; the teaching generator auto-selects a monolithic or decomposed strategy by length.
+A page can take one of four functions: a full teaching page, a glossary companion (terms beside the video), an orientation/overview page, or an after-the-week recap; the teaching generator auto-selects a monolithic or decomposed strategy by length.
 Everything renders to Canvas-safe HTML — restricted to the properties Canvas's sanitizer actually allows — so it survives import intact, including flexbox layout and native collapsible sections.
 Instructor-supplied links, references, and embeds (slideshows, videos, sketches) come in through a per-course supplements file; the model is never allowed to invent a URL.
+
+## Assignments
+
+On request, `generate --assignments` drafts one assignment per unit: a brief and a grading rubric.
+The instructor sets the grade total; the model writes the brief and each criterion's levels and relative importance.
+They export in their own `.imscc` or as part of the whole-course one.
 
 ## The design system
 
@@ -46,7 +55,7 @@ Every theme is checked for WCAG AA contrast, and every emitted style property is
 
 ## Evaluation — the part most tools don't have
 
-coursekit doesn't just generate; it *measures* whether the result is pedagogically sound, through five calibrated critics that read already-generated content off disk:
+coursekit doesn't just generate; it *measures* whether the result is pedagogically sound, through four kinds of calibrated critic that read already-generated content off disk:
 
 - **Facticity** (quizzes and pages) — is each claim or answer correct?
 - **Pedagogy rubric** (pages) — does the page scan, signal its key idea, engage, show worked examples, and prompt retrieval? Scored 0–3 with coaching notes, not a pass/fail.

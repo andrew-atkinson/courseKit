@@ -1,6 +1,7 @@
 # How coursekit works
 
 How a course's own material becomes Canvas- and Moodle-ready quizzes, pages, and assignments: who provides what, which files live in the course folder, what each `coursekit` command reads and writes, and where a model is involved.
+For one plain-language page showing the whole pipeline, including what is planned, see [the course pipeline, layer by layer](../agent/architecture-diagram.html).
 For every command's flags see the [command reference](commands.md); for the internals (the course model, the generator seam, the shared spine) see [agent/architecture.md](../agent/architecture.md).
 Verified 30 October 2026 against `main`; every diagram is render-checked with mermaid-cli.
 
@@ -108,7 +109,7 @@ Nothing here is coursekit-specific; it is what the instructor already has.
 - **the `.vtconfig/` reference:** `context.yaml` (course · weeks · modules) and the per-tool config (`quiz.yaml`, `page.yaml`, `style.yaml`, the per-week supplements, prompt overrides). The tools create these, but they are **faculty-editable** — a professor changes a theme, tunes a prompt, adds a supplement link, or fixes a week title by hand in an ordinary text editor. It is a *local reference coursekit both writes and reads*, not a hidden store.
 - **the generated files:** `week-N.md` (the unit's text), the `bank.json` / `page.json` / `assignment.json` IR, the emitted artifacts (`.gift`, QTI `.zip`, `.html`, `.imscc`), and the census (`census.json` + `census.md`).
 
-Everything is plain, versionable files in the course folder — never a database. coursekit **writes** here (week text, IR, artifacts) and **reads** here (config); the transcriber writes here too (`context.yaml`, `week-N.md`).
+Everything is plain, versionable files in the course folder — never a database. coursekit **writes** here (week text, concept maps, IR, artifacts, and its own settings) and **reads** here (config); the transcriber writes here too (`context.yaml`, `week-N.md`).
 That file boundary is why the two tools stay separate repos with disjoint runtimes — the transcriber keeps `mlx-whisper` and its Apple-Silicon stack; coursekit stays pydantic + stdlib — and neither imports the other.
 
 **③ coursekit — a set of programs.** Four phases run locally: **ingest** (documents → `week-N.md`), **analyze** (week text + the transcriber's `knowledge.json` → the per-week concept map), **generate** (week text → `bank.json`/`page.json`), **emit** (IR → Canvas files).

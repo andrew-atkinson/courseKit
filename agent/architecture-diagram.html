@@ -1,3 +1,6 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="utf-8">
 <title>coursekit architecture</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
@@ -34,6 +37,7 @@
     -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
   }
   .wrap{max-width:1040px; margin:0 auto; padding:48px 24px 80px}
+  @media(max-width:600px){.wrap{padding:32px 16px 56px}}
 
   /* ---- header ---- */
   .eyebrow{font:600 12px/1 var(--font-mono); letter-spacing:.16em; text-transform:uppercase; color:var(--accent-ink)}
@@ -70,7 +74,7 @@
   .node.planned .n-name{color:var(--muted)}
   .node.planned .tag{color:var(--accent-ink); border-color:color-mix(in srgb,var(--accent) 45%, transparent)}
   .node.vt{border-left:3px solid var(--vt); background:var(--vt-soft); border-color:var(--vt-line)}
-  .node.vt .tag{color:var(--vt); border-color:var(--vt-line); background:transparent}
+  .node.vt .tag{position:static; display:inline-block; margin-top:9px; color:var(--vt); border-color:var(--vt-line); background:transparent}
 
   .flow{display:flex; align-items:center; justify-content:center; gap:10px; padding:9px 0; color:var(--muted)}
   .flow svg{display:block; color:var(--accent)}
@@ -83,7 +87,7 @@
   .chip{font:500 12.5px/1 var(--font-mono); color:var(--ink); background:var(--surface-2); border:1px solid var(--line); border-radius:7px; padding:6px 9px}
 
   /* ---- figures ---- */
-  .figs{margin-top:56px; display:grid; gap:28px}
+  .figs{margin-top:56px; display:grid; grid-template-columns:minmax(0,1fr); gap:28px}
   figure{margin:0; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:24px; box-shadow:var(--shadow)}
   figure h2{font-size:19px; font-weight:700; letter-spacing:-.01em; margin:0 0 4px}
   figure .sub{font-size:14px; color:var(--muted); margin:0 0 18px; max-width:70ch}
@@ -114,13 +118,13 @@
   <header>
     <div class="eyebrow">coursekit · videotranscriber</div>
     <h1>The course pipeline, layer by layer</h1>
-    <p class="lede">How raw teaching materials converge on one canonical intermediate form, and where every built and
-      proposed part sits — including videotranscriber's role as a separate-repo ingest adapter.</p>
+    <p class="lede">How raw teaching materials converge on one canonical form per artifact, and where every built and
+      planned part sits — including videotranscriber's role as a separate-repo ingest adapter.</p>
     <div class="legend">
       <span><i class="key"></i> built</span>
-      <span><i class="key dash"></i> proposed</span>
+      <span><i class="key dash"></i> planned</span>
       <span><i class="key repo"></i> videotranscriber — separate repo</span>
-      <span><i class="key dot"></i> the canonical IR</span>
+      <span><i class="key dot"></i> the canonical files</span>
     </div>
   </header>
 
@@ -132,21 +136,22 @@
       <div class="nodes">
         <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">lecture videos</div></div>
         <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">readings · PDFs · slides</div></div>
-        <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">a Canvas export</div></div>
-        <div class="node planned"><div class="n-name">just an outline</div><div class="tag">planned</div></div>
+        <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">a Canvas export</div><div class="n-meta">its manifest gives the transcriber real module and unit titles.</div></div>
+        <div class="node planned pad-r"><div class="n-name">just an outline</div><div class="n-meta">outline → course (FLOW-4).</div><div class="tag">planned</div></div>
       </div>
     </section>
 
-    <div class="flow"><span class="verb">analyzed by</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
+    <div class="flow"><span class="verb">taken in by</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
 
     <!-- ingest -->
     <section class="band">
-      <div class="band-head"><span class="eyebrow">Ingest &amp; structure adapters</span><span class="band-role">source → the IR · each one a <b>single writer of its own file</b></span></div>
+      <div class="band-head"><span class="eyebrow">Ingest &amp; structure adapters</span><span class="band-role">source → the canonical files · each one a <b>single writer of its own file</b></span></div>
       <div class="nodes">
-        <div class="node vt pad-r"><div class="n-name">videotranscriber</div><div class="n-meta">media → text; writes context.yaml + knowledge.json. Heavy media stack (mlx-whisper) — its own repo.</div><span class="tag">separate repo</span></div>
-        <div class="node built pad-r"><div class="n-name">coursekit/ingest</div><div class="n-meta">PDF · slides · docx → week-N.md; folder-per-week consolidation (FLOW-2 v1).</div><span class="tag">built</span></div>
-        <div class="node planned pad-r"><div class="n-name">structure proposer</div><div class="n-meta">scans the messy tree → drafts the declared structure; surfaces unassigned files (FLOW-7 P2 / UX-2).</div><span class="tag">planned</span></div>
-        <div class="node planned pad-r"><div class="n-name">canvas import</div><div class="n-meta">an existing course export → the IR (FLOW-5).</div><span class="tag">planned</span></div>
+        <div class="node vt"><div class="n-name">videotranscriber</div><div class="n-meta">media → text; writes week-N.md, context.yaml, knowledge.json, and voice.md. Heavy media stack (mlx-whisper) — its own repo.</div><span class="tag">separate repo</span></div>
+        <div class="node built"><div class="n-name">ingest</div><div class="n-meta">PDF · slides · docx · odt → week-N.md; a folder of documents becomes one unit's text. A model tidies it unless you pass <code>--raw</code>.</div></div>
+        <div class="node built"><div class="n-name">propose</div><div class="n-meta">scans the messy tree → drafts the declared structure, grading groups, and expectations; surfaces unassigned files. No model unless you ask for one.</div></div>
+        <div class="node built"><div class="n-name">analyze</div><div class="n-meta">a unit's text → its concept map, using a model; yours to edit afterward.</div></div>
+        <div class="node planned pad-r"><div class="n-name">canvas import</div><div class="n-meta">bring an existing course in, so it can be audited too (FLOW-5).</div><span class="tag">planned</span></div>
       </div>
     </section>
 
@@ -154,12 +159,12 @@
 
     <!-- IR -->
     <section class="band ir">
-      <div class="band-head"><span class="eyebrow">The IR — canonical &amp; shared</span><span class="band-role">every input converges here; everything downstream is <b>read-only</b> on it</span></div>
+      <div class="band-head"><span class="eyebrow">The canonical files</span><span class="band-role">every input converges here · plain files in the course folder, loaded as one <b>course model</b></span></div>
       <div class="nodes">
-        <div class="node built"><div class="n-name">context.yaml <span style="color:var(--vt);font-weight:600">+</span> overlay</div><div class="n-meta">declared structure — weeks, sources, titles. Composed on read by <code>coursestructure</code> (FLOW-7 P1, built).</div></div>
-        <div class="node built"><div class="n-name">week-N.md</div><div class="n-meta">the consolidated week text.</div></div>
-        <div class="node built"><div class="n-name">concept map</div><div class="n-meta">the week's concepts (analyze) — grounds generation + evaluation.</div></div>
-        <div class="node built"><div class="n-name">bank.json · page.json</div><div class="n-meta">canonical quiz / page artifacts — the one form every emitter reads.</div></div>
+        <div class="node built"><div class="n-name">context.yaml <span style="color:var(--vt);font-weight:600">+</span> structure.coursekit.yaml</div><div class="n-meta">the declared structure — units and their order, sources, titles, grading groups, expectations.</div></div>
+        <div class="node built"><div class="n-name">week-N.md</div><div class="n-meta">the unit's consolidated text.</div></div>
+        <div class="node built"><div class="n-name">concept map</div><div class="n-meta">the unit's concepts — grounds generation + evaluation.</div></div>
+        <div class="node built"><div class="n-name">bank.json · page.json · assignment.json</div><div class="n-meta">the canonical quiz, page, and assignment — the one form every emitter reads. Generation writes these.</div></div>
       </div>
     </section>
 
@@ -167,36 +172,38 @@
 
     <!-- generation -->
     <section class="band">
-      <div class="band-head"><span class="eyebrow">Generation</span><span class="band-role"><code>coursekit/generate</code> — reads the IR, never writes it</span></div>
+      <div class="band-head"><span class="eyebrow">Generation</span><span class="band-role"><code>coursekit generate</code> — a model commits each artifact through tool calls; it never changes the structure</span></div>
       <div class="nodes">
-        <div class="node built"><div class="n-name">quizzes</div><div class="n-meta">randomized banks; whole-week + per-source (targeted).</div></div>
-        <div class="node built"><div class="n-name">pages</div><div class="n-meta">teaching · glossary · overview functions; COMP block palette.</div></div>
-        <div class="node planned pad-r"><div class="n-name">course-design advisor</div><div class="n-meta">proposes an <b>output</b> structure by pedagogical best practice (CRSE / FLOW-4).</div><span class="tag">planned</span></div>
-        <div class="node planned pad-r"><div class="n-name">sequencing planner</div><div class="n-meta">pacing &amp; spacing across the term (course-level).</div><span class="tag">planned</span></div>
+        <div class="node built"><div class="n-name">quizzes</div><div class="n-meta">randomized banks; whole-unit + per-source (targeted); an optional enduring-understanding question.</div></div>
+        <div class="node built"><div class="n-name">pages</div><div class="n-meta">teaching · glossary · overview · recap; overview and recap are assembled from the concept map, with no model.</div></div>
+        <div class="node built"><div class="n-name">assignments</div><div class="n-meta">a brief + rubric, one per unit; the instructor sets the grade total.</div></div>
+        <div class="node planned pad-r"><div class="n-name">course-design advisor</div><div class="n-meta">proposes an <b>output</b> structure by pedagogical best practice (CRSE).</div><span class="tag">planned</span></div>
+        <div class="node planned pad-r"><div class="n-name">sequencing planner</div><div class="n-meta">pacing &amp; spacing across the term (CRSE-2 · STRC).</div><span class="tag">planned</span></div>
       </div>
     </section>
 
-    <div class="flow"><span class="verb">checked by · emitted by</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
+    <div class="flow"><span class="verb">checked by</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
 
-    <!-- eval + emit side by side -->
+    <!-- evaluation -->
     <section class="band">
-      <div class="band-head"><span class="eyebrow">Evaluation</span><span class="band-role">the critics — read-only, cold-read audits</span></div>
+      <div class="band-head"><span class="eyebrow">Evaluation &amp; repair</span><span class="band-role"><code>evaluate</code> — the critics, read-only cold reads · <code>fix</code> repairs what they flag · both use a model</span></div>
       <div class="nodes">
         <div class="node built"><div class="n-name">facticity</div><div class="n-meta">is each claim correct &amp; in-scope?</div></div>
         <div class="node built"><div class="n-name">pedagogy (form)</div><div class="n-meta">scan · signal · engage · retrieval.</div></div>
         <div class="node built"><div class="n-name">concept-delivery</div><div class="n-meta">is each concept actually taught well?</div></div>
-        <div class="node planned pad-r"><div class="n-name">source-groundedness</div><div class="n-meta">faculty ↔ LLM knowledge split (EVAL-15).</div><span class="tag">planned</span></div>
+        <div class="node built"><div class="n-name">source-groundedness</div><div class="n-meta">how much comes from the source, not the model's own knowledge?</div></div>
+        <div class="node built"><div class="n-name">fix</div><div class="n-meta">regenerates each flagged item in place, then reads it again to confirm.</div></div>
       </div>
     </section>
 
-    <div class="flow"><span class="verb">emitted by</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
+    <div class="flow"><span class="verb">packaged by</span><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><line x1="8" y1="0" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><polygon points="8,20 3,13 13,13" fill="currentColor"/></svg></div>
 
     <section class="band">
-      <div class="band-head"><span class="eyebrow">Emit</span><span class="band-role">canonical IR → LMS files · <b>model-free</b>, deterministic</span></div>
+      <div class="band-head"><span class="eyebrow">Emit</span><span class="band-role">canonical files → LMS files · <b>model-free</b>, deterministic</span></div>
       <div class="nodes">
         <div class="node built"><div class="n-name">QTI .zip</div><div class="n-meta">Canvas quizzes.</div></div>
-        <div class="node built"><div class="n-name">Common Cartridge</div><div class="n-meta">pages + whole-course .imscc.</div></div>
-        <div class="node built"><div class="n-name">GIFT · HTML</div><div class="n-meta">Moodle text · standalone pages.</div></div>
+        <div class="node built"><div class="n-name">Common Cartridge</div><div class="n-meta">pages, assignments, or the whole course in one .imscc, in unit modules.</div></div>
+        <div class="node built"><div class="n-name">GIFT · HTML</div><div class="n-meta">Moodle text, written when a quiz is generated or fixed · standalone pages.</div></div>
         <div class="node planned pad-r"><div class="n-name">Canvas API · LTI</div><div class="n-meta">direct push (SHIP-4/5).</div><span class="tag">planned</span></div>
       </div>
     </section>
@@ -206,17 +213,28 @@
     <section class="band ext">
       <div class="band-head"><span class="eyebrow">LMS</span><span class="band-role">where students meet the course</span></div>
       <div class="nodes">
-        <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">Canvas</div></div>
-        <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">Moodle</div></div>
+        <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">Canvas</div><div class="n-meta">the tested path.</div></div>
+        <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">Moodle</div><div class="n-meta">GIFT, not yet checked against a live Moodle.</div></div>
       </div>
     </section>
+
+    <!-- alongside -->
+    <div class="spine">
+      <span class="eyebrow">Alongside the pipeline — offline, no model</span>
+      <div class="nodes" style="margin-top:12px">
+        <div class="node built"><div class="n-name">census</div><div class="n-meta">what exists for every unit and what's missing — presence, not quality. Writes census.json + census.md.</div></div>
+        <div class="node built"><div class="n-name">check</div><div class="n-meta">validates every settings file at once: file, key, value, and what's allowed.</div></div>
+        <div class="node built"><div class="n-name">config</div><div class="n-meta">changes one setting without editing YAML, and refuses a value it can't use.</div></div>
+      </div>
+    </div>
 
     <!-- spine -->
     <div class="spine">
       <span class="eyebrow">The spine — cross-cutting, shared by every layer</span>
       <div class="spine-items">
-        <span class="chip">providers</span><span class="chip">prompts</span><span class="chip">courseconfig</span>
-        <span class="chip">coursestructure</span><span class="chip">domain.md</span><span class="chip">voice.md</span>
+        <span class="chip">course model</span><span class="chip">coursestructure</span><span class="chip">courseconfig</span>
+        <span class="chip">settings</span><span class="chip">schemas</span><span class="chip">outcomes</span>
+        <span class="chip">providers</span><span class="chip">prompts</span><span class="chip">domain.md</span><span class="chip">voice.md</span>
         <span class="chip">design themes</span><span class="chip">hardware pre-flight</span>
       </div>
     </div>
@@ -228,10 +246,10 @@
     <!-- overlay mechanism -->
     <figure>
       <h2>One writer per file — structure is composed, not owned</h2>
-      <p class="sub">The rule that keeps two programs out of each other's files: each adapter writes only its own file, and the
+      <p class="sub">The rule that keeps two programs out of each other's files: each program writes only its own file, and the
         reader merges them into one effective structure. No file ever has two writers.</p>
       <div class="figbox">
-        <svg viewBox="0 0 760 300" role="img" aria-label="videotranscriber writes context.yaml and the proposer writes a coursekit overlay file; the coursestructure reader merges both into one effective structure that generation reads, so no file has two writers.">
+        <svg viewBox="0 0 760 300" role="img" aria-label="videotranscriber writes context.yaml; coursekit's propose and config commands write structure.coursekit.yaml; the coursestructure reader merges both into one effective structure that the course model loads, so no file has two writers.">
           <defs>
             <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
@@ -243,9 +261,9 @@
             <text x="104" y="55" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--vt)">videotranscriber</text>
             <text x="104" y="73" text-anchor="middle" font-size="11" style="fill:var(--muted)">separate repo</text>
 
-            <rect x="16" y="210" width="176" height="58" rx="9" style="fill:none;stroke:var(--faint)" stroke-width="1.5" stroke-dasharray="5 4"/>
-            <text x="104" y="235" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--ink)">structure proposer</text>
-            <text x="104" y="253" text-anchor="middle" font-size="11" style="fill:var(--muted)">coursekit · planned</text>
+            <rect x="16" y="210" width="176" height="58" rx="9" style="fill:var(--surface);stroke:var(--accent)" stroke-width="1.5"/>
+            <text x="104" y="235" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--ink)">coursekit</text>
+            <text x="104" y="253" text-anchor="middle" font-size="11" style="fill:var(--muted)">propose · config</text>
 
             <!-- files -->
             <rect x="286" y="34" width="176" height="50" rx="9" style="fill:var(--surface-2);stroke:var(--line)" stroke-width="1.5"/>
@@ -253,14 +271,14 @@
             <text x="374" y="72" text-anchor="middle" font-size="10.5" style="fill:var(--muted)">weeks · titles · videos</text>
 
             <rect x="286" y="214" width="176" height="50" rx="9" style="fill:var(--surface-2);stroke:var(--line)" stroke-width="1.5"/>
-            <text x="374" y="235" text-anchor="middle" font-size="12.5" font-weight="700" style="fill:var(--ink)">structure.overlay.yaml</text>
-            <text x="374" y="252" text-anchor="middle" font-size="10.5" style="fill:var(--muted)">typed sources · doc</text>
+            <text x="374" y="235" text-anchor="middle" font-size="11.5" font-weight="700" style="fill:var(--ink)">structure.coursekit.yaml</text>
+            <text x="374" y="252" text-anchor="middle" font-size="10.5" style="fill:var(--muted)">units · sources · grading</text>
 
             <!-- reader -->
             <rect x="556" y="94" width="188" height="110" rx="11" style="fill:var(--accent-soft);stroke:var(--accent)" stroke-width="1.8"/>
             <text x="650" y="132" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--accent-ink)">coursestructure</text>
             <text x="650" y="151" text-anchor="middle" font-size="11" style="fill:var(--muted)">reads · merges</text>
-            <text x="650" y="176" text-anchor="middle" font-size="11.5" font-weight="600" style="fill:var(--ink)">→ generation</text>
+            <text x="650" y="176" text-anchor="middle" font-size="11.5" font-weight="600" style="fill:var(--ink)">→ course model</text>
           </g>
           <!-- arrows -->
           <g stroke-width="1.8" fill="none" style="color:var(--muted);stroke:currentColor">
@@ -272,42 +290,43 @@
           <g font-family="ui-monospace,Menlo,monospace" font-size="10.5" text-anchor="middle" style="fill:var(--faint)">
             <text x="237" y="50">writes</text>
             <text x="237" y="230">writes</text>
-            <text x="505" y="86">reads</text>
-            <text x="505" y="216">reads</text>
+            <text x="532" y="96">reads</text>
+            <text x="532" y="206">reads</text>
           </g>
         </svg>
       </div>
       <figcaption>Same pattern the project already uses for <b>shipped prompts + <code>.vtconfig</code> overrides</b> and
         <b>base domain + course <code>domain.md</code></b>. Precedence is defined: <code>context.yaml</code> owns identity
-        (which weeks exist, titles); the overlay only <i>adds</i> coursekit's typed sources and a <code>doc</code> pointer.
-        The interim-safe version writes nothing programmatically — the proposer emits a draft the faculty commits, so the
-        <b>human is the writer</b> until you decide auto-write is worth it.</figcaption>
+        (which units exist, their titles); the overlay <i>adds</i> typed sources, a <code>doc</code> pointer, grading groups,
+        expectations, and the stored unit order. <code>propose</code> writes a draft and won't overwrite it without
+        <code>--force</code>, and a pedagogic choice it can't make is flagged <b>DECISION NEEDED</b>, so the
+        <b>faculty decides</b> by editing the draft.</figcaption>
     </figure>
 
     <!-- proposer scope -->
     <figure>
       <h2>The proposer's scope — one station, not three</h2>
-      <p class="sub">Your instinct that these roles relate in sequence is right. The refinement: they're distinct stations on
-        the pipeline, and fusing them into one "proposer" is where the scope over-extends. Keep the proposer descriptive;
-        let the prescriptive work be its own advisor.</p>
+      <p class="sub">These roles relate in sequence, but they are distinct stations on the pipeline, and fusing them into one
+        "proposer" is where the scope over-extends. The proposer stays descriptive; the prescriptive work gets its own
+        advisor.</p>
       <div class="roles">
         <div class="role inscope">
           <div class="rn">the proposer</div>
           <h3>Input-structure analysis</h3>
-          <p>Read the messy tree of real materials → declare what exists (weeks, sources, kinds). <b>Descriptive</b>: it maps reality, grounded in the faculty's own files.</p>
-          <span class="verdict yes">✓ in scope · FLOW-7</span>
+          <p>Read the messy tree of real materials → declare what exists (units, sources, kinds), and draft grading groups and expectations from the course's own signals. <b>Descriptive</b>: it maps reality, grounded in the faculty's own files.</p>
+          <span class="verdict yes">✓ built · FLOW-7</span>
         </div>
         <div class="role out">
           <div class="rn">a separate advisor</div>
           <h3>Output-structure proposal</h3>
           <p>What the course <i>should</i> contain &amp; how it's organized, by pedagogical best practice. <b>Prescriptive</b> — higher stakes, different grounding (best practice + domain, not the file tree).</p>
-          <span class="verdict no">→ course-design advisor · CRSE</span>
+          <span class="verdict no">→ planned · course-design advisor · CRSE</span>
         </div>
         <div class="role out">
           <div class="rn">a separate planner</div>
           <h3>Sequencing &amp; pacing</h3>
-          <p>How content types relate in sequence across the term — spacing, prerequisites, <code>teaches_toward</code> edges. A <b>course-level</b> concern over the whole IR.</p>
-          <span class="verdict no">→ sequencing planner · STRC</span>
+          <p>How content types relate in sequence across the term — spacing, prerequisites, <code>teaches_toward</code> edges. A <b>course-level</b> concern over the whole course.</p>
+          <span class="verdict no">→ planned · sequencing planner · CRSE-2 · STRC</span>
         </div>
       </div>
       <figcaption>Why split them: input-analysis is low-risk (it describes materials); output-proposal is prescriptive and
@@ -317,5 +336,5 @@
     </figure>
   </div>
 
-  <p class="foot">Solid = built &amp; tested · dashed = on the roadmap. Source of truth: <a class="src" href="#">agent/architecture.md</a> and <a class="src" href="#">agent/roadmap.md</a>.</p>
+  <p class="foot">Solid = built &amp; tested · dashed = on the roadmap. Checked against the code on 4 November 2026. For the detail: <code>docs/architecture.md</code> (what each command reads and writes), <code>agent/architecture.md</code> (the internals), and <code>agent/roadmap.md</code> (the plan).</p>
 </div>

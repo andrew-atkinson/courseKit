@@ -53,7 +53,7 @@ This course teaches **digital photography and image-making** — students make, 
 ```
 
 The profile also steers **quiz question forms**, not just page content.
-The quiz brief is subject-neutral by default (five concepts, a mix of types); the domain note is where a course earns its specifics — the coding note above draws code-completion questions where code exists, while the photo note keeps questions to identifying, comparing, and analysing images.
+The quiz brief is subject-neutral by default (one group per concept, a mix of types); the domain note is where a course earns its specifics — the coding note above draws code-completion questions where code exists, while the photo note keeps questions to identifying, comparing, and analysing images.
 No profile means no steer: the neutral brief still generates, just without a discipline's slant.
 
 That's it.

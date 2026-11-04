@@ -161,7 +161,7 @@
   <header>
     <p class="eyebrow">Local-first course authoring</p>
     <h1 class="brand">course<b>kit</b></h1>
-    <p class="lede">A course's own material becomes correct, well-taught, Canvas-ready quizzes and pages — on a model you run yourself.</p>
+    <p class="lede">A course's own material becomes correct, well-taught, Canvas-ready quizzes, pages, and assignments — on a model you run yourself.</p>
     <div class="metaline">
       <span><b>◆</b> runs on your machine</span>
       <span><b>◆</b> no cloud, no API token</span>
@@ -172,7 +172,7 @@
   <section>
     <p class="eyebrow">The one load-bearing idea</p>
     <div class="thesis col">
-      <p>Every input converges on one canonical form — <code>bank.json</code> for quizzes, <code>page.json</code> for pages — and every export reads only that form.</p>
+      <p>Every input converges on one canonical form — <code>bank.json</code> for quizzes, <code>page.json</code> for pages, <code>assignment.json</code> for assignments — and every export reads only that form.</p>
       <p class="foot">Adding a new LMS or file format is one new emitter, not a rewrite. The model <em>commits</em> each finished piece through a structured tool call rather than free text, so a revision overwrites its slot instead of piling up discarded drafts.</p>
     </div>
   </section>
@@ -185,8 +185,8 @@
       <div class="step">
         <div class="n">01</div>
         <div class="verb">ingest</div>
-        <div class="body"><p>Turns a week's documents — PDF, PowerPoint, Word, ODT, text, Markdown — into the consolidated week text the generators read. A folder of readings and slides becomes one source-tagged week document.</p></div>
-        <div class="pill offline">offline</div>
+        <div class="body"><p>Turns a week's documents — PDF, PowerPoint, Word, ODT, text, Markdown — into the consolidated week text the generators read. A folder of readings and slides becomes one source-tagged week document. <code>--raw</code> skips the model and runs fully offline.</p></div>
+        <div class="pill model">uses model</div>
       </div>
       <div class="step">
         <div class="n">02</div>
@@ -203,21 +203,22 @@
       <div class="step">
         <div class="n">04</div>
         <div class="verb">generate</div>
-        <div class="body"><p>Turns week text into randomized quizzes and designed pages. Target the whole course, selected weeks, or a single document for an à-la-carte quiz. A run ends with a cold-read review of what it produced, by default.</p></div>
+        <div class="body"><p>Turns week text into randomized quizzes and designed pages and, on request, assignments. Target the whole course, selected weeks, or a single document for an à-la-carte quiz. A run ends with a cold-read review of what it produced, by default.</p></div>
         <div class="pill model">uses model</div>
       </div>
       <div class="step">
         <div class="n">05</div>
         <div class="verb">emit</div>
-        <div class="body"><p>Packages the canonical JSON into LMS files: a Canvas quiz <code>.zip</code> (QTI), page HTML, a Common Cartridge <code>.imscc</code> of pages, or one whole-course <code>.imscc</code> of pages and quizzes in weekly modules.</p></div>
+        <div class="body"><p>Packages the canonical JSON into LMS files: a Canvas quiz <code>.zip</code> (QTI), page HTML, a Common Cartridge <code>.imscc</code> of pages, an <code>.imscc</code> of assignments, or one whole-course <code>.imscc</code> of all three in unit modules.</p></div>
         <div class="pill offline">offline</div>
       </div>
     </div>
+    <p class="sub" style="margin-top:20px">Three offline commands sit alongside them: <code>check</code> validates every settings file at once, <code>config</code> changes one setting and refuses a value it can't use, and <code>census</code> inventories what exists for every unit and what's missing. A broken settings file or a bad value stops a run with a message naming the file, the key, and what's allowed; it is never quietly ignored.</p>
   </section>
 
   <section>
     <p class="eyebrow">What it produces</p>
-    <h2>Quizzes &amp; pages</h2>
+    <h2>Quizzes, pages &amp; assignments</h2>
     <div class="feat">
       <div>
         <h3><span class="dot"></span>Randomized quizzes</h3>
@@ -234,11 +235,12 @@
       <div>
         <h3><span class="dot"></span>Designed teaching pages</h3>
         <p>Not text dumps — pages compose from a catalog of typed blocks (headings, pull quotes, columns, cards, glossaries, code, predict-then-reveal foldouts), each chosen for a documented function drawn from Cognitive Load Theory and Universal Design for Learning.</p>
-        <p>A page takes one of three functions, and the teaching generator auto-selects a monolithic or decomposed strategy by length.</p>
+        <p>A page takes one of four functions, and the teaching generator auto-selects a monolithic or decomposed strategy by length.</p>
         <ul class="chips">
           <li><b>teaching</b></li>
           <li>glossary</li>
           <li>overview</li>
+          <li>recap</li>
         </ul>
       </div>
       <div>
@@ -255,13 +257,17 @@
           <li>studio</li>
         </ul>
       </div>
+      <div style="grid-column:1/-1">
+        <h3><span class="dot"></span>Assignments with rubrics</h3>
+        <p>On request, coursekit drafts one assignment per unit: a brief and a grading rubric. The instructor sets the grade total; the model writes the brief and each criterion's levels and relative importance. They export in their own <code>.imscc</code> or as part of the whole-course one.</p>
+      </div>
     </div>
   </section>
 
   <section>
     <p class="eyebrow">The part most tools don't have</p>
     <h2>Evaluation, not just generation</h2>
-    <p class="sub">coursekit measures whether the result is pedagogically sound — five calibrated critics that read already-generated content off disk. <code>evaluate&nbsp;--all</code> runs the battery and writes a report per dimension; <code>fix</code> regenerates each flagged item in place and re-renders.</p>
+    <p class="sub">coursekit measures whether the result is pedagogically sound — four kinds of calibrated critic that read already-generated content off disk. <code>evaluate&nbsp;--all</code> runs the battery and writes a report per dimension; <code>fix</code> regenerates each flagged item in place and re-renders.</p>
     <div class="crit">
       <div class="card">
         <div class="top"><h3>Facticity</h3><span class="scope">quiz · page</span></div>

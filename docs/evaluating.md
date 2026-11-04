@@ -18,23 +18,29 @@ It reads the transcriber's `knowledge.json` when present, or the week text when 
 
 The map is **yours to edit.** Open the YAML and correct anything off — the concepts, the enduring understanding, which material a concept needs.
 Generation and evaluation both read it: the page generator uses it as a checklist it can't skip a concept from, and the evaluator scores against that fixed list instead of re-guessing.
+A map that can't be read stops the run with an error naming the file, rather than counting as no map at all; `coursekit check` finds that ahead of time.
 
 ## `evaluate` — the cold read
 
 ```bash
 uv run coursekit evaluate "/path/to/course"          # facticity: quizzes + pages
 uv run coursekit evaluate "/path/to/course" --pages  # only pages (--quizzes for only quizzes)
-uv run coursekit evaluate "/path/to/course" --all    # + pedagogy (form) + concept-delivery
+uv run coursekit evaluate "/path/to/course" --all    # + pedagogy (form) + concept-delivery + groundedness
 ```
 
-`evaluate` reads each finished quiz question and page section back in a **fresh conversation** (a cold read — not the generator grading its own homework) and reports three kinds of problem:
+`evaluate` reads each finished quiz question and page section back in a **fresh conversation** (a cold read — not the generator grading its own homework) and reports four kinds of problem:
 
 - **Facticity** — is each item *correct*? Wrong answer keys, definitions that contradict the material, code that won't run.
 - **Pedagogy** (`--all`) — does the page *scan, signal, and engage*? A 0–3 rubric, coaching rather than pass/fail.
 - **Concept-delivery** (`--all`) — does the page actually *teach* each concept the week is meant to cover?
+- **Groundedness** (`--all`) — how much of a page or quiz comes from *the source*, rather than the model's own knowledge? A low-coverage quiz means the source is too thin to ground it; on pages, contradictions with the material are flagged.
 
-It writes `quiz-review.md`, `page-review.md`, and (with `--all`) `page-pedagogy.md` / `page-concepts.md` beside the course.
+It writes `quiz-review.md`, `page-review.md`, and (with `--all`) `page-pedagogy.md`, `page-concepts.md`, `page-groundedness.md`, and `quiz-groundedness.md` beside the course.
 Nothing is changed — a human stays in the loop.
+
+**What it reads.** `evaluate` and `fix` take what they review from the course's index of artifacts, so a page belongs to the unit its `week_ref` names, wherever its folder sits, and is read against that unit's text.
+A unit's other pages (glossary, overview, recap) are reviewed along with its teaching page, and a single-document quiz is read against its own `source.md` (one with no `source.md` is skipped).
+The `--all` critics for pedagogy, concept delivery, and page groundedness are narrower for now: they read only each unit's teaching page.
 
 **Every run is archived, never overwritten.** Alongside those "latest" files, each cold read — whether from `evaluate` or the review that `generate` runs automatically after it builds — snapshots the run to `<course>/evals/<timestamp>/` (its review files + a `summary.json` recording the date, the coursekit commit, the model, and the counts) and appends one row to `<course>/evals/log.jsonl`.
 So quality is a **trend you can read over time** — did a change help, did a regression creep in — not a single file you keep overwriting.
@@ -61,6 +67,7 @@ Progress prints as it goes, so you can watch it work.
 
 The summary marks each item **fixed ✓** (repaired and now passes), **revised, still flagged** (changed but the critic still isn't happy — worth a human look), or **could not fix** (the model never produced a valid replacement).
 It updates `bank.json` + GIFT and `page.json` + HTML in place.
+If a page's HTML can't be re-rendered, the fix is still saved to `page.json`, and the run warns that the HTML is out of date and how to catch up (`coursekit emit html`).
 
 > **Re-emit after fixing.** `fix` updates the canonical IR and the standalone artifacts, but not the Canvas package. Re-run `coursekit emit qti` / `emit course` to refresh the `.zip` / `.imscc` you import.
 

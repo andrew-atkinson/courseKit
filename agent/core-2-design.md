@@ -161,6 +161,10 @@ What did change, each a rule the model already had:
 It gains a course-model section (the loader, the index, the rules, and the two `Unit` classes), the census and assignments in both system diagrams, the built proposer and the real overlay name (`structure.coursekit.yaml`), and `settings.py` as the one writer of coursekit's files.
 Its "not yet closed" list records what CORE-2 left on purpose: evaluate and fix still look beside each run's folder, the code still says `week`, and the census does not count overview pages.
 
+**Follow-up — done 2026-10-30** (`b816b8e`).
+Evaluate, fix, and `propose --grading` read the index too (`course.review_items`), which closes the first entry in that list; what they read is identical on both real courses.
+Three page critics still read only each unit's teaching page; [architecture.md](architecture.md) records that as its own decision.
+
 ## 6. Decisions (all four recommendations accepted, 2026-10-23)
 
 1. **A unit with no number.**
