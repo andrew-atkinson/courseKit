@@ -12,7 +12,6 @@ root, which loads every session. `agent/` is the deeper material that `CLAUDE.md
 | Doc | What it is | Read it when |
 | --- | --- | --- |
 | [`architecture.md`](architecture.md) | The internal structural map — the generator seam, the output-worth layer, the course model, the one-writer-per-file structure rule, the dependency direction, the order of operations, and what is not yet closed. Its user-facing half (the key, the four layers, what each `coursekit` command reads and writes) is [`docs/architecture.md`](../docs/architecture.md). Mermaid source, render-checked; both are published together as one artifact. | You're weighing a structural change (a new command or generator, a new emitter, the transcriber migration) or need the internals behind the user guide's diagrams. |
-| [`architecture-diagram.html`](architecture-diagram.html) | The one-page, plain-language picture: the pipeline layer by layer, built and planned, plus the one-writer rule and the proposer's scope. Hand-drawn, so it is updated by hand. | You want the whole system at a glance, or are explaining it to someone. |
 | [`roadmap.md`](roadmap.md) | The forward plan and the dated history: the current focus, every open item by area, and a Shipped changelog. | You're choosing what's next, or need to know whether something already landed. |
 | [`structure-review.md`](structure-review.md) | The 2026-10 step back that proposed the `CORE` arc: what coursekit is trying to become, and where its structure falls short. A proposal, so it describes the starting point, not today. | You want the reasoning behind a `CORE` item. |
 | [`core-1-audit.md`](core-1-audit.md) · [`core-2-design.md`](core-2-design.md) · [`core-3-design.md`](core-3-design.md) | The working record of each `CORE` arc: the audit or design, the increments and their pass criteria, the decisions, and what each step found. | You're continuing an arc, or asking why a piece of it is the way it is. |
@@ -25,8 +24,8 @@ root, which loads every session. `agent/` is the deeper material that `CLAUDE.md
 - **[`CLAUDE.md`](../CLAUDE.md)** — conventions and durable facts; loads automatically.
 - **[`README.md`](../README.md)** — how to install, configure, and run the tool; the user-facing surface.
 - **`agent/`** (this directory) — architecture, plans, and the format reference.
-- **`docs/`** — the tracked user guides (`*.md` and `overview.html`); anything else there is
-  gitignored.
+- **`docs/`** — the tracked user guides (`*.md`, `overview.html`, and
+  `architecture-diagram.html`, the one-page picture of the pipeline); anything else there is gitignored.
 
 ## Keeping this honest
 

@@ -1,7 +1,7 @@
 # How coursekit works
 
 How a course's own material becomes Canvas- and Moodle-ready quizzes, pages, and assignments: who provides what, which files live in the course folder, what each `coursekit` command reads and writes, and where a model is involved.
-For one plain-language page showing the whole pipeline, including what is planned, see [the course pipeline, layer by layer](../agent/architecture-diagram.html).
+For one plain-language page showing the whole pipeline, including what is planned, see [the course pipeline, layer by layer](architecture-diagram.html).
 For every command's flags see the [command reference](commands.md); for the internals (the course model, the generator seam, the shared spine) see [agent/architecture.md](../agent/architecture.md).
 Verified 30 October 2026 against `main`; every diagram is render-checked with mermaid-cli.
 

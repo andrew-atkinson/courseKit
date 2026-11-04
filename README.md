@@ -78,6 +78,7 @@ The full command surface — every verb, flag, and what uses the model — is th
 
 The README is the high-level read; the detail lives in [`docs/`](docs/):
 
+- **[The pipeline on one page](docs/architecture-diagram.html)** — the plainest view: every stage from raw material to the LMS, what's built and what's planned.
 - **[How coursekit works](docs/architecture.md)** — the map: the four layers (your material, the course folder, coursekit's commands, delivery), what each command reads and writes, and where a model is involved, in two diagrams with a key.
 - **[Command reference](docs/commands.md)** — every CLI verb and flag, and which use the model.
 - **[Evaluating and fixing](docs/evaluating.md)** — the audit → repair loop: `analyze` (the concept map), `evaluate` (the cold-read checks), and `fix` (regenerate flagged items in place). The part that makes a local model trustworthy.

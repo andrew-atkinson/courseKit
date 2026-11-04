@@ -137,7 +137,7 @@
         <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">lecture videos</div></div>
         <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">readings · PDFs · slides</div></div>
         <div class="node built" style="border-left-color:var(--faint)"><div class="n-name">a Canvas export</div><div class="n-meta">its manifest gives the transcriber real module and unit titles.</div></div>
-        <div class="node planned pad-r"><div class="n-name">just an outline</div><div class="n-meta">outline → course (FLOW-4).</div><div class="tag">planned</div></div>
+        <div class="node planned pad-r"><div class="n-name">just an outline</div><div class="n-meta">start a course from an outline alone.</div><div class="tag">planned</div></div>
       </div>
     </section>
 
@@ -151,7 +151,7 @@
         <div class="node built"><div class="n-name">ingest</div><div class="n-meta">PDF · slides · docx · odt → week-N.md; a folder of documents becomes one unit's text. A model tidies it unless you pass <code>--raw</code>.</div></div>
         <div class="node built"><div class="n-name">propose</div><div class="n-meta">scans the messy tree → drafts the declared structure, grading groups, and expectations; surfaces unassigned files. No model unless you ask for one.</div></div>
         <div class="node built"><div class="n-name">analyze</div><div class="n-meta">a unit's text → its concept map, using a model; yours to edit afterward.</div></div>
-        <div class="node planned pad-r"><div class="n-name">canvas import</div><div class="n-meta">bring an existing course in, so it can be audited too (FLOW-5).</div><span class="tag">planned</span></div>
+        <div class="node planned pad-r"><div class="n-name">canvas import</div><div class="n-meta">bring an existing course in, so it can be audited too.</div><span class="tag">planned</span></div>
       </div>
     </section>
 
@@ -177,8 +177,8 @@
         <div class="node built"><div class="n-name">quizzes</div><div class="n-meta">randomized banks; whole-unit + per-source (targeted); an optional enduring-understanding question.</div></div>
         <div class="node built"><div class="n-name">pages</div><div class="n-meta">teaching · glossary · overview · recap; overview and recap are assembled from the concept map, with no model.</div></div>
         <div class="node built"><div class="n-name">assignments</div><div class="n-meta">a brief + rubric, one per unit; the instructor sets the grade total.</div></div>
-        <div class="node planned pad-r"><div class="n-name">course-design advisor</div><div class="n-meta">proposes an <b>output</b> structure by pedagogical best practice (CRSE).</div><span class="tag">planned</span></div>
-        <div class="node planned pad-r"><div class="n-name">sequencing planner</div><div class="n-meta">pacing &amp; spacing across the term (CRSE-2 · STRC).</div><span class="tag">planned</span></div>
+        <div class="node planned pad-r"><div class="n-name">course-design advisor</div><div class="n-meta">proposes an <b>output</b> structure by pedagogical best practice.</div><span class="tag">planned</span></div>
+        <div class="node planned pad-r"><div class="n-name">sequencing planner</div><div class="n-meta">pacing &amp; spacing across the term.</div><span class="tag">planned</span></div>
       </div>
     </section>
 
@@ -204,7 +204,7 @@
         <div class="node built"><div class="n-name">QTI .zip</div><div class="n-meta">Canvas quizzes.</div></div>
         <div class="node built"><div class="n-name">Common Cartridge</div><div class="n-meta">pages, assignments, or the whole course in one .imscc, in unit modules.</div></div>
         <div class="node built"><div class="n-name">GIFT · HTML</div><div class="n-meta">Moodle text, written when a quiz is generated or fixed · standalone pages.</div></div>
-        <div class="node planned pad-r"><div class="n-name">Canvas API · LTI</div><div class="n-meta">direct push (SHIP-4/5).</div><span class="tag">planned</span></div>
+        <div class="node planned pad-r"><div class="n-name">Canvas API · LTI</div><div class="n-meta">direct push to Canvas, with no import step.</div><span class="tag">planned</span></div>
       </div>
     </section>
 
@@ -314,19 +314,19 @@
           <div class="rn">the proposer</div>
           <h3>Input-structure analysis</h3>
           <p>Read the messy tree of real materials → declare what exists (units, sources, kinds), and draft grading groups and expectations from the course's own signals. <b>Descriptive</b>: it maps reality, grounded in the faculty's own files.</p>
-          <span class="verdict yes">✓ built · FLOW-7</span>
+          <span class="verdict yes">✓ built · coursekit propose</span>
         </div>
         <div class="role out">
           <div class="rn">a separate advisor</div>
           <h3>Output-structure proposal</h3>
           <p>What the course <i>should</i> contain &amp; how it's organized, by pedagogical best practice. <b>Prescriptive</b> — higher stakes, different grounding (best practice + domain, not the file tree).</p>
-          <span class="verdict no">→ planned · course-design advisor · CRSE</span>
+          <span class="verdict no">→ planned · course-design advisor</span>
         </div>
         <div class="role out">
           <div class="rn">a separate planner</div>
           <h3>Sequencing &amp; pacing</h3>
           <p>How content types relate in sequence across the term — spacing, prerequisites, <code>teaches_toward</code> edges. A <b>course-level</b> concern over the whole course.</p>
-          <span class="verdict no">→ planned · sequencing planner · CRSE-2 · STRC</span>
+          <span class="verdict no">→ planned · sequencing planner</span>
         </div>
       </div>
       <figcaption>Why split them: input-analysis is low-risk (it describes materials); output-proposal is prescriptive and
@@ -336,5 +336,5 @@
     </figure>
   </div>
 
-  <p class="foot">Solid = built &amp; tested · dashed = on the roadmap. Checked against the code on 4 November 2026. For the detail: <code>docs/architecture.md</code> (what each command reads and writes), <code>agent/architecture.md</code> (the internals), and <code>agent/roadmap.md</code> (the plan).</p>
+  <p class="foot">Solid = built &amp; tested · dashed = on the roadmap. Checked against the code on 4 November 2026. For the detail: <code>docs/architecture.md</code> (what each command reads and writes) and <code>docs/commands.md</code> (every command and flag).</p>
 </div>

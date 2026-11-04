@@ -123,7 +123,7 @@ The *writer* half — the proposer (`coursekit propose`, writing `structure.cour
 Its job is **input-structure analysis** — read the real materials, declare what exists. Descriptive, grounded in the faculty's own files, low-risk.
 Two adjacent temptations are *separate* stations, deliberately not folded in: **output-structure proposal** (what the course *should* contain by pedagogical best practice) is a *prescriptive* course-design advisor (CRSE), grounded in best practice + domain rather than the file tree; **sequencing / pacing** across the term is a course-level planner (STRC).
 They chain — analyse inputs → propose output → sequence — but the chain is the *pipeline's* job, not one module's; fusing them would put a descriptive reader and a prescriptive designer behind one interface at one authority level, which is how a tool starts inventing structure and calling it analysis.
-The one-page picture of all this, including what is planned, is [architecture-diagram.html](architecture-diagram.html), presented at <https://claude.ai/code/artifact/74b690a9-4e17-46f4-bc42-c51a55cd555c>.
+The one-page picture of all this, including what is planned, is [docs/architecture-diagram.html](../docs/architecture-diagram.html), presented at <https://claude.ai/code/artifact/74b690a9-4e17-46f4-bc42-c51a55cd555c>.
 
 ## Finding the course folder
 

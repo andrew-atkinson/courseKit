@@ -4,7 +4,7 @@ Turns a course's own material (transcripts, readings, slides) into Canvas/Moodle
 It also evaluates what it made (the critics) and inventories the whole course (the census).
 The structural map is in two files, each the only home of its diagrams: [docs/architecture.md](docs/architecture.md) (the user guide: the key, the four layers, what each command reads and writes) and [agent/architecture.md](agent/architecture.md) (the internals: the course model, the generator seam, structure, dependencies).
 They are the source of truth for how the pieces fit; don't duplicate their diagrams here or in each other.
-[agent/architecture-diagram.html](agent/architecture-diagram.html) is the one-page, plain-language picture of the same system, including what is planned: when a stage, command, or output changes, update it too.
+[docs/architecture-diagram.html](docs/architecture-diagram.html) is the one-page, plain-language picture of the same system, including what is planned: when a stage, command, or output changes, update it too.
 The forward plan and dated history live in [agent/roadmap.md](agent/roadmap.md).
 
 **The one load-bearing idea:** every artifact has a canonical intermediate form — `bank.json` (quizzes), `page.json` (pages), `assignment.json` (assignments), `census.json` (the census).
@@ -48,7 +48,7 @@ One exception to re-emitting: GIFT has no `emit` command — `bank.finalize` wri
 - **Canvas exports (ground truth for the emitters):** real `.imscc` course exports live in `reference/` (gitignored — large, real course content).
   They are the ground truth behind `qti.py`, the page/assignment CC emitters, and the grading-group XML.
   Format notes: `docs/canvasQuizStructure.md`.
-- **`docs/` holds the tracked user-facing guides** (`*.md`; the README's Documentation section lists them); everything else there is gitignored.
+- **`docs/` holds the tracked user-facing guides** (`*.md`, `overview.html`, `architecture-diagram.html`; the README's Documentation section lists them); everything else there is gitignored.
   `reference/` is fully gitignored — don't rely on its contents surviving, and don't put the only copy of anything valuable there.
   `agent/` holds the tracked internal references (`architecture.md`, `roadmap.md`, `structure-review.md`, the `core-*` audit and designs, `local-canvas-testing.md`, `GIFT_format_compact.md`); [agent/agents.md](agent/agents.md) lists them all.
 - **Course artifacts live with the course, never in this repo** — `quizzes/`, `pages/`, `assignments/` beside the course's own files.
