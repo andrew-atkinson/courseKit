@@ -80,7 +80,7 @@ class Course:
         `<root>/<subdir>/<slug>` (or `<output_root>/<course>/<slug>`); the slug keeps today's on-disk names."""
         from coursekit import discover
         num = courseconfig.week_key(unit.id)
-        slug = f"week-{num}" if num else discover.slugify(unit.id)
+        slug = _run_slug(unit.id)
         course_slug = discover.slugify(self.title or self.root.name)
         out = Path(output_root) / course_slug / slug if output_root else self.root / subdir / slug
         has_root = (self.root / courseconfig.VTCONFIG_DIR_NAME).is_dir()
@@ -133,6 +133,48 @@ def ir_files(path, kind: str) -> list[Path]:
             outcomes.warn("course.stray_artifact", f"  {s}: outside the course layout (<kind>/<slug>/{name})"
                           f" — not packaged; move it or delete it.", path=str(s))
     return [a.path for a in course.artifacts_for(kind=kind) if a.path.is_relative_to(p)]
+
+
+def review_items(path, kind: str, weeks=None) -> list[tuple]:
+    """What evaluate and fix read for `kind` ("quiz" or "page"): (label, IR file, material, run), where
+    run is the `discover.Unit` it belongs to. Each unit the path selects (as `find_units` does, narrowed
+    by `weeks`) brings the artifacts the index owns to it, its own folder first, read against its doc;
+    a quiz in any other folder is a targeted quiz, read against its own `source.md` (none: skipped).
+    Targeted quizzes of units the path does not select come too (run None): they carry their own
+    material, so they need no unit doc. Reviews filter the index; they never walk the folder."""
+    from coursekit import discover
+    from coursekit.pipeline import _week_matches
+    p = Path(path).expanduser().resolve()
+    with outcomes.capture(sink=lambda n: None):            # strays are the emitters' to warn about
+        course = Course.load(p if p.is_dir() else p.parent)
+    runs = discover.find_units(p, subdir=_IR[kind][0])
+    if weeks:
+        runs = [r for r in runs if any(_week_matches(w, r) for w in weeks)]
+    ids = {_run_slug(u.id): u.id for u in course.units}
+    out, seen = [], set()
+    for run in runs:
+        uid = ids.get(run.week_slug, run.week_num or run.week_slug)
+        for a in sorted(course.artifacts_for(kind=kind, unit=uid), key=lambda a: (a.slug != run.week_slug, a.slug)):
+            source = a.path.parent / "source.md"
+            material = run.transcript_path if kind == "page" or a.slug == run.week_slug else (
+                source if source.exists() else None)
+            if material is not None:
+                out.append((a.slug, a.path, material, run))
+                seen.add(a.path)
+    if kind == "quiz":
+        want = {courseconfig.week_key(w) for w in weeks} if weeks else None
+        for a in course.artifacts_for(kind="quiz"):
+            source = a.path.parent / "source.md"
+            if a.path not in seen and source.exists() and (want is None or a.unit in want):
+                out.append((a.slug, a.path, source, None))
+    return out
+
+
+def _run_slug(unit_id: str) -> str:
+    """The folder a unit's artifacts live in: `week-3` for a numbered unit, else its slugified id."""
+    from coursekit import discover
+    num = courseconfig.week_key(unit_id)
+    return f"week-{num}" if num else discover.slugify(unit_id)
 
 
 # --------------------------------------------------------------- units

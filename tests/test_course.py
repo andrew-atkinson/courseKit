@@ -145,3 +145,27 @@ def test_generation_runs_come_from_the_model_in_unit_order(root):
     settings.write(root, "structure", {"weeks": {"week 4": {"doc": "docs/exposure.md", "title": "Exposure"}}})
     (u,) = find_units(root / "docs" / "exposure.md")
     assert (u.week_slug, u.week_label, u.output_dir) == ("week-4", "Week 4: Exposure", root.resolve() / "quizzes" / "week-4")
+
+
+def test_reviews_read_the_index_not_the_folder(root):
+    # CORE-2, finishing: evaluate and fix take artifacts from the index, so ownership is the one rule
+    # (a page moved by `week_ref` is read against its new unit) and a targeted quiz follows its unit.
+    from coursekit.generate.page import evaluate as pev
+    from coursekit.generate.quiz import evaluate as qev
+    d3, d4 = _doc(root, 3), _doc(root, 4)
+    _ir(root, "pages", "week-3", "page.json", {"week_ref": "week-3"})
+    _ir(root, "pages", "week-3-glossary", "page.json", {"week_ref": "week-4"})      # moved to unit 4
+    assert [(lab, t) for lab, _, t, _, _ in pev._iter_page_jsons(root)] == [
+        ("week-3", d3.resolve()), ("week-3-glossary", d4.resolve())]
+    for slug in ("week-3", "week-4"):
+        _ir(root, "quizzes", slug, "bank.json", {})
+    _ir(root, "quizzes", "week-3-essay", "bank.json", {})
+    (root / "quizzes" / "week-3-essay" / "source.md").write_text("an essay", encoding="utf-8")
+    assert [slug for slug, *_ in qev._iter_quiz_banks(root)] == ["week-3", "week-3-essay", "week-4"]
+
+
+def test_a_stray_artifact_proposes_no_grading_group(root):
+    from coursekit.ingest.propose_grading import scan_kinds
+    _ir(root, "quizzes", "week-1", "bank.json", {})
+    _ir(root, "assignments", "archive/week-2", "assignment.json", {})              # outside the layout
+    assert scan_kinds(root) == ["quiz"]

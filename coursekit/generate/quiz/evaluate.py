@@ -169,32 +169,15 @@ def read_verdicts(bank, transcript: str, provider, model: str, *, reads: int = D
 
 
 def _iter_quiz_banks(path, weeks=None):
-    """Yield (slug, bank_json, transcript_path, project_root) for every quiz in a course — whole-week
-    (via `find_units`, keeping all its transcript resolution) AND TARGETED (quizzes/week-N-<doc>/, each
-    with its own source.md). Shared by evaluate and fix so both see the same set."""
+    """Yield (slug, bank_json, transcript_path, project_root) for every quiz in a course — each unit's
+    own quiz AND its TARGETED quizzes (quizzes/week-N-<doc>/, each with its own source.md), from the
+    course model's index (`course.review_items`). Shared by evaluate and fix so both see the same set."""
     from coursekit import courseconfig
-    from coursekit.discover import find_units
-    from coursekit.pipeline import _week_matches
+    from coursekit.course import review_items
 
     root = courseconfig.find_root(path) or Path(path).expanduser().resolve()
-    seen = set()
-    units = find_units(path)
-    if weeks:
-        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
-    for u in units:
-        bj = Path(u.output_dir) / "bank.json"
-        if bj.exists():
-            seen.add(bj.resolve())
-            yield u.week_slug, bj, Path(u.transcript_path), (u.course_root or root)
-    # targeted quizzes are per-source dirs find_units doesn't enumerate; they carry their own source.md
-    want = {courseconfig.week_key(w) for w in weeks} if weeks else None
-    for bj in sorted((root / "quizzes").glob("*/bank.json")):
-        src = bj.parent / "source.md"
-        if bj.resolve() in seen or not src.exists():
-            continue
-        slug = bj.parent.name
-        if want is None or courseconfig.week_key(slug) in want:
-            yield slug, bj, src, root
+    for slug, bj, material, run in review_items(path, "quiz", weeks):
+        yield slug, bj, Path(material), ((run.course_root if run else None) or root)
 
 
 def evaluate_course(path, *, weeks=None, provider, model, out_path=None,

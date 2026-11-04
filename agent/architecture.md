@@ -53,6 +53,8 @@ flowchart LR
     units --> cen3["census"]
     idx --> cen3
     idx --> ir3["ir_files → every emit command"]
+    idx --> rv3["review_items → evaluate · fix"]
+    idx --> pg3["propose#nbsp;--grading"]
 ```
 
 - **A unit is the course's teaching block, not a week.**
@@ -223,8 +225,8 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
 - **The transcriber still carries its own copies** of provider, prompts, RAM check, and project-root logic (the diverged rows above). `courseconfig` is the surface it *can* adopt, but the adoption is its own increment in that repo — this side only built the target.
 - **Interactive prompt authoring** (`_author_new_prompt` / `_edit_existing_prompt`) lives only in `vt_prompts.py`.
   Persisting a choice back to config is no longer deferred on this side: `settings.py` writes coursekit's own files (never `context.yaml`).
-- **Evaluate and fix still find some artifacts their own way.**
-  They get their units from the model, but then look beside each run's folder: pages glob a unit's `<slug>-*` siblings, quizzes glob `quizzes/*/bank.json` for targeted quizzes, and `ingest/propose_grading.py` checks for quizzes and assignments directly.
-  Moving them onto the artifact index was a CORE-2 non-goal and is the next walker cleanup.
+- **Three page critics read only each unit's teaching page.**
+  Evaluate and fix take every quiz and page from the index (`course.review_items`), glossary and overview siblings included, but the pedagogy, concept-delivery, and page-groundedness critics (`evaluate --all`) still read one `page.json` per unit at its layout path.
+  Moving them onto `review_items` would review the siblings too — more model calls and a visible change in their reports, so it is its own decision, not a cleanup.
 - **The code still says `week`** (`week_slug`, `week_num`, `discover.Unit`) where the model says *unit*; CORE-5 renames it once its readers have moved.
 - **The census does not count overview pages yet**, though the model indexes them — a visible output change, kept out of the byte-identical CORE-2 steps.

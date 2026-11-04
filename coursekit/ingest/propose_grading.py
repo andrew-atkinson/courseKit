@@ -10,7 +10,7 @@ it sets only `grading` and preserves a `weeks` block the structure proposer may 
 
 from pathlib import Path
 
-from coursekit import courseconfig
+from coursekit import courseconfig, outcomes
 from coursekit.outcomes import CoursekitError
 
 # content kind -> the gradebook group it proposes. Kinds are detected from generated artifacts on disk.
@@ -25,13 +25,12 @@ _HEADER = (
 
 
 def scan_kinds(root: Path) -> list[str]:
-    """Which graded artifact KINDS exist under the course, in a stable order (assignments, then quizzes)."""
-    kinds = []
-    if any(root.glob("assignments/**/assignment.json")):
-        kinds.append("assignment")
-    if any(root.glob("quizzes/**/bank.json")):
-        kinds.append("quiz")
-    return kinds
+    """Which graded artifact KINDS the course model indexes, in a stable order (assignments, then
+    quizzes). A stray IR file outside the layout is not packaged, so it proposes no group either."""
+    from coursekit.course import Course
+    with outcomes.capture(sink=lambda n: None):            # strays are the emitters' to warn about
+        present = {a.kind for a in Course.load(root).artifacts}
+    return [k for k in ("assignment", "quiz") if k in present]
 
 
 def propose_grading(path) -> dict:

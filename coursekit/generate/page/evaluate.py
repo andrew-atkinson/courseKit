@@ -102,24 +102,13 @@ def _iter_page_jsons(path, weeks=None):
     """Yield (label, page_json, transcript_path, project_root, week_slug) for EVERY page under the
     course's pages/ tree — the per-week teaching page AND its function siblings (`-glossary`,
     `-overview`). `label` is the page dir name (distinguishes the siblings in a review); `week_slug`
-    is the base week, shared by a week's pages (for supplements + material). Mirrors the quiz side's
-    `_iter_quiz_banks` so evaluate and fix discover the same set."""
-    from coursekit.discover import find_units
-    from coursekit.pipeline import _week_matches
+    is the base week, shared by a week's pages (for supplements + material). A page belongs to the unit
+    the course model's index says (`course.review_items`), so a page moved by its `week_ref` is read
+    against its new unit. Mirrors the quiz side's `_iter_quiz_banks` so evaluate and fix see the same set."""
+    from coursekit.course import review_items
 
-    units = find_units(path, subdir="pages")
-    if weeks:
-        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
-    for u in units:
-        pages_root = Path(u.output_dir).parent
-        slug = u.week_slug
-        # the teaching page dir (== slug) plus its function siblings (slug-glossary, slug-overview, …);
-        # `slug-*` needs the trailing hyphen, so week-3 never sweeps in week-30.
-        dirs = [pages_root / slug] + sorted(d for d in pages_root.glob(f"{slug}-*") if d.is_dir())
-        for d in dirs:
-            pj = d / "page.json"
-            if pj.exists():
-                yield d.name, pj, Path(u.transcript_path), u.course_root, u.week_slug
+    for label, pj, material, run in review_items(path, "page", weeks):
+        yield label, pj, Path(material), run.course_root, run.week_slug
 
 
 def evaluate_course_pages(path, *, weeks=None, provider, model, out_path=None,
