@@ -2,6 +2,7 @@ import json
 import pytest
 from coursekit.providers import OpenAICompatProvider
 from coursekit.discover import find_units
+from coursekit.generate.quiz.generator import QuizGenerator
 from coursekit.outcomes import CoursekitError
 from coursekit.pipeline import run_course, run_unit
 
@@ -89,7 +90,7 @@ def test_run_unit_finalizes_and_writes_all_artifacts(tmp_path):
     f.write_text("a transcript", encoding="utf-8")
     unit = find_units(f)[0]
 
-    res = run_unit(unit, FakeClient(), "fake-model")
+    res = run_unit(unit, FakeClient(), "fake-model", QuizGenerator())
 
     assert res.finalized
     assert res.n_groups == 1
@@ -102,7 +103,7 @@ def test_run_unit_writes_under_the_units_output_dir(tmp_path):
     f = tmp_path / "week-3.md"
     f.write_text("a transcript", encoding="utf-8")
     unit = find_units(f)[0]
-    run_unit(unit, FakeClient(), "fake-model")
+    run_unit(unit, FakeClient(), "fake-model", QuizGenerator())
     # Beside the input, never in the app.
     assert unit.output_dir == (tmp_path / "quizzes" / "week-3").resolve()
     saved = json.loads((unit.output_dir / "bank.json").read_text())
@@ -118,7 +119,7 @@ def test_two_units_do_not_bleed(tmp_path):
     (tmp_path / "week 4").mkdir()
     (tmp_path / "week 4" / "week-4.md").write_text("t4", encoding="utf-8")
 
-    results = run_course(tmp_path, provider=FakeClient(), model="fake")
+    results = run_course(tmp_path, generator=QuizGenerator(), provider=FakeClient(), model="fake")
 
     assert len(results) == 2
     # Each week sees exactly its own single group — no accumulation from the previous week.
@@ -139,7 +140,7 @@ def test_dry_run_does_not_touch_the_client_or_disk(tmp_path):
     (tmp_path / "week 4" / "week-4.md").write_text("t4", encoding="utf-8")
 
     client = FakeClient(script=[])  # would IndexError if create() were called
-    results = run_course(tmp_path, provider=client, model="fake", dry_run=True)
+    results = run_course(tmp_path, generator=QuizGenerator(), provider=client, model="fake", dry_run=True)
 
     assert len(results) == 2
     assert _calls(client) == 0
@@ -155,7 +156,7 @@ def test_weeks_filter_selects_matching_units(tmp_path):
         (tmp_path / f"week {n}").mkdir()
         (tmp_path / f"week {n}" / f"week-{n}.md").write_text(f"t{n}", encoding="utf-8")
 
-    results = run_course(tmp_path, weeks=["4"], provider=FakeClient(script=[]),
+    results = run_course(tmp_path, generator=QuizGenerator(), weeks=["4"], provider=FakeClient(script=[]),
                          model="fake", dry_run=True)
     assert [r.unit.week_slug for r in results] == ["week-4"]
 
@@ -164,7 +165,7 @@ def test_weeks_filter_selects_matching_units(tmp_path):
 def test_week_filter_accepts_various_references(tmp_path, ref):
     (tmp_path / "week 3").mkdir()
     (tmp_path / "week 3" / "week-3.md").write_text("t3", encoding="utf-8")
-    results = run_course(tmp_path, weeks=[ref], provider=FakeClient(script=[]),
+    results = run_course(tmp_path, generator=QuizGenerator(), weeks=[ref], provider=FakeClient(script=[]),
                          model="fake", dry_run=True)
     assert len(results) == 1
 
@@ -450,7 +451,7 @@ def test_run_unit_honours_a_courses_prompt_override(tmp_path):
     unit = _course_with_transcript(tmp_path, override="ONLY-TRUE-FALSE-BRIEF")
     provider = FakeClient()
 
-    run_unit(unit, provider, "fake-model")
+    run_unit(unit, provider, "fake-model", QuizGenerator())
 
     sent = provider._raw.first_messages
     assert "ONLY-TRUE-FALSE-BRIEF" in sent[1]["content"]
@@ -460,7 +461,7 @@ def test_run_unit_uses_shipped_prompts_when_a_course_overrides_nothing(tmp_path)
     unit = _course_with_transcript(tmp_path)
     provider = FakeClient()
 
-    run_unit(unit, provider, "fake-model")
+    run_unit(unit, provider, "fake-model", QuizGenerator())
 
     sent = provider._raw.first_messages
     assert "Start by calling create_checklist." in sent[1]["content"]
@@ -479,7 +480,7 @@ def test_quiz_yaml_selects_a_named_task_prompt(tmp_path):
     )
     provider = FakeClient()
 
-    run_unit(unit, provider, "fake-model")
+    run_unit(unit, provider, "fake-model", QuizGenerator())
 
     sent = provider._raw.first_messages
     assert "EXAM-STYLE BRIEF" in sent[1]["content"]
@@ -491,7 +492,7 @@ def test_quiz_yaml_absent_falls_back_to_shipped_prompts(tmp_path):
     unit = _course_with_transcript(tmp_path)  # marker, no quiz.yaml
     provider = FakeClient()
 
-    run_unit(unit, provider, "fake-model")  # would raise PromptNotFound on the default.md bug
+    run_unit(unit, provider, "fake-model", QuizGenerator())  # would raise PromptNotFound on the default.md bug
 
     sent = provider._raw.first_messages
     assert "Start by calling create_checklist." in sent[1]["content"]
@@ -500,7 +501,7 @@ def test_quiz_yaml_absent_falls_back_to_shipped_prompts(tmp_path):
 # --------------------------- week filter: non-numeric refs match by slug
 
 def _filter(path, week, tmp):
-    return run_course(path, weeks=[week], provider=FakeClient(script=[]),
+    return run_course(path, generator=QuizGenerator(), weeks=[week], provider=FakeClient(script=[]),
                       model="fake", dry_run=True)
 
 
@@ -567,13 +568,23 @@ def test_run_unit_drives_an_arbitrary_generator(tmp_path):
     assert (unit.output_dir / "reply.txt").exists()  # generic artifact write, no quiz code
 
 
-def test_default_generator_is_quiz(tmp_path):
-    # Omitting the generator must keep driving quizzes (back-compat for every existing caller).
+def test_the_driver_never_guesses_which_generator_to_run(tmp_path):
+    # A forgotten generator used to mean "quizzes", silently: the driver is told what to run, or refuses.
+    from pathlib import Path
+
+    import coursekit.pipeline as pipeline
     f = tmp_path / "week-3.md"
     f.write_text("a transcript", encoding="utf-8")
     unit = find_units(f)[0]
-    res = run_unit(unit, FakeClient(), "fake-model")   # no generator passed
-    assert res.n_groups == 1 and res.n_variants == 1
+    with pytest.raises(TypeError, match="gen"):
+        run_unit(unit, FakeClient(), "fake-model")
+    with pytest.raises(TypeError, match="generator"):
+        run_course(tmp_path, provider=FakeClient(), model="fake", dry_run=True)
+    with pytest.raises(TypeError, match="gen"):
+        loop([], FakeClient(), "fake-model")
+    assert not unit.output_dir.exists()
+    source = Path(pipeline.__file__).read_text(encoding="utf-8")
+    assert "generate.quiz" not in source and "generate.page" not in source
 
 
 # ------------------------------------------------- the deterministic EU pass (ASMT-3)
@@ -652,7 +663,7 @@ def test_run_unit_refuses_a_system_override_without_transcript_before_any_model_
                                    override_name="system")
     provider = FakeClient()
     with pytest.raises(CoursekitError, match=r"\{transcript\}"):
-        run_unit(unit, provider, "fake-model")
+        run_unit(unit, provider, "fake-model", QuizGenerator())
     assert provider._raw.calls == 0                               # stopped before the model
 
 
@@ -703,7 +714,7 @@ def test_run_unit_auto_finalizes_against_the_concept_map_target(tmp_path):
     save_concept_map(ConceptMap(week="3", concepts=[Concept(name="Loops")]),
                      concept_map_path(unit.course_root, "3"))       # target: one group
     client = ScriptedClient([("tools", FULL), ("stop", "<tool_call|>")], repeat_last=True)
-    res = run_unit(unit, client, "m")
+    res = run_unit(unit, client, "m", QuizGenerator())
     assert res.finalized
     assert (unit.output_dir / "quiz.json").exists()                  # artifacts re-written in sync
 

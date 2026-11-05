@@ -80,15 +80,7 @@ def _model_error_message(provider, model: str, exc: Exception) -> str:
 DEFAULT_MAX_ITERS = 80
 
 
-def _default_generator() -> Generator:
-    """The quiz generator is the default, so callers (and tests) that don't pass one keep driving
-    quizzes. Imported lazily to keep the spine free of a compile-time dependency on any concrete
-    generator — the seam points one way, generator → spine, never back."""
-    from coursekit.generate.quiz.generator import QuizGenerator
-    return QuizGenerator()
-
-
-def loop(messages, provider, model, generator: Generator, *,
+def loop(messages, provider, model, gen: Generator, *,
          max_iters: int = DEFAULT_MAX_ITERS, max_nudges: int = 4, stall_limit: int = 4) -> str:
     """Drive one conversation to a finalized artifact.
 
@@ -98,10 +90,10 @@ def loop(messages, provider, model, generator: Generator, *,
     Neither means the work is done, so instead of trusting finish_reason we ask the generator
     whether its artifact is finalized and nudge the model back on track within a bounded budget.
 
-    `provider` is a coursekit Provider (it owns how a turn is represented); `generator` is the
-    Generator seam (it owns the tools, the finalized check, and the nudge vocabulary).
+    `provider` is a coursekit Provider (it owns how a turn is represented); `gen` is the Generator seam,
+    already set up for this conversation (it owns the tools, the finalized check, and the nudge
+    vocabulary). A focused pass (the EU question, an assignment) supplies only those four methods.
     """
-    gen = generator
     reply = None
     nudges = 0
     error_streak = 0
@@ -185,14 +177,13 @@ def loop(messages, provider, model, generator: Generator, *,
     return (reply.content or "") if reply else ""
 
 
-def run_unit(unit: Unit, provider, model, generator: Generator | None = None, *,
+def run_unit(unit: Unit, provider, model, gen: Generator, *,
              max_iters: int = DEFAULT_MAX_ITERS, config_overrides: dict | None = None) -> RunResult:
     """Generate and finalize one unit's artifact, writing to unit.output_dir.
 
     `config_overrides` (per-run config values from a CLI flag) win over the course's config file,
     so a one-off run can override what page.yaml/quiz.yaml sets without editing it.
     """
-    gen = generator or _default_generator()
     out = Path(unit.output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -232,10 +223,9 @@ def _week_matches(ref, unit: Unit) -> bool:
 
 def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
                dry_run: bool = False, max_iters: int = DEFAULT_MAX_ITERS,
-               generator: Generator | None = None, config_overrides: dict | None = None,
+               generator: Generator, config_overrides: dict | None = None,
                unit_runner=None) -> list[RunResult]:
-    """Discover units under `path`, optionally filter to `weeks`, and run each with `generator`
-    (default: the quiz generator).
+    """Discover units under `path`, optionally filter to `weeks`, and run each with `generator`.
 
     `dry_run` returns the planned units (with resolved output dirs) without calling the model.
     `config_overrides` are per-run config values (e.g. from CLI flags) that win over the course file.
@@ -245,7 +235,6 @@ def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
     """
     # The output tree (quizzes/, pages/, …) is the generator's, so a course can hold both. Read it
     # directly: a generator that forgets `artifacts_subdir` fails loudly instead of writing into quizzes/.
-    generator = generator or _default_generator()
     subdir = generator.artifacts_subdir
     units = find_units(path, output_root=output_root, subdir=subdir)
     if weeks:

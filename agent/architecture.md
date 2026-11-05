@@ -31,7 +31,7 @@ A **draft** is an artifact being built plus where it saves (`AssignmentDraft`, `
 A **tool session** is one run's tools, written as methods and bound to one draft (`AssignmentTools`, `PageTools`, `QuizTools`, all on `dispatch.ToolSession`, which owns dispatch, the call log, the stop at the finishing tool, and replay).
 A generator builds both in `reset()`; decompose and glossary build one per page; `fix_course` and `fix_course_pages` adopt each artifact into its own; and `fix_one`, `fix_one_block`, and `generate_eu_question` take it as an argument.
 The schemas stay module constants beside the class, so the fix, EU, decompose, and glossary subsets still come from one `TOOL_SPECS`, and `tests/test_tools.py` and `tests/test_page_tools.py` keep each method and its schema from drifting apart.
-`pipeline.loop` takes its generator as a required argument: only `run_unit` can supply a default, because it resets the generator first.
+The driver has no default generator: `loop`, `run_unit`, and `run_course` are each told which one to run, so a forgotten generator is an error, not a quiz.
 
 Two jobs therefore cannot write into each other's quiz, page, or assignment.
 The renderer's inline-code style is the one piece of module state left, until step 4.
