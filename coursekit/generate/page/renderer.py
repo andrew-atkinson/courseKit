@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader, pass_context, select_autoescape
 from markupsafe import Markup, escape
 
 _COMPONENTS = Path(__file__).resolve().parent / "components"
@@ -86,20 +86,15 @@ def _render_math(s: str) -> str:
     return _DOLLAR_EQUATION.sub(lambda m: m.group(1), s)   # bare "$…=…$" → the expression, no $
 
 
-# The inline-code chip style, set per render from the active theme (render_body). A self-contained
-# chip — the theme's WCAG-validated code_bg/code_fg pair — so `code` reads on ANY ground (a dark
-# terminal panel, or the white gaps between panels, where a bare unstyled <code> went light-on-white).
-_INLINE_CODE_STYLE = ""
-
-
-def _md_inline(value) -> Markup:
+def _md_inline(value, code_style: str = "") -> Markup:
     """Escape, resolve inline math, then apply inline Markdown (**bold**, *italic*, `code`).
-    Escaping first means every later pass acts on safe text and a user's `<` is already `&lt;`."""
+    Escaping first means every later pass acts on safe text and a user's `<` is already `&lt;`.
+    `code_style` is the inline-code chip for this render's theme (see render_body)."""
     s = str(escape(value))
     s = _render_math(s)
     s = _BOLD.sub(r"<strong>\1</strong>", s)
     s = _ITAL.sub(r"<em>\1</em>", s)
-    tag = f'<code style="{_INLINE_CODE_STYLE}">' if _INLINE_CODE_STYLE else "<code>"
+    tag = f'<code style="{code_style}">' if code_style else "<code>"
     s = _CODE.sub(lambda m: f"{tag}{m.group(1)}</code>", s)
     return Markup(s)
 
@@ -114,7 +109,7 @@ _env = Environment(
     autoescape=select_autoescape(["html", "j2"], default_for_string=True),
     trim_blocks=False, lstrip_blocks=False,
 )
-_env.filters["md_inline"] = _md_inline
+_env.filters["md_inline"] = pass_context(lambda context, value: _md_inline(value, context.get("code_style", "")))
 _env.filters["nl2br"] = _nl2br
 
 
@@ -232,15 +227,15 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
 
     shape = t.get("shape") or {}
     color = t.get("color") or {}
-    # Inline `code` renders as a self-contained chip in the theme's validated code_bg/code_fg pair, so
-    # it stays legible on any ground (used by _md_inline). Fixes terminal's inline code going light on
-    # the white panel gaps.
-    global _INLINE_CODE_STYLE
+    # Inline `code` renders as a self-contained chip in the theme's WCAG-validated code_bg/code_fg pair, so
+    # it stays legible on any ground: a dark terminal panel, or the white gaps between panels, where a bare
+    # <code> went light-on-white. Every template that uses `md_inline` gets it as `code_style`; it comes from
+    # this page's theme, not the template's `t`, because the recap fallback below renders with its own `t`.
     _c_bg = color.get("code_bg", color.get("surface") or "#f2f2f0")
     _c_fg = color.get("code_fg", color.get("ink") or "#111111")
     _mono = (t.get("type") or {}).get("mono_family", "ui-monospace, Menlo, monospace")
-    _INLINE_CODE_STYLE = (f"background-color: {_c_bg}; color: {_c_fg}; "
-                          f"font-family: {_mono}; padding: 1px 5px; border-radius: 3px;")
+    code_style = (f"background-color: {_c_bg}; color: {_c_fg}; "
+                  f"font-family: {_mono}; padding: 1px 5px; border-radius: 3px;")
     # section_frame: none | card (a light card on the page) | panel (each section on the theme's
     # own surface colour, so a dark identity breaks into separate petrol panels with white gaps
     # between them, rather than one flowing slab).
@@ -307,10 +302,10 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
         inner = []
         for b in body_blocks:
             if b.kind == "details":
-                inner.append(_recap_qa(str(escape(b.summary)), _md_inline(b.text)))
+                inner.append(_recap_qa(str(escape(b.summary)), _md_inline(b.text, code_style)))
             else:  # fallback if the model didn't phrase the recap as questions
                 inner.append(_env.get_template(f"{b.kind}.html.j2").render(
-                    b=b.model_dump(), t=t_recap, framed=False, frame_pad=0).strip())
+                    b=b.model_dump(), t=t_recap, framed=False, frame_pad=0, code_style=code_style).strip())
         bg = f"background-color: {r_bg}; " if r_bg else ""
         return (f'<div style="{bg}border: 1px {frame_style} {recap_border}; '
                 f'border-radius: {radius}px; padding: {unit * 2}px {unit * 3}px; '
@@ -345,7 +340,7 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
             _env.get_template(f"{b.kind}.html.j2").render(
                 b=b.model_dump(), t=t, framed=framed, frame_pad=unit * 3,
                 nested=(b.kind == "glossary" and topic_section),
-                concept=concept_name, images=img_by_ref).strip()
+                concept=concept_name, images=img_by_ref, code_style=code_style).strip()
             for b in group
         ]
         parts.append(_panel("\n".join(rendered)) if framed else "\n".join(rendered))

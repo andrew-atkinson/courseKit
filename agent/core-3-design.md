@@ -155,6 +155,7 @@ Every step must also keep the **test guard**: no test removed, and the number of
    One difference on purpose, the same as pages: `fix` no longer inherits a call log left by an earlier run in the same process. No CLI path does both.
 4. **`core-3-renderer` — the inline-code style.**
    *Pass:* G3 identical; a new test renders two themes alternating inside one template pass and each keeps its own colours.
+   **Done 2026-11-05.** G3 and the other goldens are identical to `main`, plus a scripted comparison of assignment HTML and cartridge page HTML in every theme, which G3 doesn't reach. `render_body` passes `code_style` to the two template calls that use `md_inline`; `supplements.html.j2` doesn't use the filter, so it isn't passed there. A second test checks every inline-code chip on a page, recap questions and recap fallback included, because a call site that forgets `code_style` renders a bare `<code>` with no error.
 5. **`core-3-isolation` — the proof, and the docs.**
    The new tests that make this permanent: two quiz jobs and two page jobs on separate threads, forced to alternate at every tool call by a barrier, each byte-identical to the same job run alone; and the §4 guard.
    `agent/architecture.md` and the seam's docstrings are refreshed, the §4 rules join `CLAUDE.md`, and the roadmap closes CORE-3 with its Shipped line.

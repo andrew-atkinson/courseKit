@@ -1,11 +1,13 @@
 import html as htmllib
 import json
+import re
 
 import pytest
 
 from coursekit.emit import html as html_emit
 from coursekit.generate.page import page as P
 from coursekit.generate.page.renderer import load_supplements, render_body
+from coursekit.generate.page.style import load_theme
 
 
 def _page_with(*blocks):
@@ -322,3 +324,42 @@ def test_columns_mix_code_and_prose_in_one_column():
     ])))
     assert "<pre" in body and "x = 1<br>y = 2" in body                  # the multi-line item → code
     assert "intro point" in body and "<li" not in body                 # the prose item → a row, not a bullet
+
+
+# ---- the inline-code chip belongs to one render, not to the module (CORE-3) ----
+
+def _code_page():
+    return _page_with(dict(kind="heading", block_id="r", text="Recap", level=2, role="review"),
+                      dict(kind="details", block_id="d", summary="Why?", text="Because `recall`."),
+                      dict(kind="paragraph", block_id="f", text="Fallback `recap`."),
+                      dict(kind="heading", block_id="h", text="Loops", level=2, role="concept"),
+                      dict(kind="paragraph", block_id="a", text="First `one`."),
+                      dict(kind="paragraph", block_id="b", text="Second `two`."))
+
+
+def test_inline_code_keeps_its_chip_everywhere_on_a_page():
+    theme = load_theme("terminal")
+    out = render_body(_code_page(), style=dict(theme, _name="terminal"))
+    chips = re.findall(r"<code([^>]*)>", out)
+    assert len(chips) == 4
+    assert all(theme["color"]["code_bg"] in c and theme["color"]["code_fg"] in c for c in chips)
+
+
+def test_a_second_render_midway_through_a_page_leaves_its_code_colours_alone(monkeypatch):
+    from coursekit.generate.page import renderer
+    page = _code_page()
+    first, second = dict(load_theme("terminal"), _name="terminal"), dict(load_theme("bauhaus"), _name="bauhaus")
+    assert first["color"]["code_bg"] != second["color"]["code_bg"]
+    alone_first, alone_second = render_body(page, style=first), render_body(page, style=second)
+
+    real, interrupted, inner = renderer._env.get_template, [], []
+
+    def get_template(name):                    # between two of the first page's blocks, another course renders
+        if name == "paragraph.html.j2" and not interrupted:
+            interrupted.append(True)
+            inner.append(render_body(page, style=second))
+        return real(name)
+
+    monkeypatch.setattr(renderer._env, "get_template", get_template)
+    assert render_body(page, style=first) == alone_first
+    assert inner == [alone_second]
