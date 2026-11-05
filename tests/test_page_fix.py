@@ -138,3 +138,12 @@ def test_fix_one_block_aborts_on_a_model_load_error(s):
 
     with pytest.raises(ModelLoadError):
         pfix.fix_one_block(s, _finding(), "material", _Down(), "m", critic="C")
+
+
+def test_fix_one_block_refuses_a_tool_the_fix_pass_does_not_offer(s):
+    s.add_heading("h", "Realtime")
+    s.add_code("realtime-code", code="sound.play();", language="js")
+    s.add_details("d", "Predict?", "It plays.")
+    out = pfix.fix_one_block(s, _finding(), "material", FixProvider("finalize_page", {}), "m",
+                             critic="CRITIC", max_turns=2)
+    assert out.replaced is False and not s.draft.is_finalized()           # the fixer cannot finalize the page

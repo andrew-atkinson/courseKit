@@ -3,10 +3,15 @@
 The model-driven passes are exercised by hand on a real course; here we pin the slicer, which is the
 lever (each concept sees a few K chars of relevant transcript, not the whole week)."""
 
+import json
+
+import pytest
+
 from coursekit import prompts
 from coursekit.generate import catalog
 from coursekit.generate.page import decompose
 from coursekit.generate.page.concept_map import Concept
+from coursekit.providers.base import Reply, ToolCall
 
 
 def test_concept_section_prompt_has_a_palette_slot_scoped_to_the_section_body():
@@ -114,3 +119,38 @@ def test_neighbour_window_edges_point_at_opening_and_close():
 def test_neighbour_window_carries_only_name_when_no_gist():
     cs = [_c("Loops"), _c("Arrays")]
     assert "leads into: Arrays." in decompose._neighbour_context(cs, 0)   # name only, no " — "
+
+
+class _Calls:
+    """One tool call, then prose: a pass that names a tool, and stops."""
+    def __init__(self, name, args):
+        self.replies = [Reply(finish_reason="tool_calls", tool_calls=[ToolCall("1", name, json.dumps(args))])]
+        self.seen = []
+
+    def chat_with_tools(self, **kw):
+        return self.replies.pop(0) if self.replies else Reply(finish_reason="stop", content="done")
+
+    def append_assistant(self, messages, reply):
+        messages.append({"role": "assistant", "content": reply.content or ""})
+
+    def append_tool_results(self, messages, results):
+        self.seen += [c for _, c in results]
+        messages.extend({"role": "tool", "content": c} for _, c in results)
+
+    def append_user(self, messages, text):
+        messages.append({"role": "user", "content": text})
+
+
+@pytest.mark.parametrize("specs,call", [
+    (None, ("finalize_page", {})),                                              # a section pass: add_* only
+    ([s for s in decompose._ADD_SPECS if s["name"] == "add_glossary"],          # the glossary pass
+     ("add_paragraph", {"block_id": "p", "text": "Not a term."})),
+])
+def test_a_pass_runs_only_the_tools_it_offers(specs, call):
+    from coursekit.generate.page import page as P
+    from coursekit.generate.page import tools as T
+    session = T.PageTools(P.PageDraft.new("p", None))
+    provider = _Calls(*call)
+    added = decompose._run_pass(session, provider, "m", "sys", "user", specs=specs, max_nudges=0)
+    assert added == 0 and session.draft.page.blocks == {} and not session.draft.is_finalized()
+    assert provider.seen[0].startswith(f"ERROR: no tool named '{call[0]}'")

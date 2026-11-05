@@ -796,3 +796,13 @@ def test_the_eu_script_adds_to_the_existing_bank_and_logs_it(tmp_path, monkeypat
     assert saved.run_id == "kept" and set(saved.groups) == {"c1", "enduring_understanding"}
     assert "add_open_response_variant" in (unit.output_dir / "calls.jsonl").read_text()
 
+
+def test_the_eu_pass_refuses_a_tool_it_does_not_offer():
+    # On main the EU pass ran any tool the model named: a matching group it never offered ended up in the bank.
+    from coursekit.generate.quiz import bank, eu, tools
+    s = tools.QuizTools(bank.BankDraft.new("run", None, title="t", source="week-3.md"))
+    provider = FakeClient(script=[[("create_question_group",
+                                    {"group_id": "x", "concept_title": "X", "question_type": "matching"})]]
+                          + EU_SCRIPT)
+    assert eu.generate_eu_question(s, provider, "m", "material", "an enduring idea", None)
+    assert set(s.draft.bank.groups) == {"enduring_understanding"}

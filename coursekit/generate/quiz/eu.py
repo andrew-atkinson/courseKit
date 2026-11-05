@@ -22,12 +22,13 @@ class _EUGenerator:
 
     def __init__(self, session):
         self.session = session
+        self.offered = session.offering(_EU_SPEC)    # the model can call only the tool it is shown
 
     def tool_specs(self):
         return _EU_SPEC
 
     def run_tool_calls(self, calls):
-        return self.session.run_tool_calls(calls)
+        return self.offered.run_tool_calls(calls)
 
     def is_finalized(self) -> bool:
         g = self.session.draft.bank.groups.get(_EU_GID)

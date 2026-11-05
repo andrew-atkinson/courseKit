@@ -257,3 +257,17 @@ def test_two_banks_built_at_once_do_not_touch_each_other(tmp_path):
     assert not (tmp_path / "b" / "bank.json").exists()
     assert len((tmp_path / "a" / "calls.jsonl").read_text().splitlines()) == 4
     assert len((tmp_path / "b" / "calls.jsonl").read_text().splitlines()) == 3
+
+
+# ---- a pass may call only the tools it offers (CORE-3.1) ----
+
+def test_a_session_offering_a_subset_refuses_the_rest_and_shares_everything_else(tmp_path):
+    from coursekit.providers import ToolCall
+    s = _session(tmp_path / "calls.jsonl")
+    eu_only = s.offering([_SCHEMAS["add_open_response_variant"]])
+    out = eu_only.run_tool_calls([ToolCall(id="1", name="create_question_group", arguments=json.dumps(
+        {"group_id": "x", "concept_title": "X", "question_type": "matching"}))])
+    assert out[0][1] == "ERROR: no tool named 'create_question_group'. Available: add_open_response_variant"
+    assert s.draft.bank.groups == {}                                        # refused, so nothing ran
+    assert eu_only.draft is s.draft and list(s.registry) == list(TOOL_REGISTRY)   # same draft; s unchanged
+    assert len((tmp_path / "calls.jsonl").read_text().splitlines()) == 1    # still logged, for replay

@@ -232,3 +232,12 @@ def test_fix_course_fixes_each_bank_in_its_own_draft(tmp_path):
     for wk in ("week-3", "week-4"):
         saved = bank.Bank.model_validate_json((tmp_path / "quizzes" / wk / "bank.json").read_text())
         assert saved.run_id == f"c-{wk}" and saved.groups["c1"].variants["A"].correct_index == 0
+
+
+def test_fix_one_refuses_a_tool_the_fix_pass_does_not_offer(s):
+    _flawed_group(s)
+    fp = FixProvider({"group_id": "c2", "concept_title": "Other", "question_type": "matching"},
+                     tool="create_question_group")
+    out = qfix.fix_one(s, _finding(), "material", fp, "m", critic="CRITIC", max_turns=2)
+    assert out.replaced is False
+    assert list(s.draft.bank.groups) == ["c1"]                         # no new group behind the reviewer's back

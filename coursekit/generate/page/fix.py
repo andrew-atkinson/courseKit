@@ -61,7 +61,7 @@ def fix_one_block(session, finding, material: str, provider, model: str, *, crit
             break                                        # content-level error → give up on this item
         if reply.wants_tools:
             provider.append_assistant(messages, reply)
-            results = session.run_tool_calls(reply.tool_calls)
+            results = session.offering(FIX_TOOL_SPECS).run_tool_calls(reply.tool_calls)
             provider.append_tool_results(messages, results)
             now = blocks.get(block_id)
             committed = any(not c.startswith("ERROR") for _, c in results)

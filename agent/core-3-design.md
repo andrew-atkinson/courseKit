@@ -2,7 +2,7 @@
 
 The third step of [structure-review.md](structure-review.md): the artifact being built lives in an object a job owns, not in a module every job shares.
 The decisions in §6 were settled with the user on 2026-11-04; the step notes in §5 record what each increment found.
-**Complete 2026-11-05.** All five increments landed; the one follow-up left is enforcing tool subsets (`CORE-3.1`).
+**Complete 2026-11-05**, with its follow-up: enforcing tool subsets landed as `CORE-3.1` the same day (see the non-goals).
 Facts below were read from `main` at `b816b8e` and from both real courses (read only); counts are snapshots.
 
 ## 1. What exists today
@@ -57,7 +57,7 @@ Both real courses hold recorded `calls.jsonl` logs from real model runs (~20 art
 - **Two jobs writing one output folder.** Isolated state does not stop them overwriting each other's files; whatever schedules jobs must refuse that.
 - **Reshaping the seam.** The `Generator` protocol keeps its shape, and decompose keeps its own section loop.
 - **Renaming `week`.** That is CORE-5.
-- **Enforcing which tools a pass may call.** The EU, fix, decompose, and glossary passes offer the model a subset of the tools, but dispatch accepts all of them: on `main`, the EU pass offers only `add_open_response_variant` and still runs `create_question_group`. Closing that changes behaviour, so it is a follow-up, and a session makes it a small one.
+- **Enforcing which tools a pass may call.** The EU, fix, decompose, and glossary passes offer the model a subset of the tools, but dispatch accepts all of them: on `main`, the EU pass offers only `add_open_response_variant` and still runs `create_question_group`. Closing that changes behaviour, so it is a follow-up, and a session makes it a small one. **Done as `CORE-3.1`, 2026-11-05:** `ToolSession.offering(specs)` gives a pass a view of its session that runs only the tools it offers.
 
 ## 3. The shape
 

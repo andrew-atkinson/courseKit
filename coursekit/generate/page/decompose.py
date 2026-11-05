@@ -124,7 +124,7 @@ def _run_pass(session, provider, model, system: str, user: str, *, max_turns: in
     of blocks it added. The model calls `add_*` tools; when it replies in PROSE without having produced
     anything, nudge it back to tool calls (the small model narrates instead of calling tools) — the same
     remedy the monolithic loop and the fix loop use. A prose reply AFTER blocks exist means the section
-    is simply done. `specs` restricts the offered tools (default: every `add_*`)."""
+    is simply done. `specs` is the tools the pass offers, and the only ones it runs (default: every `add_*`)."""
     specs = specs or _ADD_SPECS
     blocks = session.draft.page.blocks
     before = len(blocks)
@@ -142,7 +142,7 @@ def _run_pass(session, provider, model, system: str, user: str, *, max_turns: in
             break
         if reply.wants_tools:
             provider.append_assistant(messages, reply)
-            provider.append_tool_results(messages, session.run_tool_calls(reply.tool_calls))
+            provider.append_tool_results(messages, session.offering(specs).run_tool_calls(reply.tool_calls))
             continue
         if len(blocks) > before or nudges >= max_nudges:
             break                                   # produced its blocks then stopped, or gave up

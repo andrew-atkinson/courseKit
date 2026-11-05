@@ -82,7 +82,7 @@ def fix_one(session, finding, transcript: str, provider, model: str, *, critic: 
             break                                        # content-level error → give up on this item
         if reply.wants_tools:
             provider.append_assistant(messages, reply)
-            results = session.run_tool_calls(reply.tool_calls)
+            results = session.offering(FIX_TOOL_SPECS).run_tool_calls(reply.tool_calls)
             provider.append_tool_results(messages, results)
             now = groups[gid].variants.get(label)
             committed = any(not c.startswith("ERROR") for _, c in results)

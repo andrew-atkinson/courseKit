@@ -6,6 +6,7 @@ a small model, and log raw calls so a bad run becomes a replayable fixture. A ge
 tools as methods on a `ToolSession` subclass, one instance per run; everything else is common.
 """
 
+import copy
 import json
 from pathlib import Path
 from typing import Callable
@@ -109,3 +110,11 @@ class ToolSession:
 
     def replay(self, path) -> list[str]:
         return replay(self.registry, path)
+
+    def offering(self, specs) -> "ToolSession":
+        """This session limited to the tools a pass offers the model (CORE-3.1): the same draft, call log,
+        and state, but a call to any other tool gets the "no tool named" error and does nothing. Offering a
+        subset only steers a model; this enforces it."""
+        view = copy.copy(self)
+        view.registry = {s["name"]: self.registry[s["name"]] for s in specs}
+        return view

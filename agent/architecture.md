@@ -30,7 +30,7 @@ A run owns what it builds ([CORE-3 design](core-3-design.md)).
 A **draft** is an artifact being built plus where it saves (`AssignmentDraft`, `PageDraft`, `BankDraft`); the IR models themselves stay plain.
 A **tool session** is one run's tools, written as methods and bound to one draft (`AssignmentTools`, `PageTools`, `QuizTools`, all on `dispatch.ToolSession`, which owns dispatch, the call log, the stop at the finishing tool, and replay).
 A generator builds both in `reset()`; decompose and glossary build one per page; `fix_course` and `fix_course_pages` adopt each artifact into its own; and `fix_one`, `fix_one_block`, and `generate_eu_question` take it as an argument.
-The schemas stay module constants beside the class, so the fix, EU, decompose, and glossary subsets still come from one `TOOL_SPECS`, and `tests/test_tools.py` and `tests/test_page_tools.py` keep each method and its schema from drifting apart.
+The schemas stay module constants beside the class, so the fix, EU, decompose, and glossary subsets still come from one `TOOL_SPECS`, and each of those passes runs through `session.offering(specs)`, so it can call only the tools it shows the model (CORE-3.1); and `tests/test_tools.py` and `tests/test_page_tools.py` keep each method and its schema from drifting apart.
 The driver has no default generator: `loop`, `run_unit`, and `run_course` are each told which one to run, so a forgotten generator is an error, not a quiz.
 
 Two jobs therefore cannot write into each other's quiz, page, or assignment.
@@ -240,8 +240,6 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
 - **The transcriber still carries its own copies** of provider, prompts, RAM check, and project-root logic (the diverged rows above). `courseconfig` is the surface it *can* adopt, but the adoption is its own increment in that repo — this side only built the target.
 - **Interactive prompt authoring** (`_author_new_prompt` / `_edit_existing_prompt`) lives only in `vt_prompts.py`.
   Persisting a choice back to config is no longer deferred on this side: `settings.py` writes coursekit's own files (never `context.yaml`).
-- **A pass's tool subset is only a suggestion.**
-  The fix, EU, decompose, and glossary passes offer the model a subset of the tools, but dispatch runs any of them; closing that changes behaviour, so it is its own item (`CORE-3.1`).
 - **Three page critics read only each unit's teaching page.**
   Evaluate and fix take every quiz and page from the index (`course.review_items`), glossary and overview siblings included, but the pedagogy, concept-delivery, and page-groundedness critics (`evaluate --all`) still read one `page.json` per unit at its layout path.
   Moving them onto `review_items` would review the siblings too — more model calls and a visible change in their reports, so it is its own decision, not a cleanup.
