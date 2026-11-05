@@ -2,8 +2,8 @@
 
 The machinery is identical across generators: never raise (a malformed call at iteration 17 must
 not lose the first 16 commits), turn a pydantic ValidationError into a short actionable message for
-a small model, and log raw calls so a bad run becomes a replayable fixture. A generator supplies its
-own `{name: callable}` registry; everything else is common.
+a small model, and log raw calls so a bad run becomes a replayable fixture. A generator writes its
+tools as methods on a `ToolSession` subclass, one instance per run; everything else is common.
 """
 
 import json

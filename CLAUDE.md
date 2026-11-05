@@ -24,6 +24,9 @@ One exception to re-emitting: GIFT has no `emit` command — `BankDraft.finalize
 - **Library code never exits or prints.**
   It raises `CoursekitError` (a stable `code`, `details`, a `category`) and reports progress and warnings through `coursekit.outcomes` (`info` / `warn` / `error`); the CLI and the per-module `main()` scripts render them via `console.py`.
   [tests/test_outcomes.py](tests/test_outcomes.py) enforces it.
+- **A run owns its state; nothing under `coursekit/generate/` keeps any in a module.**
+  The artifact being built lives in a draft (`BankDraft`, `PageDraft`, `AssignmentDraft`) and the run's tools in a tool session (`dispatch.ToolSession`); a function that needs either takes it as an argument, so two jobs in one process never touch each other's artifact.
+  [tests/test_isolation.py](tests/test_isolation.py) enforces it (no `global`, no shared module-level containers, no class attributes set at run time) and proves it with two jobs taking turns on threads.
 - **coursekit writes its own `.vtconfig` settings only through `coursekit/settings.py`** — validated against `coursekit/schemas.py`, atomic, never `context.yaml`.
   New code that changes a setting calls the settings API; it never dumps YAML into `.vtconfig/` itself.
 - Default branch for PRs is `main`.

@@ -5,7 +5,7 @@ Presented version, combining this file and the docs guide (30 Oct 2026): <https:
 
 Verified 30 October 2026 against `main`; every diagram render-checked with mermaid-cli 12.
 The 30 Oct pass adds **[the course model](#the-course-model--one-loader-one-index)** (CORE-2: one loader, units with their own identity and stored order, one artifact index that the census, the emitters, and discovery all read), the **CORE-1 spine** (`outcomes` · `schemas` · `settings`, with `coursekit check` and `coursekit config`), the **census**, **assignments** as a third IR, and the built **proposer** (`coursekit propose`).
-The 4 Nov pass adds **[who owns the artifact being built](#who-owns-the-artifact-being-built)** (CORE-3, steps 1 to 4 of 5) and evaluate and fix reading the index (`course.review_items`).
+The 4–5 Nov pass adds **[who owns the artifact being built](#who-owns-the-artifact-being-built)** (CORE-3, complete) and evaluate and fix reading the index (`course.review_items`).
 The 31 July pass (after 27 July's CLI subcommands + `emit course`) added the **analyze** phase (a per-week concept map), the **output-worth evaluator** (facticity · pedagogy · concept-delivery cold reads), and the targeted **fix** loop that regenerates flagged items in place.
 The 18 Aug pass adds **[the adapter architecture](#the-adapter-architecture--ingeststructure--ir--generation)** — the three-layer ingest/structure · IR · generation model, the one-writer-per-file rule, and the declared course-structure IR (FLOW-7 Phase 1: `coursestructure.py` + manifest-driven discovery).
 The videotranscriber (separate repo at `~/video_transcription`, last commit 18 Aug 2026) still imports nothing from coursekit; only its rows in the [spine table](#dependency-direction) were re-checked in this pass.
@@ -35,6 +35,7 @@ The driver has no default generator: `loop`, `run_unit`, and `run_course` are ea
 
 Two jobs therefore cannot write into each other's quiz, page, or assignment.
 The renderer works the same way: `render_body` works out the inline-code style for one page and hands it to that page's templates as `code_style`, so two courses rendering at once keep their own colours.
+`tests/test_isolation.py` keeps it that way: a guard rejects a `global`, a module-level container mutated by a function, or a class attribute set at run time anywhere under `generate/`, and two quiz jobs and two page jobs run on threads, taking turns at every model call, each byte-identical to the same job run alone.
 
 ### The output-worth layer — analyze, evaluate, fix
 
@@ -230,7 +231,7 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
 12. ✅ **The census** — `coursekit census`: an offline inventory of every unit's materials and artifacts, with gaps against declared and modal expectations.
 13. ✅ **The CORE-1 spine** — `outcomes` (one error type with a stable code, warnings as notices, no prints in library code), `schemas` + `coursekit check`, `settings` + `coursekit config`, and required inputs (a switched-on feature produces its artifact or records why not).
 14. ✅ **The course model** (CORE-2) — see [above](#the-course-model--one-loader-one-index).
-15. 🔶 **Generator state in instances** (CORE-3) — assignments, pages, quizzes, and the renderer done; the proof that keeps it that way next. See [above](#who-owns-the-artifact-being-built).
+15. ✅ **Generator state in instances** (CORE-3) — assignments, pages, quizzes, and the renderer, with a guard and a threaded proof. See [above](#who-owns-the-artifact-being-built).
 16. **Migrate the transcriber onto the spine** — providers first, taking the union of capabilities.
 17. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class.
 
@@ -240,10 +241,8 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
 - **Interactive prompt authoring** (`_author_new_prompt` / `_edit_existing_prompt`) lives only in `vt_prompts.py`.
   Persisting a choice back to config is no longer deferred on this side: `settings.py` writes coursekit's own files (never `context.yaml`).
 - **An unreadable `domain.md` or `voice.md` still counts as absent** (`CORE-1.6`), the one case left of a broken input being read as a missing one.
-- **Nothing yet stops module state coming back.**
-  The generators no longer hold any, but the test that keeps it out for good arrives with CORE-3 step 5.
 - **A pass's tool subset is only a suggestion.**
-  The fix, EU, decompose, and glossary passes offer the model a subset of the tools, but dispatch runs any of them; closing that changes behaviour, so it is a follow-up to CORE-3.
+  The fix, EU, decompose, and glossary passes offer the model a subset of the tools, but dispatch runs any of them; closing that changes behaviour, so it is its own item (`CORE-3.1`).
 - **Three page critics read only each unit's teaching page.**
   Evaluate and fix take every quiz and page from the index (`course.review_items`), glossary and overview siblings included, but the pedagogy, concept-delivery, and page-groundedness critics (`evaluate --all`) still read one `page.json` per unit at its layout path.
   Moving them onto `review_items` would review the siblings too — more model calls and a visible change in their reports, so it is its own decision, not a cleanup.

@@ -2,6 +2,7 @@
 
 The third step of [structure-review.md](structure-review.md): the artifact being built lives in an object a job owns, not in a module every job shares.
 The decisions in §6 were settled with the user on 2026-11-04; the step notes in §5 record what each increment found.
+**Complete 2026-11-05.** All five increments landed; the one follow-up left is enforcing tool subsets (`CORE-3.1`).
 Facts below were read from `main` at `b816b8e` and from both real courses (read only); counts are snapshots.
 
 ## 1. What exists today
@@ -160,6 +161,11 @@ Every step must also keep the **test guard**: no test removed, and the number of
    The new tests that make this permanent: two quiz jobs and two page jobs on separate threads, forced to alternate at every tool call by a barrier, each byte-identical to the same job run alone; and the §4 guard.
    `agent/architecture.md` and the seam's docstrings are refreshed, the §4 rules join `CLAUDE.md`, and the roadmap closes CORE-3 with its Shipped line.
    *Pass:* the new tests pass, and fail when a global is put back (mutation check).
+   **Done 2026-11-05.** `tests/test_isolation.py` holds both. The threaded test runs each pair alone, then on two threads that take strict turns at every model call, and compares every file of every job byte for byte; it also checks the turns really alternated.
+   The guard flags a `global`, a module-level container a function mutates, and a class attribute or imported module attribute set inside a function; a second test checks it sees each of those in a deliberately bad file.
+   Mutation checks: a `global` in the renderer and a page-tools class attribute were caught by the guard (the second by the page threads too); a module-level list of quiz drafts by both; and quiz drafts shared through a helper's default argument, which the guard cannot see, by the quiz threads alone.
+   The renderer is not exercised by the threads, because a page renders once, after its last tool call; step 4's test covers it, a second render inside the first.
+   The §4 rules are now in `CLAUDE.md`, beside "library code never prints", and the seam's docstrings no longer describe module state.
 
 ## 6. Decisions
 
