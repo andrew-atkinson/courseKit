@@ -88,7 +88,7 @@ def _default_generator() -> Generator:
     return QuizGenerator()
 
 
-def loop(messages, provider, model, generator: Generator | None = None, *,
+def loop(messages, provider, model, generator: Generator, *,
          max_iters: int = DEFAULT_MAX_ITERS, max_nudges: int = 4, stall_limit: int = 4) -> str:
     """Drive one conversation to a finalized artifact.
 
@@ -101,7 +101,7 @@ def loop(messages, provider, model, generator: Generator | None = None, *,
     `provider` is a coursekit Provider (it owns how a turn is represented); `generator` is the
     Generator seam (it owns the tools, the finalized check, and the nudge vocabulary).
     """
-    gen = generator or _default_generator()
+    gen = generator
     reply = None
     nudges = 0
     error_streak = 0

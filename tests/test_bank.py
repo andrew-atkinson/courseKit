@@ -5,9 +5,9 @@ from coursekit.generate.quiz.bank import (MAVariant, MatchVariant, MCVariant, Nu
                   TFVariant, ValidationError)
 
 
-@pytest.fixture(autouse=True)
-def clean():
-    bankmod.reset()
+@pytest.fixture
+def d():
+    return bankmod.BankDraft.new("test")
 
 
 def _mc(label, correct=0, group="c1", **kw):
@@ -23,35 +23,35 @@ def _mc(label, correct=0, group="c1", **kw):
 class TestOverwrite:
     """The reason this module exists: a revision must replace, never accumulate."""
 
-    def test_same_key_replaces_rather_than_appends(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        bankmod.put_variant(_mc("A", 0, options=["first draft", "b", "c", "d"]))
-        bankmod.put_variant(_mc("A", 0, options=["revised", "b", "c", "d"]))
-        g = bankmod.get().groups["c1"]
+    def test_same_key_replaces_rather_than_appends(self, d):
+        d.create_group("c1", "Loops", "multiple_choice")
+        d.put_variant(_mc("A", 0, options=["first draft", "b", "c", "d"]))
+        d.put_variant(_mc("A", 0, options=["revised", "b", "c", "d"]))
+        g = d.bank.groups["c1"]
         assert len(g.variants) == 1
         assert g.variants["A"].options[0] == "revised"
 
-    def test_ack_says_replaced_on_a_rewrite(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        assert "stored" in bankmod.put_variant(_mc("A", 0))
-        assert "replaced" in bankmod.put_variant(_mc("A", 0))
+    def test_ack_says_replaced_on_a_rewrite(self, d):
+        d.create_group("c1", "Loops", "multiple_choice")
+        assert "stored" in d.put_variant(_mc("A", 0))
+        assert "replaced" in d.put_variant(_mc("A", 0))
 
-    def test_rewriting_a_variant_may_keep_its_own_position(self):
+    def test_rewriting_a_variant_may_keep_its_own_position(self, d):
         # The position check must exclude the variant being replaced, or a no-op
         # rewrite would collide with itself.
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        bankmod.put_variant(_mc("A", 0))
-        bankmod.put_variant(_mc("B", 1))
-        out = bankmod.put_variant(_mc("B", 1, options=["w", "x", "y", "z"]))
+        d.create_group("c1", "Loops", "multiple_choice")
+        d.put_variant(_mc("A", 0))
+        d.put_variant(_mc("B", 1))
+        out = d.put_variant(_mc("B", 1, options=["w", "x", "y", "z"]))
         assert not out.startswith("ERROR")
 
-    def test_the_observed_failure_cannot_happen(self):
+    def test_the_observed_failure_cannot_happen(self, d):
         # output/quiz_20260716_141609.txt has Variation A four times. Four commits of
         # A can only ever leave one A.
-        bankmod.create_group("c1", "Loops", "multiple_choice")
+        d.create_group("c1", "Loops", "multiple_choice")
         for draft in ["first", "second", "third", "final"]:
-            bankmod.put_variant(_mc("A", 0, options=[draft, "b", "c", "d"]))
-        g = bankmod.get().groups["c1"]
+            d.put_variant(_mc("A", 0, options=[draft, "b", "c", "d"]))
+        g = d.bank.groups["c1"]
         assert list(g.variants) == ["A"]
         assert g.variants["A"].options[0] == "final"
 
@@ -59,14 +59,14 @@ class TestOverwrite:
 # ------------------------------------------------------------- guardrails
 
 class TestGuardrails:
-    def test_variant_before_group_is_refused_with_a_next_step(self):
-        out = bankmod.put_variant(_mc("A"))
+    def test_variant_before_group_is_refused_with_a_next_step(self, d):
+        out = d.put_variant(_mc("A"))
         assert out.startswith("ERROR")
         assert "create_question_group" in out
 
-    def test_wrong_tool_for_group_type_names_the_right_tool(self):
-        bankmod.create_group("c2", "Facts", "true_false")
-        out = bankmod.put_variant(_mc("A", group="c2"))
+    def test_wrong_tool_for_group_type_names_the_right_tool(self, d):
+        d.create_group("c2", "Facts", "true_false")
+        out = d.put_variant(_mc("A", group="c2"))
         assert "add_true_false_variant" in out
 
     def test_duplicate_options_rejected(self):
@@ -143,107 +143,107 @@ class TestGuardrails:
 # ------------------------------------------- correct-answer position steering
 
 class TestPositions:
-    def test_reused_position_is_rejected_and_lists_free_ones(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        bankmod.put_variant(_mc("A", 0))
-        out = bankmod.put_variant(_mc("B", 0))
+    def test_reused_position_is_rejected_and_lists_free_ones(self, d):
+        d.create_group("c1", "Loops", "multiple_choice")
+        d.put_variant(_mc("A", 0))
+        out = d.put_variant(_mc("B", 0))
         assert out.startswith("ERROR")
         assert "variant A already" in out
         assert "[1, 2, 3]" in out
 
-    def test_rejected_variant_does_not_half_write(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        bankmod.put_variant(_mc("A", 0))
-        bankmod.put_variant(_mc("B", 0))
-        assert list(bankmod.get().groups["c1"].variants) == ["A"]
+    def test_rejected_variant_does_not_half_write(self, d):
+        d.create_group("c1", "Loops", "multiple_choice")
+        d.put_variant(_mc("A", 0))
+        d.put_variant(_mc("B", 0))
+        assert list(d.bank.groups["c1"].variants) == ["A"]
 
-    def test_ack_steers_toward_the_free_positions(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        bankmod.put_variant(_mc("A", 0))
-        out = bankmod.put_variant(_mc("B", 1))
+    def test_ack_steers_toward_the_free_positions(self, d):
+        d.create_group("c1", "Loops", "multiple_choice")
+        d.put_variant(_mc("A", 0))
+        out = d.put_variant(_mc("B", 1))
         assert "positions still free: [2, 3]" in out
 
-    def test_four_distinct_positions_all_accepted(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
+    def test_four_distinct_positions_all_accepted(self, d):
+        d.create_group("c1", "Loops", "multiple_choice")
         for i, lbl in enumerate("ABCD"):
-            assert not bankmod.put_variant(_mc(lbl, i)).startswith("ERROR")
-        assert bankmod.validate_final() == []
+            assert not d.put_variant(_mc(lbl, i)).startswith("ERROR")
+        assert d.validate_final() == []
 
-    def test_position_rule_not_applied_to_true_false(self):
+    def test_position_rule_not_applied_to_true_false(self, d):
         # Incoherent for a type with no answer positions.
-        bankmod.create_group("c2", "Facts", "true_false")
+        d.create_group("c2", "Facts", "true_false")
         for lbl, ans in zip("ABCD", [True, False, True, False]):
-            out = bankmod.put_variant(TFVariant(group_id="c2", label=lbl,
-                                                question_text=f"Statement {lbl} is true?",
-                                                variant_summary=f"Claim {lbl}",
-                                                correct_answer=ans))
+            out = d.put_variant(TFVariant(group_id="c2", label=lbl,
+                                          question_text=f"Statement {lbl} is true?",
+                                          variant_summary=f"Claim {lbl}",
+                                          correct_answer=ans))
             assert not out.startswith("ERROR")
-        assert bankmod.validate_final() == []
+        assert d.validate_final() == []
 
-    def test_position_rule_relaxes_when_variants_exceed_options(self):
+    def test_position_rule_relaxes_when_variants_exceed_options(self, d):
         # Five variants cannot occupy four distinct positions; the rule must not
         # become unsatisfiable.
-        bankmod.create_group("c1", "Loops", "multiple_choice")
+        d.create_group("c1", "Loops", "multiple_choice")
         for i, lbl in enumerate("ABCD"):
-            bankmod.put_variant(_mc(lbl, i))
-        assert not bankmod.put_variant(_mc("E", 0)).startswith("ERROR")
+            d.put_variant(_mc(lbl, i))
+        assert not d.put_variant(_mc("E", 0)).startswith("ERROR")
 
 
 # --------------------------------------------------------------- finalize
 
 class TestFinalize:
-    def test_all_true_true_false_group_is_flagged(self):
-        bankmod.create_group("c2", "Facts", "true_false")
+    def test_all_true_true_false_group_is_flagged(self, d):
+        d.create_group("c2", "Facts", "true_false")
         for lbl in "AB":
-            bankmod.put_variant(TFVariant(group_id="c2", label=lbl,
-                                          question_text=f"Statement {lbl} is true?",
-                                          variant_summary=f"Claim {lbl}",
-                                          correct_answer=True))
-        assert any("at least one of each" in p for p in bankmod.validate_final())
+            d.put_variant(TFVariant(group_id="c2", label=lbl,
+                                    question_text=f"Statement {lbl} is true?",
+                                    variant_summary=f"Claim {lbl}",
+                                    correct_answer=True))
+        assert any("at least one of each" in p for p in d.validate_final())
 
-    def test_empty_group_is_flagged(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        assert any("no variants" in p for p in bankmod.validate_final())
+    def test_empty_group_is_flagged(self, d):
+        d.create_group("c1", "Loops", "multiple_choice")
+        assert any("no variants" in p for p in d.validate_final())
 
-    def test_finalize_refuses_and_does_not_set_the_flag(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        out = bankmod.finalize()
+    def test_finalize_refuses_and_does_not_set_the_flag(self, d):
+        d.create_group("c1", "Loops", "multiple_choice")
+        out = d.finalize()
         assert out.startswith("ERROR")
-        assert not bankmod.is_finalized()
+        assert not d.is_finalized()
 
-    def test_finalize_succeeds_on_a_valid_bank(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
+    def test_finalize_succeeds_on_a_valid_bank(self, d):
+        d.create_group("c1", "Loops", "multiple_choice")
         for i, lbl in enumerate("ABCD"):
-            bankmod.put_variant(_mc(lbl, i))
-        assert bankmod.finalize().startswith("OK")
-        assert bankmod.is_finalized()
+            d.put_variant(_mc(lbl, i))
+        assert d.finalize().startswith("OK")
+        assert d.is_finalized()
 
-    def test_group_cannot_change_type_once_it_has_variants(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        bankmod.put_variant(_mc("A", 0))
-        assert bankmod.create_group("c1", "Loops", "true_false").startswith("ERROR")
+    def test_group_cannot_change_type_once_it_has_variants(self, d):
+        d.create_group("c1", "Loops", "multiple_choice")
+        d.put_variant(_mc("A", 0))
+        assert d.create_group("c1", "Loops", "true_false").startswith("ERROR")
 
 
 # --------------------------------------------------------------- autosave
 
 def test_autosave_writes_after_every_put(tmp_path):
-    bankmod.init("run1", tmp_path)
-    bankmod.create_group("c1", "Loops", "multiple_choice")
-    bankmod.put_variant(_mc("A", 0))
+    d = bankmod.BankDraft.new("run1", tmp_path)
+    d.create_group("c1", "Loops", "multiple_choice")
+    d.put_variant(_mc("A", 0))
     saved = json.loads((tmp_path / "bank.partial.json").read_text())   # in progress, not yet promoted
     assert saved["groups"]["c1"]["variants"]["A"]["correct_index"] == 0
 
-    bankmod.put_variant(_mc("B", 1))
+    d.put_variant(_mc("B", 1))
     saved = json.loads((tmp_path / "bank.partial.json").read_text())
     assert sorted(saved["groups"]["c1"]["variants"]) == ["A", "B"]
 
 
 def test_finalize_writes_all_four_artifacts(tmp_path):
-    bankmod.init("run1", tmp_path)
-    bankmod.create_group("c1", "Loops", "multiple_choice")
+    d = bankmod.BankDraft.new("run1", tmp_path)
+    d.create_group("c1", "Loops", "multiple_choice")
     for i, lbl in enumerate("ABCD"):
-        bankmod.put_variant(_mc(lbl, i))
-    out = bankmod.finalize(seed=42)
+        d.put_variant(_mc(lbl, i))
+    out = d.finalize(seed=42)
     assert out.startswith("OK")
     for name in ["bank.json", "quiz.json", "bank.gift", "quiz_42.gift"]:
         assert (tmp_path / name).exists(), name
@@ -253,15 +253,15 @@ def test_finalize_writes_all_four_artifacts(tmp_path):
 
 
 def test_bank_json_round_trips_through_the_model(tmp_path):
-    bankmod.init("run1", tmp_path)
-    bankmod.create_group("c1", "Loops", "multiple_choice")
-    bankmod.create_group("c5", "Matching", "matching")
-    bankmod.put_variant(_mc("A", 0))
-    bankmod.put_variant(MatchVariant(group_id="c5", label="A",
-                                     question_text="Match the pairs up.",
-                                     variant_summary="Pairs",
-                                     pairs=[Pair(left="a", right="b"),
-                                            Pair(left="c", right="d")]))
+    d = bankmod.BankDraft.new("run1", tmp_path)
+    d.create_group("c1", "Loops", "multiple_choice")
+    d.create_group("c5", "Matching", "matching")
+    d.put_variant(_mc("A", 0))
+    d.put_variant(MatchVariant(group_id="c5", label="A",
+                               question_text="Match the pairs up.",
+                               variant_summary="Pairs",
+                               pairs=[Pair(left="a", right="b"),
+                                      Pair(left="c", right="d")]))
     reloaded = bankmod.Bank.model_validate_json((tmp_path / "bank.partial.json").read_text())
     assert reloaded.groups["c1"].variants["A"].kind == "multiple_choice"
     assert reloaded.groups["c5"].variants["A"].kind == "matching"
@@ -270,18 +270,18 @@ def test_bank_json_round_trips_through_the_model(tmp_path):
 # ------------------------------------------------------- variant summaries
 
 class TestVariantSummary:
-    def test_duplicate_summary_in_a_group_is_rejected(self):
+    def test_duplicate_summary_in_a_group_is_rejected(self, d):
         # Two variants testing the same angle is the failure the bank exists to prevent.
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        bankmod.put_variant(_mc("A", 0, variant_summary="Purpose of the condition"))
-        out = bankmod.put_variant(_mc("B", 1, variant_summary="purpose of the CONDITION"))
+        d.create_group("c1", "Loops", "multiple_choice")
+        d.put_variant(_mc("A", 0, variant_summary="Purpose of the condition"))
+        out = d.put_variant(_mc("B", 1, variant_summary="purpose of the CONDITION"))
         assert out.startswith("ERROR")
         assert "variant A already has the summary" in out
 
-    def test_duplicate_summary_does_not_block_a_rewrite(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        bankmod.put_variant(_mc("A", 0, variant_summary="Purpose of the condition"))
-        out = bankmod.put_variant(_mc("A", 0, variant_summary="Purpose of the condition"))
+    def test_duplicate_summary_does_not_block_a_rewrite(self, d):
+        d.create_group("c1", "Loops", "multiple_choice")
+        d.put_variant(_mc("A", 0, variant_summary="Purpose of the condition"))
+        out = d.put_variant(_mc("A", 0, variant_summary="Purpose of the condition"))
         assert "replaced" in out
 
     def test_summary_may_not_be_the_question_text(self):
@@ -311,10 +311,10 @@ class TestMultipleAnswer:
                          question_text=f"Which are true in set {label}? Select all that apply.",
                          correct_indices=list(correct), **kw)
 
-    def test_stores_through_the_bank(self):
-        bankmod.create_group("c7", "Loop facts", "multiple_answer")
-        assert not bankmod.put_variant(self._ma()).startswith("ERROR")
-        assert bankmod.get().groups["c7"].variants["A"].correct_indices == [0, 2]
+    def test_stores_through_the_bank(self, d):
+        d.create_group("c7", "Loop facts", "multiple_answer")
+        assert not d.put_variant(self._ma()).startswith("ERROR")
+        assert d.bank.groups["c7"].variants["A"].correct_indices == [0, 2]
 
     def test_one_correct_answer_is_refused(self):
         # That is a multiple_choice question; the message has to say so.
@@ -333,17 +333,17 @@ class TestMultipleAnswer:
         with pytest.raises(ValidationError, match="out of range"):
             self._ma(correct=(0, 9))
 
-    def test_wrong_tool_for_a_multiple_answer_group(self):
-        bankmod.create_group("c7", "Loop facts", "multiple_answer")
-        out = bankmod.put_variant(_mc("A", 0, group="c7"))
+    def test_wrong_tool_for_a_multiple_answer_group(self, d):
+        d.create_group("c7", "Loop facts", "multiple_answer")
+        out = d.put_variant(_mc("A", 0, group="c7"))
         assert "add_multiple_answer_variant" in out
 
-    def test_position_rule_does_not_apply(self):
+    def test_position_rule_does_not_apply(self, d):
         # There is no single correct position, so the rule is incoherent here.
-        bankmod.create_group("c7", "Loop facts", "multiple_answer")
+        d.create_group("c7", "Loop facts", "multiple_answer")
         for lbl in "ABCD":
-            assert not bankmod.put_variant(self._ma(label=lbl, correct=(0, 2))).startswith("ERROR")
-        assert bankmod.validate_final() == []
+            assert not d.put_variant(self._ma(label=lbl, correct=(0, 2))).startswith("ERROR")
+        assert d.validate_final() == []
 
     def test_option_starting_with_a_weight_is_refused(self):
         # GIFT would read a leading %50% as an answer weight and eat it.
@@ -365,20 +365,20 @@ def test_short_answer_rejects_a_rubric_description_as_an_answer():
 
 # ------------------------------------------- OPS-11: a failed re-run must not clobber a good bank
 
-def _finished_bank(d, run_id):
-    bankmod.init(run_id, d)
-    bankmod.create_group("c1", "Loops", "multiple_choice")
+def _finished_bank(out_dir, run_id):
+    d = bankmod.BankDraft.new(run_id, out_dir)
+    d.create_group("c1", "Loops", "multiple_choice")
     for i, lbl in enumerate("ABCD"):
-        bankmod.put_variant(_mc(lbl, i))
-    assert bankmod.finalize(seed=42).startswith("OK")
+        d.put_variant(_mc(lbl, i))
+    assert d.finalize(seed=42).startswith("OK")
 
 
 def test_a_rerun_that_fails_before_finalize_leaves_the_good_bank_byte_identical(tmp_path):
     _finished_bank(tmp_path, "good")
     before = {n: (tmp_path / n).read_bytes() for n in ("bank.json", "quiz.json", "bank.gift")}
-    bankmod.init("rerun", tmp_path)                                  # the re-run starts...
-    bankmod.create_group("c1", "Other", "multiple_choice")
-    bankmod.put_variant(_mc("A", 0))                                 # ...autosaves, then dies here
+    d = bankmod.BankDraft.new("rerun", tmp_path)                                  # the re-run starts...
+    d.create_group("c1", "Other", "multiple_choice")
+    d.put_variant(_mc("A", 0))                                 # ...autosaves, then dies here
     assert {n: (tmp_path / n).read_bytes() for n in before} == before
     assert json.loads((tmp_path / "bank.partial.json").read_text())["run_id"] == "rerun"
 
@@ -393,8 +393,8 @@ def test_finalize_promotes_the_in_progress_bank(tmp_path):
 def test_an_adopted_bank_saves_in_place(tmp_path):
     # fix / the EU pass `load` an existing bank and edit it: those edits land in bank.json directly
     _finished_bank(tmp_path, "good")
-    bankmod.load(bankmod.Bank.model_validate_json((tmp_path / "bank.json").read_text()), tmp_path)
-    bankmod.create_group("c2", "Arrays", "multiple_choice")
+    d = bankmod.BankDraft.adopt(bankmod.Bank.model_validate_json((tmp_path / "bank.json").read_text()), tmp_path)
+    d.create_group("c2", "Arrays", "multiple_choice")
     assert "c2" in json.loads((tmp_path / "bank.json").read_text())["groups"]
     assert not (tmp_path / "bank.partial.json").exists()
 

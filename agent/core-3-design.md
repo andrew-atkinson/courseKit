@@ -29,7 +29,7 @@ The renderer has the same shape: two courses rendering at once can take each oth
 **What is already safe.**
 `outcomes` keeps its report and sink in `ContextVar`s, so it needs no change.
 The tool schemas, `build_variant`, and `build_block` hold no state.
-The `Generator` classes are already instances, so `pipeline.py` needs no change: only what they point at moves.
+The `Generator` classes are already instances, so `pipeline.py` barely changes: only what they point at moves (step 3 found the one exception, `loop`'s default generator).
 
 **The size of the move** (counted with an import-aware AST scan).
 
@@ -147,6 +147,11 @@ Every step must also keep the **test guard**: no test removed, and the number of
    `BankDraft` and `QuizTools`, including the checklist, with the generator, EU pass, fix, and their tests moved.
    *Pass:* G0, G1, and G2 for quizzes, including `.gift` and `quiz.json`; the same two-unit test; the guards hold.
    The docs that name `bank.finalize` and `bank.load` (`CLAUDE.md`, both architecture files) move with it, and `dispatch.py`'s docstring loses its stale line about the quiz generator keeping its own copy.
+   **Done 2026-11-04.** All goldens identical to `main`, and the only assert changes are the new tests.
+   As in step 2, this step added a scripted comparison against an extracted copy of `main`: `run_unit` with the EU pass (added, prose, wrong tool, no map, no text), an unfinished re-run, auto-finalize, one generator over two units, a targeted quiz, `fix_course` over two banks, and `eu.main`. All byte-identical, and it caught a real slip while moving the code: a rename had changed the text of an error message the model reads.
+   `pipeline.loop` no longer defaults to a new `QuizGenerator`: nobody could reset that generator, and it only worked because the state lived in the module. Nothing outside the tests relied on it, and `run_unit`'s default stays, because `run_unit` resets the generator first.
+   Mutation checks found the suite didn't notice the EU pass or `eu.main` dropping the call log, so two more tests pin that.
+   One difference on purpose, the same as pages: `fix` no longer inherits a call log left by an earlier run in the same process. No CLI path does both.
 4. **`core-3-renderer` — the inline-code style.**
    *Pass:* G3 identical; a new test renders two themes alternating inside one template pass and each keeps its own colours.
 5. **`core-3-isolation` — the proof, and the docs.**

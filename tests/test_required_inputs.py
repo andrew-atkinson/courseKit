@@ -62,14 +62,17 @@ class _Cfg:
 
 
 def _postprocess(u, monkeypatch, *, made=True):
-    from coursekit.generate.quiz import bank, eu
+    from types import SimpleNamespace
+
+    from coursekit.generate.quiz import eu
     from coursekit.generate.quiz.generator import QuizGenerator
     calls = []
-    monkeypatch.setattr(bank, "is_finalized", lambda: True)
-    monkeypatch.setattr(bank, "finalize", lambda: calls.append("finalize"))
+    gen = QuizGenerator()
+    gen.tools = None
+    gen.draft = SimpleNamespace(is_finalized=lambda: True, finalize=lambda: calls.append("finalize"))
     monkeypatch.setattr(eu, "generate_eu_question", lambda *a, **k: calls.append("eu") or made)
     with _captured() as report:
-        QuizGenerator().postprocess(u, None, "m", _Cfg(eu_question=True), "material")
+        gen.postprocess(u, None, "m", _Cfg(eu_question=True), "material")
     return calls, report
 
 

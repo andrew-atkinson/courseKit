@@ -221,13 +221,18 @@ FINALIZE = [("finalize_bank", {})]
 BAD = ("tools", [("mark_complete", {"index": 9, "completion_notes": "x"})])  # always rejected
 
 
+def _gen(target=None):
+    from coursekit.generate.quiz.generator import QuizGenerator
+    g = QuizGenerator()
+    g.draft = bankmod.BankDraft.new("t")
+    g.tools = toolsmod.QuizTools(g.draft)
+    g._expected_groups = target
+    return g
+
+
 @pytest.fixture
-def fresh_bank():
-    bankmod.init("t", None)
-    toolsmod.reset_state()
-    yield
-    bankmod.reset()
-    toolsmod.reset_state()
+def gen():
+    return _gen()
 
 
 def _msgs():
@@ -239,16 +244,16 @@ def _nudged(messages):
             and m.get("role") == "user" and "Recorded so far:" in m.get("content", "")]
 
 
-def test_happy_path_finalizes_with_no_nudges(fresh_bank):
+def test_happy_path_finalizes_with_no_nudges(gen):
     client = ScriptedClient([("tools", BUILD), ("tools", FINALIZE)])
     messages = _msgs()
-    loop(messages, client, "m")
-    assert bankmod.is_finalized()
+    loop(messages, client, "m", gen)
+    assert gen.is_finalized()
     assert _calls(client) == 2
     assert _nudged(messages) == []
 
 
-def test_recovers_from_early_stop(fresh_bank):
+def test_recovers_from_early_stop(gen):
     # Week 3/5 mode: a stray token as prose, then it continues after the nudge.
     client = ScriptedClient([
         ("stop", "<tool_call|>"),
@@ -256,43 +261,43 @@ def test_recovers_from_early_stop(fresh_bank):
         ("tools", FINALIZE),
     ])
     messages = _msgs()
-    loop(messages, client, "m")
-    assert bankmod.is_finalized()
+    loop(messages, client, "m", gen)
+    assert gen.is_finalized()
     assert len(_nudged(messages)) == 1  # exactly one corrective nudge
 
 
-def test_recovers_from_a_rejection_streak(fresh_bank):
+def test_recovers_from_a_rejection_streak(gen):
     # Week 4 mode, but the model takes the hint after being nudged.
     client = ScriptedClient([BAD, BAD, BAD, ("tools", BUILD), ("tools", FINALIZE)])
     messages = _msgs()
-    loop(messages, client, "m", stall_limit=3)
-    assert bankmod.is_finalized()
+    loop(messages, client, "m", gen, stall_limit=3)
+    assert gen.is_finalized()
     assert len(_nudged(messages)) == 1
 
 
-def test_bails_on_persistent_rejections_without_burning_max_iters(fresh_bank):
+def test_bails_on_persistent_rejections_without_burning_max_iters(gen):
     # Week 4 mode, unrecoverable: every call fails forever.
     client = ScriptedClient([BAD], repeat_last=True)
     messages = _msgs()
-    loop(messages, client, "m", max_iters=80, max_nudges=2, stall_limit=3)
-    assert not bankmod.is_finalized()
+    loop(messages, client, "m", gen, max_iters=80, max_nudges=2, stall_limit=3)
+    assert not gen.is_finalized()
     assert _calls(client) < 80  # bailed early, did not grind to the cap
 
 
-def test_gives_up_when_model_never_calls_tools(fresh_bank):
+def test_gives_up_when_model_never_calls_tools(gen):
     # Week 10 mode: model just stops, repeatedly. Must terminate within the nudge budget.
     client = ScriptedClient([("stop", "nope")], repeat_last=True)
     messages = _msgs()
-    loop(messages, client, "m", max_iters=80, max_nudges=3, stall_limit=4)
-    assert not bankmod.is_finalized()
+    loop(messages, client, "m", gen, max_iters=80, max_nudges=3, stall_limit=4)
+    assert not gen.is_finalized()
     assert _calls(client) <= 5  # initial + 3 nudges + the terminating check
 
 
-def test_nudge_reports_real_bank_state(fresh_bank):
+def test_nudge_reports_real_bank_state(gen):
     # After building one group then stopping, the nudge should quote the true counts.
     client = ScriptedClient([("tools", BUILD), ("stop", "done?"), ("tools", FINALIZE)])
     messages = _msgs()
-    loop(messages, client, "m")
+    loop(messages, client, "m", gen)
     nudges = _nudged(messages)
     assert nudges
     assert "1 group(s), 1 variant(s)" in nudges[0]["content"]
@@ -326,23 +331,23 @@ def test_looks_like_model_error_ignores_unrelated():
     assert not _looks_like_model_error(ValueError("something else entirely"))
 
 
-def test_loop_translates_model_load_failure(fresh_bank, monkeypatch):
+def test_loop_translates_model_load_failure(gen, monkeypatch):
     exc = Exception('Failed to load model "big". Error: insufficient system resources')
     client = RaisingClient(exc)
     # Stub the provider's own fit check so the message build doesn't shell out to `lms`.
     monkeypatch.setattr(client, "check_fit", lambda m: (False, "won't fit"))
     with pytest.raises(ModelLoadError) as ei:
-        loop(_msgs(), client, "big")
+        loop(_msgs(), client, "big", gen)
     text = str(ei.value)
     assert "Could not use model 'big'" in text
     assert "won't fit" in text          # the fit advisory is folded into the error
     assert "Fix:" in text
 
 
-def test_loop_reraises_non_model_errors(fresh_bank):
+def test_loop_reraises_non_model_errors(gen):
     client = RaisingClient(ValueError("bad json in a tool, unrelated"))
     with pytest.raises(ValueError):
-        loop(_msgs(), client, "m")
+        loop(_msgs(), client, "m", gen)
 
 
 def test_looks_like_timeout_matches_timeouts_only():
@@ -353,13 +358,12 @@ def test_looks_like_timeout_matches_timeouts_only():
     assert not _looks_like_timeout(Exception("Failed to load model"))   # a LOAD error, not a timeout
 
 
-def test_loop_ends_cleanly_on_a_timeout(fresh_bank):
+def test_loop_ends_cleanly_on_a_timeout(gen):
     # A request timeout is transient + per-unit: the loop ends cleanly (no raw traceback), leaving the
     # artifact unfinalized — so a batch / --source loop moves on. The generate-side of OPS-6/7.
-    from coursekit.generate.quiz import bank as bankmod
     client = RaisingClient(TimeoutError("Request timed out."))
-    out = loop(_msgs(), client, "m")
-    assert out == "" and not bankmod.is_finalized()
+    out = loop(_msgs(), client, "m", gen)
+    assert out == "" and not gen.is_finalized()
 
 
 class _APIConnectionError(Exception):
@@ -376,16 +380,16 @@ def test_looks_like_unreachable_matches_down_endpoints_not_slow_ones():
     assert not _looks_like_timeout(_APIConnectionError("Connection error."))
 
 
-def test_loop_aborts_the_batch_on_an_unreachable_endpoint(fresh_bank):
+def test_loop_aborts_the_batch_on_an_unreachable_endpoint(gen):
     # A down endpoint fails every unit identically → abort with a clear message, not N misleading
     # per-unit 'timed out's. ModelLoadError propagates out of run_course → the CLI exits 2.
     client = RaisingClient(_APIConnectionError("Connection error."))
     with pytest.raises(ModelLoadError) as ei:
-        loop(_msgs(), client, "m")
+        loop(_msgs(), client, "m", gen)
     assert "Could not reach the model endpoint" in str(ei.value)
 
 
-def test_stop_turn_is_reappended_as_a_plain_dict_not_the_native_message(fresh_bank):
+def test_stop_turn_is_reappended_as_a_plain_dict_not_the_native_message(gen):
     """Pins a subtle, easily-'cleaned-up' decision in loop().
 
     On the stop-then-nudge path the loop deliberately builds a fresh Reply *without*
@@ -397,7 +401,7 @@ def test_stop_turn_is_reappended_as_a_plain_dict_not_the_native_message(fresh_ba
                              ("tools", BUILD),
                              ("tools", FINALIZE)])
     messages = _msgs()
-    loop(messages, client, "m")
+    loop(messages, client, "m", gen)
 
     assistants = [m for m in messages if isinstance(m, dict) and m.get("role") == "assistant"]
     assert assistants, "the stopped turn must stay in context"
@@ -407,12 +411,12 @@ def test_stop_turn_is_reappended_as_a_plain_dict_not_the_native_message(fresh_ba
         assert "tool_calls" not in m
 
 
-def test_nudge_is_appended_as_content_not_a_nested_message(fresh_bank):
+def test_nudge_is_appended_as_content_not_a_nested_message(gen):
     """_nudge() returns text; the provider wraps it. Returning a dict would nest a message
     inside a message — the bug this refactor actually introduced once."""
     client = ScriptedClient([("stop", "stopped"), ("tools", BUILD), ("tools", FINALIZE)])
     messages = _msgs()
-    loop(messages, client, "m")
+    loop(messages, client, "m", gen)
 
     for m in _nudged(messages):
         assert isinstance(m["content"], str)
@@ -575,15 +579,15 @@ def test_default_generator_is_quiz(tmp_path):
 # ------------------------------------------------- the deterministic EU pass (ASMT-3)
 
 def test_eu_pass_adds_an_open_response_group_the_model_cannot_mistype():
-    from coursekit.generate.quiz import bank, eu
-    bank.init("run", None, title="t", source="week-3.md")
+    from coursekit.generate.quiz import bank, eu, tools
+    s = tools.QuizTools(bank.BankDraft.new("run", None, title="t", source="week-3.md"))
     provider = FakeClient(script=[[("add_open_response_variant",
         {"group_id": "enduring_understanding", "variant_label": "A",
          "question_text": "Apply the idea to a new situation and justify your design choices.",
          "variant_summary": "EU transfer task",
          "rubric_criteria": ["applies the idea correctly", "justifies the choice"]})]])
-    assert eu.generate_eu_question(provider, "m", "the week's material", "Structure governs many.", None)
-    g = bank.get().groups["enduring_understanding"]
+    assert eu.generate_eu_question(s, provider, "m", "the week's material", "Structure governs many.", None)
+    g = s.draft.bank.groups["enduring_understanding"]
     assert g.question_type == "open_response"          # the PROGRAM fixed the type, not the model
     v = g.variants["A"]
     assert v.kind == "open_response" and v.rubric_criteria == ["applies the idea correctly",
@@ -591,8 +595,8 @@ def test_eu_pass_adds_an_open_response_group_the_model_cannot_mistype():
 
 
 def test_eu_pass_leaves_the_bank_unchanged_when_it_fails():
-    from coursekit.generate.quiz import bank, eu
-    bank.init("run", None, title="t", source="week-3.md")
+    from coursekit.generate.quiz import bank, eu, tools
+    s = tools.QuizTools(bank.BankDraft.new("run", None, title="t", source="week-3.md"))
 
     class _Boom:
         def chat_with_tools(self, **kw):
@@ -600,23 +604,23 @@ def test_eu_pass_leaves_the_bank_unchanged_when_it_fails():
 
     from coursekit import outcomes
     with outcomes.capture(sink=lambda n: None) as report:
-        assert not eu.generate_eu_question(_Boom(), "m", "material", "an enduring idea", None)
-    assert "enduring_understanding" not in bank.get().groups   # the empty group is removed, not left
+        assert not eu.generate_eu_question(s, _Boom(), "m", "material", "an enduring idea", None)
+    assert "enduring_understanding" not in s.draft.bank.groups   # the empty group is removed, not left
     assert [n.code for n in report.warnings] == ["eu.pass_error"]   # …and the failure is recorded, not silent
 
 
 def test_eu_pass_is_idempotent_a_rerun_replaces_the_question():
-    from coursekit.generate.quiz import bank, eu
+    from coursekit.generate.quiz import bank, eu, tools
 
     def _prov(q):
         return FakeClient(script=[[("add_open_response_variant",
             {"group_id": "enduring_understanding", "variant_label": "A", "question_text": q,
              "variant_summary": "EU task", "rubric_criteria": ["c1"]})]])
 
-    bank.init("run", None, title="t", source="week-3.md")
-    eu.generate_eu_question(_prov("First transfer task prompt here."), "m", "mat", "an EU", None)
-    eu.generate_eu_question(_prov("Second transfer task prompt here."), "m", "mat", "an EU", None)
-    g = bank.get().groups["enduring_understanding"]
+    s = tools.QuizTools(bank.BankDraft.new("run", None, title="t", source="week-3.md"))
+    eu.generate_eu_question(s, _prov("First transfer task prompt here."), "m", "mat", "an EU", None)
+    eu.generate_eu_question(s, _prov("Second transfer task prompt here."), "m", "mat", "an EU", None)
+    g = s.draft.bank.groups["enduring_understanding"]
     assert list(g.variants) == ["A"]                                  # replaced, not duplicated
     assert g.variants["A"].question_text == "Second transfer task prompt here."
 
@@ -663,36 +667,33 @@ FULL = [("create_question_group",
     for i, lbl in enumerate("ABCD")]
 
 
-def _gen(target):
-    from coursekit.generate.quiz.generator import QuizGenerator
-    g = QuizGenerator()
-    g._expected_groups = target
-    return g
-
-
-def test_auto_finalizes_a_complete_bank_when_the_model_fumbles_the_last_call(fresh_bank):
+def test_auto_finalizes_a_complete_bank_when_the_model_fumbles_the_last_call():
     # week 7 of a real course: a complete bank, then `<tool_call|>` leaked as prose until nudges ran out
     client = ScriptedClient([("tools", FULL), ("stop", "<tool_call|>")], repeat_last=True)
-    loop(_msgs(), client, "m", _gen(1), max_nudges=2)
-    assert bankmod.is_finalized()
+    gen = _gen(1)
+    loop(_msgs(), client, "m", gen, max_nudges=2)
+    assert gen.is_finalized()
 
 
-def test_a_bank_short_of_its_group_target_stays_incomplete(fresh_bank):
+def test_a_bank_short_of_its_group_target_stays_incomplete():
     client = ScriptedClient([("tools", FULL), ("stop", "<tool_call|>")], repeat_last=True)
-    loop(_msgs(), client, "m", _gen(2), max_nudges=2)     # brief asked for 2 groups; only 1 built
-    assert not bankmod.is_finalized()                       # an honest INCOMPLETE, not a false success
+    gen = _gen(2)
+    loop(_msgs(), client, "m", gen, max_nudges=2)     # brief asked for 2 groups; only 1 built
+    assert not gen.is_finalized()                       # an honest INCOMPLETE, not a false success
 
 
-def test_a_group_short_of_its_variants_stays_incomplete(fresh_bank):
+def test_a_group_short_of_its_variants_stays_incomplete():
     client = ScriptedClient([("tools", BUILD), ("stop", "<tool_call|>")], repeat_last=True)
-    loop(_msgs(), client, "m", _gen(1), max_nudges=2)     # one variant of four
-    assert not bankmod.is_finalized()
+    gen = _gen(1)
+    loop(_msgs(), client, "m", gen, max_nudges=2)     # one variant of four
+    assert not gen.is_finalized()
 
 
-def test_no_known_target_never_auto_finalizes(fresh_bank):
+def test_no_known_target_never_auto_finalizes():
     client = ScriptedClient([("tools", FULL), ("stop", "<tool_call|>")], repeat_last=True)
-    loop(_msgs(), client, "m", _gen(None), max_nudges=2)  # model chose the count: nothing to verify
-    assert not bankmod.is_finalized()
+    gen = _gen(None)
+    loop(_msgs(), client, "m", gen, max_nudges=2)  # model chose the count: nothing to verify
+    assert not gen.is_finalized()
 
 
 def test_run_unit_auto_finalizes_against_the_concept_map_target(tmp_path):
@@ -705,3 +706,82 @@ def test_run_unit_auto_finalizes_against_the_concept_map_target(tmp_path):
     res = run_unit(unit, client, "m")
     assert res.finalized
     assert (unit.output_dir / "quiz.json").exists()                  # artifacts re-written in sync
+
+
+def test_one_generator_reused_for_two_units_keeps_them_separate(tmp_path):
+    # run_course reuses one generator: the second unit must not inherit the first's bank, checklist, or log.
+    from coursekit.discover import find_units
+    from coursekit.generate.quiz.generator import QuizGenerator
+
+    def script(tag):
+        return [[("create_checklist", {"descriptions": [f"{tag} only"]}),
+                 ("create_question_group", {"group_id": tag, "concept_title": tag, "question_type": "multiple_choice"}),
+                 ("add_multiple_choice_variant",
+                  {"group_id": tag, "variant_label": "A", "question_text": f"Question about {tag}?",
+                   "variant_summary": f"{tag} angle", "options": ["a", "b", "c", "d"], "correct_index": 0})],
+                [("finalize_bank", {})]]
+
+    (tmp_path / "week-3.md").write_text("loops", encoding="utf-8")
+    (tmp_path / "week-4.md").write_text("arrays", encoding="utf-8")
+    first, second = find_units(tmp_path)[:2]
+    gen = QuizGenerator()
+
+    a = run_unit(first, FakeClient(script=script("a")), "m", gen)
+    assert gen.tools.checklist == ["a only"]
+    b = run_unit(second, FakeClient(script=script("b")), "m", gen)
+
+    assert gen.tools.checklist == ["b only"]
+    assert a.finalized and b.finalized and a.counts == b.counts == {"groups": 1, "variants": 1}
+    assert list(json.loads((first.output_dir / "bank.json").read_text())["groups"]) == ["a"]
+    assert list(json.loads((second.output_dir / "bank.json").read_text())["groups"]) == ["b"]
+    logged = [json.loads(line)["arguments"] for line in (second.output_dir / "calls.jsonl").read_text().splitlines()]
+    assert "b only" in " ".join(logged) and "a only" not in " ".join(logged)
+
+
+EU_SCRIPT = [[("add_open_response_variant",
+               {"group_id": "enduring_understanding", "variant_label": "A",
+                "question_text": "Apply the idea to a new situation and justify it.",
+                "variant_summary": "EU task", "rubric_criteria": ["applies it"]})]]
+
+
+def _unit_with_an_enduring_understanding(tmp_path):
+    from coursekit.generate.page.concept_map import ConceptMap, concept_map_path, save_concept_map
+    unit = _course_with_transcript(tmp_path)
+    save_concept_map(ConceptMap(week="3", enduring_understanding="Structure governs many."),
+                     concept_map_path(unit.course_root, "3"))
+    return unit
+
+
+def test_the_eu_pass_joins_the_runs_call_log(tmp_path):
+    # calls.jsonl is what makes a bad run replayable, so it must hold the EU pass's calls too.
+    from types import SimpleNamespace
+
+    from coursekit.generate.quiz.generator import QuizGenerator
+    unit = _unit_with_an_enduring_understanding(tmp_path)
+    gen = QuizGenerator()
+    gen.reset(unit, unit.output_dir)
+    gen.draft.bank.finalized = True
+    gen.postprocess(unit, FakeClient(script=EU_SCRIPT), "m", SimpleNamespace(value=lambda key: key == "eu_question"), "material")
+
+    assert "enduring_understanding" in gen.draft.bank.groups
+    logged = [json.loads(line)["name"] for line in (unit.output_dir / "calls.jsonl").read_text().splitlines()]
+    assert logged == ["add_open_response_variant"]
+
+
+def test_the_eu_script_adds_to_the_existing_bank_and_logs_it(tmp_path, monkeypatch):
+    import coursekit.cli as cli
+    from coursekit.generate.quiz import bank, eu
+    unit = _unit_with_an_enduring_understanding(tmp_path)
+    unit.output_dir.mkdir(parents=True)
+    existing = bank.Bank(run_id="kept", groups={"c1": bank.Group(group_id="c1", concept_title="Loops", question_type="short_answer", variants={
+        "A": bank.SAVariant(group_id="c1", label="A", question_text="Name the loop keyword.", variant_summary="keyword", accepted_answers=["for"])})})
+    (unit.output_dir / "bank.json").write_text(existing.model_dump_json())
+    monkeypatch.setattr(cli, "_build_provider", lambda: FakeClient(script=EU_SCRIPT))
+    monkeypatch.setenv("MODEL_NAME", "m")
+    monkeypatch.setattr("sys.argv", ["eu", str(unit.course_root), "--week", "3"])
+
+    assert eu.main() == 0
+    saved = bank.Bank.model_validate_json((unit.output_dir / "bank.json").read_text())
+    assert saved.run_id == "kept" and set(saved.groups) == {"c1", "enduring_understanding"}
+    assert "add_open_response_variant" in (unit.output_dir / "calls.jsonl").read_text()
+

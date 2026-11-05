@@ -147,15 +147,14 @@ def _write_course(tmp_path):
     (course / "output" / "week-3.md").write_text("loops and iteration", encoding="utf-8")
     qd = course / "quizzes" / "week-3"
     qd.mkdir(parents=True)
-    bankmod.reset()
-    bankmod.init("run", None, title="Week 3", source="week-3.md")
-    bankmod.create_group("c1", "Loops", "multiple_choice")
+    d = bankmod.BankDraft.new("run", None, title="Week 3", source="week-3.md")
+    d.create_group("c1", "Loops", "multiple_choice")
     for i, lbl in enumerate("ABCD"):
-        bankmod.put_variant(bankmod.MCVariant(
-            group_id="c1", label=lbl, variant_summary=f"angle {lbl}",
-            question_text=f"Q{lbl}: loops {'OUTOFSCOPE' if lbl == 'B' else 'here'}?",
-            options=["one", "two", "three", "four"], correct_index=i))
-    (qd / "bank.json").write_text(bankmod.get().model_dump_json(), encoding="utf-8")
+        d.put_variant(bankmod.MCVariant(
+      group_id="c1", label=lbl, variant_summary=f"angle {lbl}",
+      question_text=f"Q{lbl}: loops {'OUTOFSCOPE' if lbl == 'B' else 'here'}?",
+      options=["one", "two", "three", "four"], correct_index=i))
+    (qd / "bank.json").write_text(d.bank.model_dump_json(), encoding="utf-8")
     return course
 
 

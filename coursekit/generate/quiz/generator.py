@@ -29,19 +29,18 @@ class QuizGenerator:
         self.concept_shape = concept_shape
 
     def reset(self, unit: Unit, out_dir: Path) -> None:
-        # Fresh per-unit state. The module-level singletons in bank.py and tools.py would
-        # otherwise carry one week's groups, checklist, and call-log into the next.
-        bank.init(run_id=f"{unit.course_slug}-{unit.week_slug}", out_dir=out_dir,
-                  title=unit.week_label, source=unit.transcript_path.name)
-        tools.reset_state()
-        tools.set_call_log(out_dir / "calls.jsonl")
+        # Fresh per-unit state: run_course reuses one generator, and one week's groups, checklist, and
+        # call log must not carry into the next.
+        self.draft = bank.BankDraft.new(f"{unit.course_slug}-{unit.week_slug}", out_dir,
+                                        title=unit.week_label, source=unit.transcript_path.name)
+        self.tools = tools.QuizTools(self.draft, call_log=out_dir / "calls.jsonl")
         self._expected_groups = None   # set by build_messages from this unit's brief
 
     def tool_specs(self) -> list:
         return tools.TOOL_SPECS
 
     def run_tool_calls(self, calls):
-        return tools.run_tool_calls(calls)
+        return self.tools.run_tool_calls(calls)
 
     def build_messages(self, unit: Unit, transcript: str, cfg) -> list[dict]:
         # A course selects its prompts by name (system_prompt/task_prompt in quiz.yaml) and by
@@ -79,7 +78,7 @@ class QuizGenerator:
         from coursekit.generate.page.concept_map import load_for_unit
         from coursekit.generate.quiz import eu as eu_pass
         where = unit.week_slug
-        if not bank.is_finalized():
+        if not self.draft.is_finalized():
             outcomes.warn("eu.skipped", f"  {where}: no EU question — the quiz itself didn't finish.",
                           unit=where, reason="quiz_not_finalized")
             return
@@ -91,14 +90,14 @@ class QuizGenerator:
             outcomes.warn("eu.skipped", f"  {where}: eu_question is on but no EU question was added — {why}.",
                           unit=where, reason="no_concept_map" if cm is None else "no_enduring_understanding")
             return
-        if eu_pass.generate_eu_question(provider, model, transcript, eu, unit.course_root):
-            bank.finalize()   # same deterministic seed → re-writes cleanly with the EU group included
+        if eu_pass.generate_eu_question(self.tools, provider, model, transcript, eu, unit.course_root):
+            self.draft.finalize()   # same deterministic seed → re-writes cleanly with the EU group included
         else:
             outcomes.warn("eu.not_added", f"  {where}: the model didn't write the EU question — the quiz is "
                                           f"saved without it; re-run to try again.", unit=where)
 
     def is_finalized(self) -> bool:
-        return bank.is_finalized()
+        return self.draft.is_finalized()
 
     def auto_finalize(self) -> bool:
         """The model stopped without calling finalize_bank (e.g. it leaked `<tool_call|>` as prose and
@@ -107,22 +106,22 @@ class QuizGenerator:
         halfway (3 of 7 groups, one variant of four), and finalizing that would turn an honest
         INCOMPLETE into a false success. Complete = at least the target number of groups (unknown →
         don't guess) and the full set of variants in each (an open-response EU group is single by
-        design). `bank.finalize` still validates on top of this."""
+        design). `BankDraft.finalize` still validates on top of this."""
         target = getattr(self, "_expected_groups", None)
         if target is None:
             return False
-        groups = [g for g in bank.get().groups.values() if g.question_type != "open_response"]
+        groups = [g for g in self.draft.bank.groups.values() if g.question_type != "open_response"]
         if len(groups) < target or any(len(g.variants) < VARIANTS_PER_GROUP for g in groups):
             return False
-        bank.finalize()
-        return bank.is_finalized()
+        self.draft.finalize()
+        return self.draft.is_finalized()
 
     def nudge(self, *, stalled: bool) -> str:
         # Report real bank state so the model has ground truth, not its own sense of progress.
-        b = bank.get()
+        b = self.draft.bank
         n_groups = len(b.groups)
         n_variants = sum(len(g.variants) for g in b.groups.values())
-        problems = bank.validate_final()
+        problems = self.draft.validate_final()
 
         head = ("Several tool calls in a row failed; stop repeating the same call. "
                 if stalled else
@@ -135,10 +134,10 @@ class QuizGenerator:
         return head + state + tail
 
     def result(self, unit: Unit, out_dir: Path, reply: str) -> RunResult:
-        b = bank.get()
+        b = self.draft.bank
         return RunResult(
-            unit=unit, finalized=bank.is_finalized(), output_dir=out_dir,
+            unit=unit, finalized=self.draft.is_finalized(), output_dir=out_dir,
             counts={"groups": len(b.groups),
                     "variants": sum(len(g.variants) for g in b.groups.values())},
-            problems=bank.validate_final(), reply=reply,
+            problems=self.draft.validate_final(), reply=reply,
         )

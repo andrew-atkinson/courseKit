@@ -168,15 +168,14 @@ def test_instructions_render_inline_markdown_and_steps():
 def _quiz_bank_json():
     """A finalizable all-MC bank, serialized — for a quiz in the course cartridge."""
     from coursekit.generate.quiz import bank as bankmod
-    bankmod.reset()
-    bankmod.init("run-w3", None, title="Week 3", source="week-3.md")
-    bankmod.create_group("c1", "Loops", "multiple_choice")
+    d = bankmod.BankDraft.new("run-w3", None, title="Week 3", source="week-3.md")
+    d.create_group("c1", "Loops", "multiple_choice")
     for i, lbl in enumerate("ABCD"):
-        bankmod.put_variant(bankmod.MCVariant(
-            group_id="c1", label=lbl, variant_summary=f"angle {lbl}",
-            question_text=f"Question {lbl}: what does a loop do?",
-            options=["one", "two", "three", "four"], correct_index=i))
-    return bankmod.get().model_dump_json()
+        d.put_variant(bankmod.MCVariant(
+      group_id="c1", label=lbl, variant_summary=f"angle {lbl}",
+      question_text=f"Question {lbl}: what does a loop do?",
+      options=["one", "two", "three", "four"], correct_index=i))
+    return d.bank.model_dump_json()
 
 
 def test_declared_scheme_weights_groups_and_places_assignment_and_quiz(tmp_path):

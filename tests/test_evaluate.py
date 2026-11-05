@@ -19,15 +19,14 @@ class _FakeCritic:
 
 
 def _bank():
-    bankmod.reset()
-    bankmod.init("run", None, title="Week 3", source="week-3.md")
-    bankmod.create_group("c1", "Loops", "multiple_choice")
+    d = bankmod.BankDraft.new("run", None, title="Week 3", source="week-3.md")
+    d.create_group("c1", "Loops", "multiple_choice")
     for i, lbl in enumerate("ABCD"):
-        bankmod.put_variant(bankmod.MCVariant(
-            group_id="c1", label=lbl, variant_summary=f"angle {lbl}",
-            question_text=f"Question {lbl}: what does a loop do {'OUTOFSCOPE' if lbl == 'B' else 'here'}?",
-            options=["one", "two", "three", "four"], correct_index=i))
-    return bankmod.get()
+        d.put_variant(bankmod.MCVariant(
+      group_id="c1", label=lbl, variant_summary=f"angle {lbl}",
+      question_text=f"Question {lbl}: what does a loop do {'OUTOFSCOPE' if lbl == 'B' else 'here'}?",
+      options=["one", "two", "three", "four"], correct_index=i))
+    return d.bank
 
 
 def test_parse_verdict_reads_pass_flag_and_fields():

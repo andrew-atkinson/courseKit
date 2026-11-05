@@ -11,9 +11,7 @@ Tool results are prompt. Every ack is re-sent on every later turn, so keep them 
 and leave the full listing to get_bank_report.
 """
 
-import os
 from pathlib import Path
-from typing import Callable
 from dotenv import load_dotenv
 from coursekit import outcomes
 from coursekit.generate import dispatch
@@ -21,42 +19,7 @@ from coursekit.generate.quiz import bank
 
 load_dotenv(override=True)
 
-checklist = []
-completed = []
-
-_call_log: Path | None = None
-
-
-def set_call_log(path: Path | None) -> None:
-    """Record raw tool calls so a bad model run becomes a replayable fixture."""
-    global _call_log
-    _call_log = Path(path) if path else None
-
-
-def reset_state() -> None:
-    """Clear per-run tool state between weeks, so one week's checklist and call-log path
-    do not bleed into the next. Pair with bank.init(), which resets the bank itself."""
-    checklist.clear()
-    completed.clear()
-    set_call_log(None)
-
-
-# ------------------------------------------------------------- checklist
-
-def get_checklist_report() -> str:
-    """The checklist as plain text — the same lines for the model and the console. (No rich markup:
-    it is re-sent every turn and would teach the model to emit the markup the system prompt forbids.)"""
-    return "\n".join(f"#{index + 1} [{'x' if done else ' '}] {item}"
-                     for index, (item, done) in enumerate(zip(checklist, completed)))
-
-
-def create_checklist(descriptions: list[str]) -> str:
-    checklist.extend(descriptions)
-    completed.extend([False] * len(descriptions))
-    report = get_checklist_report()
-    outcomes.info("quiz.checklist", report)
-    return report
-
+# ------------------------------------------------------------- schemas
 
 create_checklist_json = {
     "name": "create_checklist",
@@ -74,17 +37,6 @@ create_checklist_json = {
         "additionalProperties": False,
     },
 }
-
-
-def mark_complete(index: int, completion_notes: str) -> str:
-    if not 1 <= index <= len(checklist):
-        return f"ERROR: no checklist item at #{index}. There are {len(checklist)}."
-    completed[index - 1] = True
-    outcomes.info("quiz.checklist_note", completion_notes)
-    report = get_checklist_report()
-    outcomes.info("quiz.checklist", report)
-    return report
-
 
 mark_complete_json = {
     "name": "mark_complete",
@@ -109,29 +61,25 @@ mark_complete_json = {
     },
 }
 
-# ------------------------------------------------------------ bank tools
-
 _GROUP_ID = {"type": "string",
              "description": "The group this variant belongs to, e.g. 'c1'"}
+
 _LABEL = {"type": "string",
           "description": "Which variant of the group this is: a single capital letter, A to D"}
+
 _SUMMARY = {
     "type": "string",
     "description": ("A few words naming what THIS variant tests, different from the other "
                     "variants in the group, e.g. 'Purpose of the condition' or 'What the "
                     "incrementer does'. Under 60 characters. Do not repeat the question text."),
 }
+
 _TEXT_FORMAT = {
     "type": "string",
     "enum": ["plain", "markdown", "html"],
     "description": ("Use 'markdown' when the question or any option contains code, and put the "
                     "code in backticks. Otherwise 'plain'."),
 }
-
-
-def create_question_group(group_id: str, concept_title: str, question_type: str) -> str:
-    return bank.create_group(group_id, concept_title, question_type)
-
 
 create_question_group_json = {
     "name": "create_question_group",
@@ -155,17 +103,6 @@ create_question_group_json = {
         "additionalProperties": False,
     },
 }
-
-
-def add_multiple_choice_variant(group_id: str, variant_label: str, question_text: str,
-                                variant_summary: str, options: list[str], correct_index: int,
-                                text_format: str = "plain", feedback: str = "") -> str:
-    v = bank.build_variant("multiple_choice", group_id=group_id, label=variant_label,
-                           question_text=question_text, variant_summary=variant_summary, options=options,
-                           correct_index=correct_index, text_format=text_format,
-                           feedback=feedback or None)
-    return bank.put_variant(v)
-
 
 add_multiple_choice_variant_json = {
     "name": "add_multiple_choice_variant",
@@ -201,18 +138,6 @@ add_multiple_choice_variant_json = {
         "additionalProperties": False,
     },
 }
-
-
-def add_multiple_answer_variant(group_id: str, variant_label: str, question_text: str,
-                                variant_summary: str, options: list[str],
-                                correct_indices: list[int], text_format: str = "plain",
-                                feedback: str = "") -> str:
-    v = bank.build_variant("multiple_answer", group_id=group_id, label=variant_label,
-                           question_text=question_text, variant_summary=variant_summary,
-                           options=options, correct_indices=correct_indices,
-                           text_format=text_format, feedback=feedback or None)
-    return bank.put_variant(v)
-
 
 add_multiple_answer_variant_json = {
     "name": "add_multiple_answer_variant",
@@ -254,19 +179,6 @@ add_multiple_answer_variant_json = {
     },
 }
 
-
-def add_true_false_variant(group_id: str, variant_label: str, question_text: str,
-                           variant_summary: str, correct_answer: bool,
-                           text_format: str = "plain",
-                           feedback_wrong: str = "", feedback_right: str = "") -> str:
-    v = bank.build_variant("true_false", group_id=group_id, label=variant_label,
-                           question_text=question_text, variant_summary=variant_summary,
-                           correct_answer=correct_answer,
-                           text_format=text_format, feedback_wrong=feedback_wrong or None,
-                           feedback_right=feedback_right or None)
-    return bank.put_variant(v)
-
-
 add_true_false_variant_json = {
     "name": "add_true_false_variant",
     "description": ("Record ONE finished true/false question. Calling this again with the same "
@@ -292,17 +204,6 @@ add_true_false_variant_json = {
         "additionalProperties": False,
     },
 }
-
-
-def add_short_answer_variant(group_id: str, variant_label: str, question_text: str,
-                             variant_summary: str, accepted_answers: list[str],
-                             text_format: str = "plain", feedback: str = "") -> str:
-    v = bank.build_variant("short_answer", group_id=group_id, label=variant_label,
-                           question_text=question_text, variant_summary=variant_summary,
-                           accepted_answers=accepted_answers,
-                           text_format=text_format, feedback=feedback or None)
-    return bank.put_variant(v)
-
 
 add_short_answer_variant_json = {
     "name": "add_short_answer_variant",
@@ -331,17 +232,6 @@ add_short_answer_variant_json = {
     },
 }
 
-
-def add_numerical_variant(group_id: str, variant_label: str, question_text: str,
-                          variant_summary: str, answer: float, tolerance: float = 0.0,
-                          text_format: str = "plain", feedback: str = "") -> str:
-    v = bank.build_variant("numerical", group_id=group_id, label=variant_label,
-                           question_text=question_text, variant_summary=variant_summary,
-                           answer=answer, tolerance=tolerance,
-                           text_format=text_format, feedback=feedback or None)
-    return bank.put_variant(v)
-
-
 add_numerical_variant_json = {
     "name": "add_numerical_variant",
     "description": ("Record ONE finished numerical question, where the student types a number. "
@@ -366,16 +256,6 @@ add_numerical_variant_json = {
         "additionalProperties": False,
     },
 }
-
-
-def add_matching_variant(group_id: str, variant_label: str, question_text: str,
-                         variant_summary: str, pairs: list[dict],
-                         text_format: str = "plain") -> str:
-    v = bank.build_variant("matching", group_id=group_id, label=variant_label,
-                           question_text=question_text, variant_summary=variant_summary,
-                           pairs=pairs, text_format=text_format)
-    return bank.put_variant(v)
-
 
 add_matching_variant_json = {
     "name": "add_matching_variant",
@@ -413,13 +293,6 @@ add_matching_variant_json = {
     },
 }
 
-
-def get_bank_report() -> str:
-    report = bank.report()
-    outcomes.info("quiz.bank_report", report)
-    return report
-
-
 get_bank_report_json = {
     "name": "get_bank_report",
     "description": ("List every group and variant recorded so far, and whether the bank is ready "
@@ -428,13 +301,6 @@ get_bank_report_json = {
                    "additionalProperties": False},
 }
 
-
-def finalize_bank() -> str:
-    result = bank.finalize()
-    outcomes.info("quiz.finalize", result)
-    return result
-
-
 finalize_bank_json = {
     "name": "finalize_bank",
     "description": ("Check the whole bank and write it out. Call this last. If it reports "
@@ -442,16 +308,6 @@ finalize_bank_json = {
     "parameters": {"type": "object", "properties": {}, "required": [],
                    "additionalProperties": False},
 }
-
-
-def add_open_response_variant(group_id: str, variant_label: str, question_text: str,
-                              variant_summary: str, rubric_criteria: list[str] | None = None,
-                              text_format: str = "plain") -> str:
-    v = bank.build_variant("open_response", group_id=group_id, label=variant_label,
-                           question_text=question_text, variant_summary=variant_summary,
-                           rubric_criteria=rubric_criteria or [], text_format=text_format)
-    return bank.put_variant(v)
-
 
 add_open_response_variant_json = {
     "name": "add_open_response_variant",
@@ -483,24 +339,6 @@ add_open_response_variant_json = {
     },
 }
 
-
-# ------------------------------------------------------------- dispatch
-
-TOOL_REGISTRY: dict[str, Callable[..., str]] = {
-    "create_checklist": create_checklist,
-    "mark_complete": mark_complete,
-    "create_question_group": create_question_group,
-    "add_multiple_choice_variant": add_multiple_choice_variant,
-    "add_multiple_answer_variant": add_multiple_answer_variant,
-    "add_true_false_variant": add_true_false_variant,
-    "add_short_answer_variant": add_short_answer_variant,
-    "add_numerical_variant": add_numerical_variant,
-    "add_matching_variant": add_matching_variant,
-    "add_open_response_variant": add_open_response_variant,
-    "get_bank_report": get_bank_report,
-    "finalize_bank": finalize_bank,
-}
-
 _SCHEMAS = {
     "create_checklist": create_checklist_json,
     "mark_complete": mark_complete_json,
@@ -519,18 +357,119 @@ _SCHEMAS = {
 # Neutral specs — {name, description, parameters}. The provider wraps them for the wire, so
 # this stays vendor-agnostic. `tools` is the pre-wrapped OpenAI form, kept for anything still
 # talking to the SDK directly.
-TOOL_SPECS = [_SCHEMAS[name] for name in TOOL_REGISTRY]
+TOOL_SPECS = list(_SCHEMAS.values())
 tools = [{"type": "function", "function": spec} for spec in TOOL_SPECS]
 
 
-def _dispatch_one(name: str, raw_args: str | None) -> str:
-    """Never raise. A malformed call at iteration 17 must not lose the first 16 variants."""
-    return dispatch.dispatch_one(TOOL_REGISTRY, name, raw_args)
+# ------------------------------------------------------------- the tools
 
+class QuizTools(dispatch.ToolSession):
+    """The tools the model calls to build one bank, and that run's checklist."""
 
-def run_tool_calls(tool_calls) -> list[tuple[str, str]]:
-    return dispatch.run_tool_calls(TOOL_REGISTRY, tool_calls, _call_log, terminal_tools={"finalize_bank"})
+    SCHEMAS = _SCHEMAS
+    TERMINAL = frozenset({"finalize_bank"})
 
+    def __init__(self, draft: bank.BankDraft, call_log: Path | None = None):
+        self.draft = draft
+        self.checklist: list[str] = []
+        self.completed: list[bool] = []
+        super().__init__(call_log)
 
-def replay(path) -> list[str]:
-    return dispatch.replay(TOOL_REGISTRY, path)
+    def get_checklist_report(self) -> str:
+        """The self.checklist as plain text — the same lines for the model and the console. (No rich markup:
+        it is re-sent every turn and would teach the model to emit the markup the system prompt forbids.)"""
+        return "\n".join(f"#{index + 1} [{'x' if done else ' '}] {item}"
+                         for index, (item, done) in enumerate(zip(self.checklist, self.completed)))
+
+    def create_checklist(self, descriptions: list[str]) -> str:
+        self.checklist.extend(descriptions)
+        self.completed.extend([False] * len(descriptions))
+        report = self.get_checklist_report()
+        outcomes.info("quiz.checklist", report)
+        return report
+
+    def mark_complete(self, index: int, completion_notes: str) -> str:
+        if not 1 <= index <= len(self.checklist):
+            return f"ERROR: no checklist item at #{index}. There are {len(self.checklist)}."
+        self.completed[index - 1] = True
+        outcomes.info("quiz.checklist_note", completion_notes)
+        report = self.get_checklist_report()
+        outcomes.info("quiz.checklist", report)
+        return report
+
+    def create_question_group(self, group_id: str, concept_title: str, question_type: str) -> str:
+        return self.draft.create_group(group_id, concept_title, question_type)
+
+    def add_multiple_choice_variant(self, group_id: str, variant_label: str, question_text: str,
+                                    variant_summary: str, options: list[str], correct_index: int,
+                                    text_format: str = "plain", feedback: str = "") -> str:
+        v = bank.build_variant("multiple_choice", group_id=group_id, label=variant_label,
+                               question_text=question_text, variant_summary=variant_summary, options=options,
+                               correct_index=correct_index, text_format=text_format,
+                               feedback=feedback or None)
+        return self.draft.put_variant(v)
+
+    def add_multiple_answer_variant(self, group_id: str, variant_label: str, question_text: str,
+                                    variant_summary: str, options: list[str],
+                                    correct_indices: list[int], text_format: str = "plain",
+                                    feedback: str = "") -> str:
+        v = bank.build_variant("multiple_answer", group_id=group_id, label=variant_label,
+                               question_text=question_text, variant_summary=variant_summary,
+                               options=options, correct_indices=correct_indices,
+                               text_format=text_format, feedback=feedback or None)
+        return self.draft.put_variant(v)
+
+    def add_true_false_variant(self, group_id: str, variant_label: str, question_text: str,
+                               variant_summary: str, correct_answer: bool,
+                               text_format: str = "plain",
+                               feedback_wrong: str = "", feedback_right: str = "") -> str:
+        v = bank.build_variant("true_false", group_id=group_id, label=variant_label,
+                               question_text=question_text, variant_summary=variant_summary,
+                               correct_answer=correct_answer,
+                               text_format=text_format, feedback_wrong=feedback_wrong or None,
+                               feedback_right=feedback_right or None)
+        return self.draft.put_variant(v)
+
+    def add_short_answer_variant(self, group_id: str, variant_label: str, question_text: str,
+                                 variant_summary: str, accepted_answers: list[str],
+                                 text_format: str = "plain", feedback: str = "") -> str:
+        v = bank.build_variant("short_answer", group_id=group_id, label=variant_label,
+                               question_text=question_text, variant_summary=variant_summary,
+                               accepted_answers=accepted_answers,
+                               text_format=text_format, feedback=feedback or None)
+        return self.draft.put_variant(v)
+
+    def add_numerical_variant(self, group_id: str, variant_label: str, question_text: str,
+                              variant_summary: str, answer: float, tolerance: float = 0.0,
+                              text_format: str = "plain", feedback: str = "") -> str:
+        v = bank.build_variant("numerical", group_id=group_id, label=variant_label,
+                               question_text=question_text, variant_summary=variant_summary,
+                               answer=answer, tolerance=tolerance,
+                               text_format=text_format, feedback=feedback or None)
+        return self.draft.put_variant(v)
+
+    def add_matching_variant(self, group_id: str, variant_label: str, question_text: str,
+                             variant_summary: str, pairs: list[dict],
+                             text_format: str = "plain") -> str:
+        v = bank.build_variant("matching", group_id=group_id, label=variant_label,
+                               question_text=question_text, variant_summary=variant_summary,
+                               pairs=pairs, text_format=text_format)
+        return self.draft.put_variant(v)
+
+    def get_bank_report(self) -> str:
+        report = self.draft.report()
+        outcomes.info("quiz.bank_report", report)
+        return report
+
+    def finalize_bank(self) -> str:
+        result = self.draft.finalize()
+        outcomes.info("quiz.finalize", result)
+        return result
+
+    def add_open_response_variant(self, group_id: str, variant_label: str, question_text: str,
+                                  variant_summary: str, rubric_criteria: list[str] | None = None,
+                                  text_format: str = "plain") -> str:
+        v = bank.build_variant("open_response", group_id=group_id, label=variant_label,
+                               question_text=question_text, variant_summary=variant_summary,
+                               rubric_criteria=rubric_criteria or [], text_format=text_format)
+        return self.draft.put_variant(v)

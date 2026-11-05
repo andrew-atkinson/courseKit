@@ -53,12 +53,12 @@ def _abort_if_model_error(provider, model, exc) -> None:
     abort_if_model_error(provider, model, exc)
 
 
-def fix_one(finding, transcript: str, provider, model: str, *, critic: str,
+def fix_one(session, finding, transcript: str, provider, model: str, *, critic: str,
             project_root=None, max_turns: int = 4) -> FixOutcome:
-    """Correct ONE flagged variant in the loaded bank (the singleton), then verify. The variant must
-    already be present in `bank.get()` (the caller loads the bank first)."""
+    """Correct ONE flagged variant in the session's bank, then verify."""
     gid, label = finding.group_id, finding.label
-    group = bank.get().groups.get(gid)
+    groups = session.draft.bank.groups
+    group = groups.get(gid)
     before = group.variants.get(label) if group else None
     if before is None:                       # the bank changed under us; nothing to fix
         return FixOutcome(finding.week, gid, label, finding.concern, False, None)
@@ -82,9 +82,9 @@ def fix_one(finding, transcript: str, provider, model: str, *, critic: str,
             break                                        # content-level error → give up on this item
         if reply.wants_tools:
             provider.append_assistant(messages, reply)
-            results = tools.run_tool_calls(reply.tool_calls)
+            results = session.run_tool_calls(reply.tool_calls)
             provider.append_tool_results(messages, results)
-            now = bank.get().groups[gid].variants.get(label)
+            now = groups[gid].variants.get(label)
             committed = any(not c.startswith("ERROR") for _, c in results)
             if committed and now is not None and now.model_dump() != before_dump:
                 replaced = True
@@ -99,7 +99,7 @@ def fix_one(finding, transcript: str, provider, model: str, *, critic: str,
 
     now_passes = None
     if replaced:
-        now = bank.get().groups[gid].variants.get(label)
+        now = groups[gid].variants.get(label)
         verdict, _, _ = ev._one_read(critic, transcript, now, provider, model)
         now_passes = verdict == "PASS"
     return FixOutcome(finding.week, gid, label, finding.concern, replaced, now_passes)
@@ -128,17 +128,18 @@ def fix_course(path, *, weeks=None, provider, model, reads: int = ev.DEFAULT_REA
             flagged = [f for f in fnd if f.flagged]
         if not flagged:
             continue
-        bank.load(bank_obj, out_dir=bj.parent)            # adopt this bank; put_variant autosaves it
+        draft = bank.BankDraft.adopt(bank_obj, bj.parent)   # put_variant autosaves it
+        session = tools.QuizTools(draft)
         critic = ev._critic_body(ev.EVALUATE_CATEGORY, proot)
         for f in flagged:
             if progress:
                 progress(f"fixing {slug} {f.group_id}/{f.label}…")
-            o = fix_one(f, transcript, provider, model, critic=critic,
+            o = fix_one(session, f, transcript, provider, model, critic=critic,
                         project_root=proot, max_turns=max_turns)
             if progress:
                 progress(f"  → {_outcome_word(o)}")
             outcomes.append(o)
-        bank.finalize()                                   # re-emit GIFT + quiz.json (deterministic seed)
+        draft.finalize()                                  # re-emit GIFT + quiz.json (deterministic seed)
     return outcomes
 
 

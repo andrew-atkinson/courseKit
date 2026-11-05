@@ -20,14 +20,17 @@ class _EUGenerator:
     """A one-tool generator for the EU pass — the model can ONLY add the open-response variant, so
     the question type is the program's decision, not the model's."""
 
+    def __init__(self, session):
+        self.session = session
+
     def tool_specs(self):
         return _EU_SPEC
 
     def run_tool_calls(self, calls):
-        return tools.run_tool_calls(calls)
+        return self.session.run_tool_calls(calls)
 
     def is_finalized(self) -> bool:
-        g = bank.get().groups.get(_EU_GID)
+        g = self.session.draft.bank.groups.get(_EU_GID)
         return bool(g and g.variants)
 
     def nudge(self, *, stalled: bool) -> str:
@@ -35,26 +38,27 @@ class _EUGenerator:
                 f'"{_EU_GID}", label "A", a question_text, and rubric_criteria. No other tool, no prose.')
 
 
-def generate_eu_question(provider, model, material: str, eu: str, project_root=None) -> bool:
+def generate_eu_question(session, provider, model, material: str, eu: str, project_root=None) -> bool:
     """Create the open-response EU group deterministically, then have the model fill ONLY its content.
     Returns True if the variant was recorded; leaves the bank exactly as it was on failure."""
     from coursekit.pipeline import loop      # local: avoid an import cycle (pipeline drives generators)
-    bank.get().groups.pop(_EU_GID, None)     # idempotent: a re-run replaces any prior EU question
-    bank.create_group(_EU_GID, "Enduring Understanding", "open_response")
+    draft = session.draft
+    draft.bank.groups.pop(_EU_GID, None)     # idempotent: a re-run replaces any prior EU question
+    draft.create_group(_EU_GID, "Enduring Understanding", "open_response")
     system = prompts.load("quiz", "eu_question", project_root=project_root).body
     user = (f"The enduring understanding to assess:\n{eu}\n\n"
             f"The week's material:\n<material>\n{material}\n</material>\n\nWrite the transfer task now.")
     try:
         loop([{"role": "system", "content": system}, {"role": "user", "content": user}],
-             provider, model, _EUGenerator(), max_iters=6)
+             provider, model, _EUGenerator(session), max_iters=6)
     except CoursekitError:
         raise                                  # infrastructure (a model that won't load) aborts the run
     except Exception as e:                     # anything else: recorded, the finished quiz kept
         outcomes.warn("eu.pass_error", f"  EU pass failed: {type(e).__name__}: {e}", error_type=type(e).__name__)
     finally:
-        g = bank.get().groups.get(_EU_GID)
+        g = draft.bank.groups.get(_EU_GID)
         if not (g and g.variants):             # never leave an empty EU group behind
-            bank.get().groups.pop(_EU_GID, None)
+            draft.bank.groups.pop(_EU_GID, None)
     return bool(g and g.variants)
 
 
@@ -95,15 +99,14 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     bank_path = out_dir / "bank.json"
     if bank_path.exists():
-        bank.load(bank.Bank.model_validate_json(bank_path.read_text(encoding="utf-8")), out_dir=out_dir)
+        draft = bank.BankDraft.adopt(bank.Bank.model_validate_json(bank_path.read_text(encoding="utf-8")), out_dir)
         print(f"Adding the EU question to the existing quiz at {bank_path}")
     else:
-        bank.init(run_id=f"{unit.course_slug}-{unit.week_slug}", out_dir=out_dir,
-                  title=unit.week_label, source=unit.transcript_path.name)
+        draft = bank.BankDraft.new(f"{unit.course_slug}-{unit.week_slug}", out_dir,
+                                   title=unit.week_label, source=unit.transcript_path.name)
         print(f"No existing bank — writing an EU-only bank to {out_dir}")
 
-    tools.reset_state()
-    tools.set_call_log(out_dir / "calls.jsonl")
+    session = tools.QuizTools(draft, call_log=out_dir / "calls.jsonl")
 
     from coursekit.cli import _build_provider
     provider = _build_provider()
@@ -111,8 +114,8 @@ def main() -> int:
         args.course, config_name="quiz.yaml").value("model")
 
     transcript = Path(unit.transcript_path).read_text(encoding="utf-8", errors="replace")
-    if generate_eu_question(provider, model, transcript, eu, unit.course_root):
-        print(bank.finalize())
+    if generate_eu_question(session, provider, model, transcript, eu, unit.course_root):
+        print(draft.finalize())
         return 0
     print("The EU pass produced no question (model unreachable or refused).")
     return 1

@@ -4,8 +4,6 @@ The machinery is identical across generators: never raise (a malformed call at i
 not lose the first 16 commits), turn a pydantic ValidationError into a short actionable message for
 a small model, and log raw calls so a bad run becomes a replayable fixture. A generator supplies its
 own `{name: callable}` registry; everything else is common.
-
-(The quiz generator predates this module and still carries its own copy; it can adopt this later.)
 """
 
 import json

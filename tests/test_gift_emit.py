@@ -196,26 +196,26 @@ def test_code_question_escapes_equals():
 # ---------------------------------------------------------------- quiz
 
 def test_quiz_emits_one_variant_per_group_with_seed_header():
-    bankmod.reset()
-    bankmod.create_group("c1", "Loops", "multiple_choice")
+    d = bankmod.BankDraft.new("test")
+    d.create_group("c1", "Loops", "multiple_choice")
     for i, lbl in enumerate("ABCD"):
-        bankmod.put_variant(MCVariant(group_id="c1", label=lbl,
-                                      question_text=f"Question {lbl} about loops?", variant_summary=f"Angle {lbl}",
-                                      options=["w", "x", "y", "z"], correct_index=i))
-    quiz = bankmod.pick_quiz(seed=99)
-    out = gift.emit_quiz(quiz, bankmod.get())
+        d.put_variant(MCVariant(group_id="c1", label=lbl,
+                                question_text=f"Question {lbl} about loops?", variant_summary=f"Angle {lbl}",
+                                options=["w", "x", "y", "z"], correct_index=i))
+    quiz = d.pick_quiz(seed=99)
+    out = gift.emit_quiz(quiz, d.bank)
     assert out.startswith("// Question bank\n// seed: 99")
     assert len([b for b in _blocks(out) if b.startswith("// [id:")]) == 1
 
 
 def test_quiz_pick_is_deterministic_for_a_seed():
-    bankmod.reset()
-    bankmod.create_group("c1", "Loops", "multiple_choice")
+    d = bankmod.BankDraft.new("test")
+    d.create_group("c1", "Loops", "multiple_choice")
     for i, lbl in enumerate("ABCD"):
-        bankmod.put_variant(MCVariant(group_id="c1", label=lbl,
-                                      question_text=f"Question {lbl} about loops?", variant_summary=f"Angle {lbl}",
-                                      options=["w", "x", "y", "z"], correct_index=i))
-    assert bankmod.pick_quiz(seed=7) == bankmod.pick_quiz(seed=7)
+        d.put_variant(MCVariant(group_id="c1", label=lbl,
+                                question_text=f"Question {lbl} about loops?", variant_summary=f"Angle {lbl}",
+                                options=["w", "x", "y", "z"], correct_index=i))
+    assert d.pick_quiz(seed=7) == d.pick_quiz(seed=7)
 
 
 # ------------------------------------------------- titles and categories

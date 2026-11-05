@@ -14,19 +14,15 @@ from coursekit.providers.base import Reply, ToolCall
 
 
 @pytest.fixture
-def fresh():
-    bank.reset()
-    tools.reset_state()
-    yield
-    bank.reset()
-    tools.reset_state()
+def s():
+    return tools.QuizTools(bank.BankDraft.new("test"))
 
 
-def _flawed_group():
+def _flawed_group(s):
     """A group with one MC variant whose marked answer is wrong (index 1; correct is index 0)."""
-    bank.create_group("c1", "key vs keyCode", "multiple_choice")
-    tools.add_multiple_choice_variant("c1", "A", "What does `key` hold?", "meaning of key",
-                                      ["a string character", "a numeric code"], 1)
+    s.draft.create_group("c1", "key vs keyCode", "multiple_choice")
+    s.add_multiple_choice_variant("c1", "A", "What does `key` hold?", "meaning of key",
+                                  ["a string character", "a numeric code"], 1)
 
 
 class FixProvider:
@@ -71,31 +67,31 @@ def test_fix_tool_specs_are_only_add_tools():
 
 # ------------------------------------------------------------- fix_one
 
-def test_fix_one_replaces_and_verifies(fresh):
-    _flawed_group()
+def test_fix_one_replaces_and_verifies(s):
+    _flawed_group(s)
     corrected = {"group_id": "c1", "variant_label": "A", "question_text": "What does `key` hold? FIXED",
                  "variant_summary": "key is the character", "options": ["a string character", "a numeric code"],
                  "correct_index": 0}
     fp = FixProvider(corrected)
-    out = qfix.fix_one(_finding(), "material", fp, "m", critic="CRITIC")
+    out = qfix.fix_one(s, _finding(), "material", fp, "m", critic="CRITIC")
     assert out.replaced is True and out.now_passes is True
     # the bank now marks the correct option
-    assert bank.get().groups["c1"].variants["A"].correct_index == 0
+    assert s.draft.bank.groups["c1"].variants["A"].correct_index == 0
 
 
-def test_fix_one_gives_up_when_the_tool_keeps_erroring(fresh):
-    _flawed_group()
+def test_fix_one_gives_up_when_the_tool_keeps_erroring(s):
+    _flawed_group(s)
     # wrong group_id -> put_variant returns ERROR every turn -> never replaced
     fp = FixProvider({"group_id": "nope", "variant_label": "A", "question_text": "x FIXED",
                       "variant_summary": "s", "options": ["a", "b"], "correct_index": 0})
-    out = qfix.fix_one(_finding(), "material", fp, "m", critic="CRITIC", max_turns=2)
+    out = qfix.fix_one(s, _finding(), "material", fp, "m", critic="CRITIC", max_turns=2)
     assert out.replaced is False and out.now_passes is None
-    assert bank.get().groups["c1"].variants["A"].correct_index == 1   # untouched
+    assert s.draft.bank.groups["c1"].variants["A"].correct_index == 1   # untouched
 
 
 # ------------------------------------------------------------- fix_course (integration)
 
-def test_fix_course_updates_bank_on_disk(tmp_path, fresh):
+def test_fix_course_updates_bank_on_disk(tmp_path):
     pytest.importorskip("yaml")
     (tmp_path / ".vtconfig").mkdir()
     (tmp_path / "week-3.md").write_text("`key` is a string character; `keyCode` is a numeric code.")
@@ -131,7 +127,7 @@ def test_parse_review_round_trips_render_review():
     assert ("week-9", "realtime-code", "code", "FLAG", "undeclared variable") in got   # rsplit on last /
 
 
-def test_fix_course_from_review_uses_given_findings(tmp_path, fresh):
+def test_fix_course_from_review_uses_given_findings(tmp_path):
     pytest.importorskip("yaml")
     (tmp_path / ".vtconfig").mkdir()
     (tmp_path / "week-3.md").write_text("`key` is a string character; `keyCode` is a numeric code.")
@@ -194,7 +190,7 @@ def test_abort_if_model_error_aborts_on_infra_but_not_on_content():
     # a content-level exception does not abort; the caller breaks just that one item
     assert qfix._abort_if_model_error(_P(), "m", ValueError("some content issue")) is None
 
-def test_fix_course_repairs_a_targeted_quiz(tmp_path, fresh):
+def test_fix_course_repairs_a_targeted_quiz(tmp_path):
     pytest.importorskip("yaml")
     # a TARGETED quiz: quizzes/week-2-<doc>/ with its own source.md — fix must find + repair it
     (tmp_path / ".vtconfig").mkdir()
@@ -218,3 +214,21 @@ def test_fix_course_repairs_a_targeted_quiz(tmp_path, fresh):
     assert len(outcomes) == 1 and outcomes[0].now_passes
     saved = bank.Bank.model_validate_json((outd / "bank.json").read_text())
     assert saved.groups["c1"].variants["A"].correct_index == 0     # repaired in place
+
+
+def test_fix_course_fixes_each_bank_in_its_own_draft(tmp_path):
+    (tmp_path / ".vtconfig").mkdir()
+    for wk in ("week-3", "week-4"):
+        (tmp_path / f"{wk}.md").write_text("`key` holds a string character; `keyCode` a numeric code.")
+        s = tools.QuizTools(bank.BankDraft.adopt(bank.Bank(run_id=f"c-{wk}", title=wk), tmp_path / "quizzes" / wk))
+        _flawed_group(s)
+
+    corrected = {"group_id": "c1", "variant_label": "A", "question_text": "What does `key` hold? FIXED",
+                 "variant_summary": "key is the character", "options": ["a string character", "a numeric code"],
+                 "correct_index": 0}
+    outcomes = qfix.fix_course(tmp_path, provider=FixProvider(corrected), model="m")
+
+    assert [o.replaced for o in outcomes] == [True, True]
+    for wk in ("week-3", "week-4"):
+        saved = bank.Bank.model_validate_json((tmp_path / "quizzes" / wk / "bank.json").read_text())
+        assert saved.run_id == f"c-{wk}" and saved.groups["c1"].variants["A"].correct_index == 0

@@ -322,245 +322,227 @@ class Bank(BaseModel):
     finalized: bool = False
 
 
-# ---- module state (mirrors the checklist/completed convention in tools.py) ----
+class BankDraft:
+    """A bank being built, and where it saves. `new` starts empty and stages to `bank.partial.json`, so a
+    re-run that fails leaves the last good bank (and its quiz.json/gift) untouched; `adopt` takes an
+    existing bank for editing (the targeted-fix pass reloads a `bank.json`, then a `put_variant` overwrites
+    just the flagged variant and autosaves the whole bank), and saves in place."""
 
-_bank = Bank(run_id="unsaved")
-_out_dir: Path | None = None
-_staged = False   # a fresh run (init) stages until finalize; an adopted bank (load) saves in place
+    def __init__(self, bank: Bank, out_dir: Path | None = None, *, staged: bool = False):
+        self.bank = bank
+        self.out_dir = Path(out_dir) if out_dir else None
+        self.staged = staged
 
+    @classmethod
+    def new(cls, run_id: str, out_dir: Path | None = None, title: str = "Question bank",
+            source: str | None = None) -> "BankDraft":
+        return cls(Bank(run_id=run_id, title=title, source=source), out_dir, staged=True)
 
-def init(run_id: str, out_dir: Path | None = None, title: str = "Question bank",
-         source: str | None = None) -> None:
-    """Start an empty bank. It autosaves to `bank.partial.json` and is promoted over `bank.json` only
-    on finalize, so a re-run that fails leaves the last good bank (and its quiz.json/gift) untouched."""
-    global _bank, _out_dir, _staged
-    _bank = Bank(run_id=run_id, title=title, source=source)
-    _out_dir = Path(out_dir) if out_dir else None
-    _staged = True
+    @classmethod
+    def adopt(cls, bank: Bank, out_dir: Path | None = None) -> "BankDraft":
+        return cls(bank, out_dir)
 
+    def is_finalized(self) -> bool:
+        return self.bank.finalized
 
-def reset() -> None:
-    """Test hook."""
-    init("test", None)
+    def _autosave(self) -> None:
+        """Persist after every write. The file is tiny and this is the whole point of the
+        feature: a crash at variant 19 must not lose the first 18. A staged run writes only
+        `bank.partial.json`; `bank.json` is replaced atomically, and only by a finished bank or an
+        in-place edit of an adopted one — so readers never see a half-built bank."""
+        if self.out_dir is None:
+            return
+        self.out_dir.mkdir(parents=True, exist_ok=True)
+        partial = self.out_dir / "bank.partial.json"
+        partial.write_text(json.dumps(self.bank.model_dump(), indent=2), encoding="utf-8")
+        if self.bank.finalized or not self.staged:
+            os.replace(partial, self.out_dir / "bank.json")
 
-
-def load(bank_obj: "Bank", out_dir: Path | None = None) -> None:
-    """Adopt an EXISTING bank as the working singleton — for editing a finished bank in place (the
-    targeted-fix pass reloads a `bank.json`, then a `put_variant` overwrites just the flagged variant
-    and autosaves the whole bank). Distinct from `init`, which starts empty."""
-    global _bank, _out_dir, _staged
-    _bank = bank_obj
-    _out_dir = Path(out_dir) if out_dir else None
-    _staged = False
-
-
-def get() -> Bank:
-    return _bank
-
-
-def is_finalized() -> bool:
-    return _bank.finalized
-
-
-def _autosave() -> None:
-    """Persist after every write. The file is tiny and this is the whole point of the
-    feature: a crash at variant 19 must not lose the first 18. A staged run writes only
-    `bank.partial.json`; `bank.json` is replaced atomically, and only by a finished bank or an
-    in-place edit of an adopted one — so readers never see a half-built bank."""
-    if _out_dir is None:
-        return
-    _out_dir.mkdir(parents=True, exist_ok=True)
-    partial = _out_dir / "bank.partial.json"
-    partial.write_text(json.dumps(_bank.model_dump(), indent=2), encoding="utf-8")
-    if _bank.finalized or not _staged:
-        os.replace(partial, _out_dir / "bank.json")
+    def create_group(self, group_id: str, concept_title: str, question_type: str) -> str:
+        if question_type not in _KIND_TO_TOOL:
+            return (f"ERROR: unknown question_type '{question_type}'. "
+                    f"Use one of: {', '.join(_KIND_TO_TOOL)}")
+        existing = self.bank.groups.get(group_id)
+        if existing and existing.variants:
+            return (f"ERROR: group '{group_id}' already has {len(existing.variants)} variant(s). "
+                    f"To change its type, use a new group_id.")
+        self.bank.groups[group_id] = Group(
+            group_id=group_id, concept_title=concept_title.strip(), question_type=question_type
+        )
+        self._autosave()
+        return (f"OK group '{group_id}' ({question_type}): {concept_title.strip()[:50]}. "
+                f"Now add variants A-D with {_KIND_TO_TOOL[question_type]}.")
 
 
-def create_group(group_id: str, concept_title: str, question_type: str) -> str:
-    if question_type not in _KIND_TO_TOOL:
-        return (f"ERROR: unknown question_type '{question_type}'. "
-                f"Use one of: {', '.join(_KIND_TO_TOOL)}")
-    existing = _bank.groups.get(group_id)
-    if existing and existing.variants:
-        return (f"ERROR: group '{group_id}' already has {len(existing.variants)} variant(s). "
-                f"To change its type, use a new group_id.")
-    _bank.groups[group_id] = Group(
-        group_id=group_id, concept_title=concept_title.strip(), question_type=question_type
-    )
-    _autosave()
-    return (f"OK group '{group_id}' ({question_type}): {concept_title.strip()[:50]}. "
-            f"Now add variants A-D with {_KIND_TO_TOOL[question_type]}.")
+    def unused_correct_positions(self, group_id: str, exclude_label: str | None = None) -> list[int]:
+        """Which correct-answer indices are still free in a multiple-choice group.
+
+        Powers the steering ack. Only meaningful for multiple_choice: the other four types
+        have no answer positions, so the 'different correct answer per variation' rule is
+        incoherent for them.
+        """
+        g = self.bank.groups.get(group_id)
+        if not g or g.question_type != "multiple_choice":
+            return []
+        mc = [v for lbl, v in g.variants.items()
+              if lbl != exclude_label and v.kind == "multiple_choice"]
+        if not mc:
+            return []
+        width = min(len(v.options) for v in mc)
+        used = {v.correct_index for v in mc}
+        return [i for i in range(width) if i not in used]
 
 
-def unused_correct_positions(group_id: str, exclude_label: str | None = None) -> list[int]:
-    """Which correct-answer indices are still free in a multiple-choice group.
+    def put_variant(self, v: Variant) -> str:
+        """Store a variant, REPLACING any variant already at (group_id, label)."""
+        g = self.bank.groups.get(v.group_id)
+        if g is None:
+            known = ", ".join(self.bank.groups) or "none yet"
+            return (f"ERROR: no group '{v.group_id}'. Call create_question_group first. "
+                    f"Existing groups: {known}")
+        if g.question_type != v.kind:
+            return (f"ERROR: group '{v.group_id}' is question_type='{g.question_type}', but you "
+                    f"called the {v.kind} tool. Use {_KIND_TO_TOOL[g.question_type]}, or create "
+                    f"a different group.")
 
-    Powers the steering ack. Only meaningful for multiple_choice: the other four types
-    have no answer positions, so the 'different correct answer per variation' rule is
-    incoherent for them.
-    """
-    g = _bank.groups.get(group_id)
-    if not g or g.question_type != "multiple_choice":
-        return []
-    mc = [v for lbl, v in g.variants.items()
-          if lbl != exclude_label and v.kind == "multiple_choice"]
-    if not mc:
-        return []
-    width = min(len(v.options) for v in mc)
-    used = {v.correct_index for v in mc}
-    return [i for i in range(width) if i not in used]
+        replacing = v.label in g.variants
 
+        # Two variants that test the same thing are the failure this whole feature exists to
+        # prevent; a repeated summary is the cheapest signal of it.
+        clash = next((lbl for lbl, x in g.variants.items()
+                      if lbl != v.label
+                      and x.variant_summary.casefold() == v.variant_summary.casefold()), None)
+        if clash:
+            return (f"ERROR: in group '{v.group_id}' variant {clash} already has the summary "
+                    f"'{v.variant_summary}'. Each variant must test a different angle on the "
+                    f"concept. Write a different question, or a summary that says how this "
+                    f"one differs.")
 
-def put_variant(v: Variant) -> str:
-    """Store a variant, REPLACING any variant already at (group_id, label)."""
-    g = _bank.groups.get(v.group_id)
-    if g is None:
-        known = ", ".join(_bank.groups) or "none yet"
-        return (f"ERROR: no group '{v.group_id}'. Call create_question_group first. "
-                f"Existing groups: {known}")
-    if g.question_type != v.kind:
-        return (f"ERROR: group '{v.group_id}' is question_type='{g.question_type}', but you "
-                f"called the {v.kind} tool. Use {_KIND_TO_TOOL[g.question_type]}, or create "
-                f"a different group.")
+        if v.kind == "multiple_choice":
+            others = [x for lbl, x in g.variants.items()
+                      if lbl != v.label and x.kind == "multiple_choice"]
+            # Only enforceable while there are at least as many positions as variants.
+            if others and len(others) + 1 <= min(len(x.options) for x in others + [v]):
+                taken = {x.correct_index: lbl for lbl, x in g.variants.items()
+                         if lbl != v.label and x.kind == "multiple_choice"}
+                if v.correct_index in taken:
+                    free = self.unused_correct_positions(v.group_id, exclude_label=v.label)
+                    return (f"ERROR: in group '{v.group_id}' variant {taken[v.correct_index]} already "
+                            f"puts the correct answer at index {v.correct_index}. Each variant needs a "
+                            f"different position. Free positions: {free}. Reorder the options so the "
+                            f"correct one lands on a free index.")
 
-    replacing = v.label in g.variants
+        g.variants[v.label] = v
+        self._autosave()
 
-    # Two variants that test the same thing are the failure this whole feature exists to
-    # prevent; a repeated summary is the cheapest signal of it.
-    clash = next((lbl for lbl, x in g.variants.items()
-                  if lbl != v.label
-                  and x.variant_summary.casefold() == v.variant_summary.casefold()), None)
-    if clash:
-        return (f"ERROR: in group '{v.group_id}' variant {clash} already has the summary "
-                f"'{v.variant_summary}'. Each variant must test a different angle on the "
-                f"concept. Write a different question, or a summary that says how this "
-                f"one differs.")
-
-    if v.kind == "multiple_choice":
-        others = [x for lbl, x in g.variants.items()
-                  if lbl != v.label and x.kind == "multiple_choice"]
-        # Only enforceable while there are at least as many positions as variants.
-        if others and len(others) + 1 <= min(len(x.options) for x in others + [v]):
-            taken = {x.correct_index: lbl for lbl, x in g.variants.items()
-                     if lbl != v.label and x.kind == "multiple_choice"}
-            if v.correct_index in taken:
-                free = unused_correct_positions(v.group_id, exclude_label=v.label)
-                return (f"ERROR: in group '{v.group_id}' variant {taken[v.correct_index]} already "
-                        f"puts the correct answer at index {v.correct_index}. Each variant needs a "
-                        f"different position. Free positions: {free}. Reorder the options so the "
-                        f"correct one lands on a free index.")
-
-    g.variants[v.label] = v
-    _autosave()
-
-    verb = "replaced" if replacing else "stored"
-    ack = f"OK {v.group_id}/{v.label} {verb} ({v.kind})."
-    n = len(g.variants)
-    ack += f" Group {v.group_id}: {n} variant(s)."
-    free = unused_correct_positions(v.group_id)
-    if free:
-        ack += f" Correct-answer positions still free: {free}."
-    return ack
+        verb = "replaced" if replacing else "stored"
+        ack = f"OK {v.group_id}/{v.label} {verb} ({v.kind})."
+        n = len(g.variants)
+        ack += f" Group {v.group_id}: {n} variant(s)."
+        free = self.unused_correct_positions(v.group_id)
+        if free:
+            ack += f" Correct-answer positions still free: {free}."
+        return ack
 
 
-def report() -> str:
-    """Full listing. Called once, not per turn: tool results are re-sent every turn."""
-    if not _bank.groups:
-        return "Bank is empty. Call create_question_group first."
-    lines = [f"Bank '{_bank.run_id}': {len(_bank.groups)} group(s)."]
-    for g in _bank.groups.values():
-        labels = ", ".join(sorted(g.variants)) or "NONE"
-        lines.append(f"  {g.group_id} [{g.question_type}] {g.concept_title[:48]}")
-        lines.append(f"    variants: {labels}")
-        for lbl in sorted(g.variants):
-            v = g.variants[lbl]
-            detail = ""
-            if v.kind == "multiple_choice":
-                detail = f" correct=index {v.correct_index} of {len(v.options)}"
-            elif v.kind == "multiple_answer":
-                detail = f" correct=indices {sorted(v.correct_indices)} of {len(v.options)}"
-            elif v.kind == "true_false":
-                detail = f" answer={v.correct_answer}"
-            lines.append(f"      {lbl}: {v.question_text[:56]}{detail}")
-    problems = validate_final()
-    lines.append("")
-    lines.append("Ready to finalize." if not problems
-                 else "Not ready:\n" + "\n".join(f"  - {p}" for p in problems))
-    return "\n".join(lines)
+    def report(self) -> str:
+        """Full listing. Called once, not per turn: tool results are re-sent every turn."""
+        if not self.bank.groups:
+            return "Bank is empty. Call create_question_group first."
+        lines = [f"Bank '{self.bank.run_id}': {len(self.bank.groups)} group(s)."]
+        for g in self.bank.groups.values():
+            labels = ", ".join(sorted(g.variants)) or "NONE"
+            lines.append(f"  {g.group_id} [{g.question_type}] {g.concept_title[:48]}")
+            lines.append(f"    variants: {labels}")
+            for lbl in sorted(g.variants):
+                v = g.variants[lbl]
+                detail = ""
+                if v.kind == "multiple_choice":
+                    detail = f" correct=index {v.correct_index} of {len(v.options)}"
+                elif v.kind == "multiple_answer":
+                    detail = f" correct=indices {sorted(v.correct_indices)} of {len(v.options)}"
+                elif v.kind == "true_false":
+                    detail = f" answer={v.correct_answer}"
+                lines.append(f"      {lbl}: {v.question_text[:56]}{detail}")
+        problems = self.validate_final()
+        lines.append("")
+        lines.append("Ready to finalize." if not problems
+                     else "Not ready:\n" + "\n".join(f"  - {p}" for p in problems))
+        return "\n".join(lines)
 
 
-def validate_final() -> list[str]:
-    """Backstop. Empty list means the bank is consistent."""
-    problems: list[str] = []
-    if not _bank.groups:
-        problems.append("bank has no groups")
-    for g in _bank.groups.values():
-        if not g.variants:
-            problems.append(f"group '{g.group_id}' has no variants")
-            continue
-        if g.question_type == "multiple_choice":
-            mc = [v for v in g.variants.values() if v.kind == "multiple_choice"]
-            width = min(len(v.options) for v in mc)
-            if len(mc) <= width:
-                used = [v.correct_index for v in mc]
-                if len(set(used)) != len(used):
+    def validate_final(self) -> list[str]:
+        """Backstop. Empty list means the bank is consistent."""
+        problems: list[str] = []
+        if not self.bank.groups:
+            problems.append("bank has no groups")
+        for g in self.bank.groups.values():
+            if not g.variants:
+                problems.append(f"group '{g.group_id}' has no variants")
+                continue
+            if g.question_type == "multiple_choice":
+                mc = [v for v in g.variants.values() if v.kind == "multiple_choice"]
+                width = min(len(v.options) for v in mc)
+                if len(mc) <= width:
+                    used = [v.correct_index for v in mc]
+                    if len(set(used)) != len(used):
+                        problems.append(
+                            f"group '{g.group_id}' reuses a correct-answer position: {sorted(used)}"
+                        )
+            if g.question_type == "true_false":
+                answers = {v.correct_answer for v in g.variants.values() if v.kind == "true_false"}
+                if len(g.variants) > 1 and len(answers) < 2:
                     problems.append(
-                        f"group '{g.group_id}' reuses a correct-answer position: {sorted(used)}"
+                        f"group '{g.group_id}' is all-{answers.pop()}; needs at least one of each"
                     )
-        if g.question_type == "true_false":
-            answers = {v.correct_answer for v in g.variants.values() if v.kind == "true_false"}
-            if len(g.variants) > 1 and len(answers) < 2:
-                problems.append(
-                    f"group '{g.group_id}' is all-{answers.pop()}; needs at least one of each"
-                )
-    return problems
+        return problems
 
 
-def pick_quiz(seed: int, pick_count: int = 1) -> dict:
-    """Choose variants deterministically. Recorded in quiz.json so the pick reproduces."""
-    rng = random.Random(seed)
-    picks = {}
-    for gid in sorted(_bank.groups):
-        labels = sorted(_bank.groups[gid].variants)
-        if labels:
-            picks[gid] = rng.sample(labels, min(pick_count, len(labels)))
-    return {
-        "quiz_id": f"quiz-{_bank.run_id}",
-        "bank_id": _bank.run_id,
-        "title": _bank.title,
-        "seed": seed,
-        "picks": picks,
-        "groups": [{"group_id": gid, "pick_count": pick_count, "points": 1}
-                   for gid in sorted(_bank.groups) if _bank.groups[gid].variants],
-    }
+    def pick_quiz(self, seed: int, pick_count: int = 1) -> dict:
+        """Choose variants deterministically. Recorded in quiz.json so the pick reproduces."""
+        rng = random.Random(seed)
+        picks = {}
+        for gid in sorted(self.bank.groups):
+            labels = sorted(self.bank.groups[gid].variants)
+            if labels:
+                picks[gid] = rng.sample(labels, min(pick_count, len(labels)))
+        return {
+            "quiz_id": f"quiz-{self.bank.run_id}",
+            "bank_id": self.bank.run_id,
+            "title": self.bank.title,
+            "seed": seed,
+            "picks": picks,
+            "groups": [{"group_id": gid, "pick_count": pick_count, "points": 1}
+                       for gid in sorted(self.bank.groups) if self.bank.groups[gid].variants],
+        }
 
 
-def finalize(seed: int | None = None) -> str:
-    """Validate, write artefacts, and only then set the flag."""
-    problems = validate_final()
-    if problems:
-        return ("ERROR: not finalized.\n" + "\n".join(f"  - {p}" for p in problems)
-                + "\nFix these with more add_* calls, then call finalize_bank again.")
+    def finalize(self, seed: int | None = None) -> str:
+        """Validate, write artefacts, and only then set the flag."""
+        problems = self.validate_final()
+        if problems:
+            return ("ERROR: not finalized.\n" + "\n".join(f"  - {p}" for p in problems)
+                    + "\nFix these with more add_* calls, then call finalize_bank again.")
 
-    from coursekit.emit import gift  # local import: bank.py stays free of serialisation concerns
+        from coursekit.emit import gift  # local import: bank.py stays free of serialisation concerns
 
-    if seed is None:
-        seed = random.Random(_bank.run_id).randint(1000, 9999)
-    quiz = pick_quiz(seed)
+        if seed is None:
+            seed = random.Random(self.bank.run_id).randint(1000, 9999)
+        quiz = self.pick_quiz(seed)
 
-    _bank.finalized = True
-    _autosave()
+        self.bank.finalized = True
+        self._autosave()
 
-    if _out_dir is None:
-        return "OK bank valid (no output directory set, nothing written)."
+        if self.out_dir is None:
+            return "OK bank valid (no output directory set, nothing written)."
 
-    (_out_dir / "quiz.json").write_text(json.dumps(quiz, indent=2), encoding="utf-8")
-    (_out_dir / "bank.gift").write_text(gift.emit_bank(_bank), encoding="utf-8")
-    (_out_dir / f"quiz_{seed}.gift").write_text(gift.emit_quiz(quiz, _bank), encoding="utf-8")
+        (self.out_dir / "quiz.json").write_text(json.dumps(quiz, indent=2), encoding="utf-8")
+        (self.out_dir / "bank.gift").write_text(gift.emit_bank(self.bank), encoding="utf-8")
+        (self.out_dir / f"quiz_{seed}.gift").write_text(gift.emit_quiz(quiz, self.bank), encoding="utf-8")
 
-    n = sum(len(g.variants) for g in _bank.groups.values())
-    return (f"OK finalized: {len(_bank.groups)} groups, {n} variants -> "
-            f"bank.json, quiz.json, bank.gift, quiz_{seed}.gift. Stop now.")
+        n = sum(len(g.variants) for g in self.bank.groups.values())
+        return (f"OK finalized: {len(self.bank.groups)} groups, {n} variants -> "
+                f"bank.json, quiz.json, bank.gift, quiz_{seed}.gift. Stop now.")
 
 
 def build_variant(kind: str, **kwargs) -> Variant:
@@ -575,6 +557,5 @@ def build_variant(kind: str, **kwargs) -> Variant:
 __all__ = [
     "Bank", "Group", "Pair", "Variant", "ValidationError",
     "MCVariant", "MAVariant", "TFVariant", "SAVariant", "NumVariant", "MatchVariant",
-    "init", "load", "reset", "get", "is_finalized", "create_group", "put_variant", "report",
-    "validate_final", "pick_quiz", "finalize", "build_variant", "unused_correct_positions",
+    "BankDraft", "build_variant",
 ]

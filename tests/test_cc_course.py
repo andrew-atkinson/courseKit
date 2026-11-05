@@ -30,17 +30,16 @@ def _write_page(root, week, title, slug):
 
 
 def _write_quiz(root, week, title):
-    B.reset()
-    B.init(f"test-{week}", None, title=title, source=f"{week}.md")
-    B.create_group("c1", "Loops", "multiple_choice")
+    d = B.BankDraft.new(f"test-{week}", None, title=title, source=f"{week}.md")
+    d.create_group("c1", "Loops", "multiple_choice")
     for i, lbl in enumerate("ABCD"):
-        B.put_variant(B.MCVariant(
+        d.put_variant(B.MCVariant(
             group_id="c1", label=lbl, variant_summary=f"angle {lbl}",
             question_text=f"Q{lbl}: what is `x < {i}`?", text_format="markdown",
             options=["one", "two", "three", "four"], correct_index=i))
-    d = root / "quizzes" / week
-    d.mkdir(parents=True)
-    (d / "bank.json").write_text(B.get().model_dump_json(), encoding="utf-8")
+    qdir = root / "quizzes" / week
+    qdir.mkdir(parents=True)
+    (qdir / "bank.json").write_text(d.bank.model_dump_json(), encoding="utf-8")
 
 
 @pytest.fixture

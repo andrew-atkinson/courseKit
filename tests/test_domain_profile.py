@@ -104,13 +104,12 @@ class _RecordingCritic:
 
 
 def _one_group_bank():
-    bankmod.reset()
-    bankmod.init("run", None)
-    bankmod.create_group("c1", "Loops", "multiple_choice")
-    bankmod.put_variant(bankmod.MCVariant(
-        group_id="c1", label="A", variant_summary="angle", question_text="What does the loop do here?",
-        options=["a", "b", "c", "d"], correct_index=0))
-    return bankmod.get()
+    d = bankmod.BankDraft.new("run", None)
+    d.create_group("c1", "Loops", "multiple_choice")
+    d.put_variant(bankmod.MCVariant(
+  group_id="c1", label="A", variant_summary="angle", question_text="What does the loop do here?",
+  options=["a", "b", "c", "d"], correct_index=0))
+    return d.bank
 
 
 def test_critic_domain_preface_is_review_framed():

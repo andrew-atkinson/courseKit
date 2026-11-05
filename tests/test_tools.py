@@ -3,15 +3,24 @@ import json
 import pytest
 from coursekit.generate.quiz import bank as bankmod
 from coursekit.generate.quiz import tools
-from coursekit.generate.quiz.tools import _SCHEMAS, TOOL_REGISTRY, _dispatch_one
+from coursekit.generate.dispatch import dispatch_one
+from coursekit.generate.quiz.tools import _SCHEMAS
 
 
-@pytest.fixture(autouse=True)
-def clean():
-    bankmod.reset()
-    tools.checklist.clear()
-    tools.completed.clear()
-    tools.set_call_log(None)
+def _session(call_log=None):
+    return tools.QuizTools(bankmod.BankDraft.new("test"), call_log=call_log)
+
+
+TOOL_REGISTRY = _session().registry
+
+
+@pytest.fixture
+def s():
+    return _session()
+
+
+def _dispatch_one(s, name, raw_args):
+    return dispatch_one(s.registry, name, raw_args)
 
 
 # ------------------------------------------------- schema / signature drift
@@ -49,42 +58,42 @@ def test_every_tool_returns_a_string():
 # ------------------------------------------------------------- dispatch
 
 class TestDispatch:
-    def test_unknown_tool_names_the_alternatives(self):
-        out = _dispatch_one("add_essay_variant", "{}")
+    def test_unknown_tool_names_the_alternatives(self, s):
+        out = _dispatch_one(s, "add_essay_variant", "{}")
         assert out.startswith("ERROR: no tool named")
         assert "add_multiple_choice_variant" in out
 
-    def test_namespace_bleed_is_closed(self):
+    def test_namespace_bleed_is_closed(self, s):
         # globals() would have resolved these to real module-level objects.
         for name in ["json", "os", "show", "tools", "bank", "Console", "checklist"]:
-            assert _dispatch_one(name, "{}").startswith("ERROR: no tool named")
+            assert _dispatch_one(s, name, "{}").startswith("ERROR: no tool named")
 
-    def test_empty_arguments_string_does_not_raise(self):
+    def test_empty_arguments_string_does_not_raise(self, s):
         # Zero-arg tools commonly arrive as "" and json.loads("") raises.
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        assert not _dispatch_one("get_bank_report", "").startswith("ERROR")
-        assert not _dispatch_one("get_bank_report", None).startswith("ERROR")
-        assert not _dispatch_one("get_bank_report", "   ").startswith("ERROR")
+        s.draft.create_group("c1", "Loops", "multiple_choice")
+        assert not _dispatch_one(s, "get_bank_report", "").startswith("ERROR")
+        assert not _dispatch_one(s, "get_bank_report", None).startswith("ERROR")
+        assert not _dispatch_one(s, "get_bank_report", "   ").startswith("ERROR")
 
-    def test_malformed_json_is_reported_not_raised(self):
-        out = _dispatch_one("create_question_group", '{"group_id": "c1",,}')
+    def test_malformed_json_is_reported_not_raised(self, s):
+        out = _dispatch_one(s, "create_question_group", '{"group_id": "c1",,}')
         assert out.startswith("ERROR: arguments")
         assert "valid JSON" in out
 
-    def test_non_object_arguments(self):
-        assert _dispatch_one("get_bank_report", "[1,2]").startswith("ERROR: arguments")
+    def test_non_object_arguments(self, s):
+        assert _dispatch_one(s, "get_bank_report", "[1,2]").startswith("ERROR: arguments")
 
-    def test_missing_required_argument(self):
-        out = _dispatch_one("create_question_group", '{"group_id": "c1"}')
+    def test_missing_required_argument(self, s):
+        out = _dispatch_one(s, "create_question_group", '{"group_id": "c1"}')
         assert out.startswith("ERROR: wrong arguments")
 
-    def test_unexpected_argument(self):
-        out = _dispatch_one("get_bank_report", '{"nope": 1}')
+    def test_unexpected_argument(self, s):
+        out = _dispatch_one(s, "get_bank_report", '{"nope": 1}')
         assert out.startswith("ERROR: wrong arguments")
 
-    def test_wrong_type_is_reported_in_plain_language(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        out = _dispatch_one("add_multiple_choice_variant", json.dumps({
+    def test_wrong_type_is_reported_in_plain_language(self, s):
+        s.draft.create_group("c1", "Loops", "multiple_choice")
+        out = _dispatch_one(s, "add_multiple_choice_variant", json.dumps({
             "group_id": "c1", "variant_label": "A",
             "question_text": "Which one is correct here?",
             "variant_summary": "Basic recall",
@@ -94,21 +103,21 @@ class TestDispatch:
         assert "correct_index" in out
         assert "[type=" not in out  # pydantic jargon must not reach the model
 
-    def test_a_rejected_call_leaves_the_bank_untouched(self):
-        bankmod.create_group("c1", "Loops", "multiple_choice")
-        _dispatch_one("add_multiple_choice_variant", json.dumps({
+    def test_a_rejected_call_leaves_the_bank_untouched(self, s):
+        s.draft.create_group("c1", "Loops", "multiple_choice")
+        _dispatch_one(s, "add_multiple_choice_variant", json.dumps({
             "group_id": "c1", "variant_label": "A",
             "question_text": "Which one is correct here?",
             "variant_summary": "Basic recall",
             "options": ["a", "b", "c", "d"], "correct_index": 99,
         }))
-        assert bankmod.get().groups["c1"].variants == {}
+        assert s.draft.bank.groups["c1"].variants == {}
 
 
 # --------------------------------------------------------- the happy path
 
-def _add(label, correct):
-    return _dispatch_one("add_multiple_choice_variant", json.dumps({
+def _add(s, label, correct):
+    return _dispatch_one(s, "add_multiple_choice_variant", json.dumps({
         "group_id": "c1", "variant_label": label,
         "question_text": f"Question {label} about for loops?",
         "variant_summary": f"Angle {label}",
@@ -118,36 +127,36 @@ def _add(label, correct):
     }))
 
 
-def test_full_group_through_the_dispatcher():
-    assert not _dispatch_one("create_question_group", json.dumps({
+def test_full_group_through_the_dispatcher(s):
+    assert not _dispatch_one(s, "create_question_group", json.dumps({
         "group_id": "c1", "concept_title": "Anatomy of a for loop",
         "question_type": "multiple_choice"})).startswith("ERROR")
     for i, lbl in enumerate("ABCD"):
-        assert not _add(lbl, i).startswith("ERROR")
-    assert bankmod.validate_final() == []
+        assert not _add(s, lbl, i).startswith("ERROR")
+    assert s.draft.validate_final() == []
 
 
-def test_position_collision_steers_the_model():
-    _dispatch_one("create_question_group", json.dumps({
+def test_position_collision_steers_the_model(s):
+    _dispatch_one(s, "create_question_group", json.dumps({
         "group_id": "c1", "concept_title": "Loops", "question_type": "multiple_choice"}))
-    _add("A", 0)
-    out = _add("B", 0)
+    _add(s, "A", 0)
+    out = _add(s, "B", 0)
     assert "already" in out and "Free positions: [1, 2, 3]" in out
 
 
-def test_revision_replaces_through_the_dispatcher():
-    _dispatch_one("create_question_group", json.dumps({
+def test_revision_replaces_through_the_dispatcher(s):
+    _dispatch_one(s, "create_question_group", json.dumps({
         "group_id": "c1", "concept_title": "Loops", "question_type": "multiple_choice"}))
-    _add("A", 0)
-    out = _add("A", 0)
+    _add(s, "A", 0)
+    out = _add(s, "A", 0)
     assert "replaced" in out
-    assert list(bankmod.get().groups["c1"].variants) == ["A"]
+    assert list(s.draft.bank.groups["c1"].variants) == ["A"]
 
 
-def test_matching_pairs_arrive_as_dicts():
-    _dispatch_one("create_question_group", json.dumps({
+def test_matching_pairs_arrive_as_dicts(s):
+    _dispatch_one(s, "create_question_group", json.dumps({
         "group_id": "c5", "concept_title": "Terms", "question_type": "matching"}))
-    out = _dispatch_one("add_matching_variant", json.dumps({
+    out = _dispatch_one(s, "add_matching_variant", json.dumps({
         "group_id": "c5", "variant_label": "A",
         "question_text": "Match each function to what it does.",
         "variant_summary": "Function purposes",
@@ -156,23 +165,23 @@ def test_matching_pairs_arrive_as_dicts():
                   {"left": "rect()", "right": "draws a rectangle"}],
     }))
     assert not out.startswith("ERROR")
-    assert len(bankmod.get().groups["c5"].variants["A"].pairs) == 3
+    assert len(s.draft.bank.groups["c5"].variants["A"].pairs) == 3
 
 
 # ------------------------------------------------------- checklist hygiene
 
-def test_checklist_report_to_the_model_has_no_rich_markup():
+def test_checklist_report_to_the_model_has_no_rich_markup(s):
     # It is re-sent every turn; markup here teaches the model to emit markup.
-    create = _dispatch_one("create_checklist", json.dumps({"descriptions": ["one", "two"]}))
+    create = _dispatch_one(s, "create_checklist", json.dumps({"descriptions": ["one", "two"]}))
     assert "[green]" not in create and "[strike]" not in create
-    marked = _dispatch_one("mark_complete", json.dumps({"index": 1, "completion_notes": "done"}))
+    marked = _dispatch_one(s, "mark_complete", json.dumps({"index": 1, "completion_notes": "done"}))
     assert "[green]" not in marked and "[strike]" not in marked
     assert "#1 [x] one" in marked
 
 
-def test_mark_complete_out_of_range_does_not_raise():
-    _dispatch_one("create_checklist", json.dumps({"descriptions": ["one"]}))
-    assert _dispatch_one("mark_complete",
+def test_mark_complete_out_of_range_does_not_raise(s):
+    _dispatch_one(s, "create_checklist", json.dumps({"descriptions": ["one"]}))
+    assert _dispatch_one(s, "mark_complete",
                          json.dumps({"index": 9, "completion_notes": "x"})).startswith("ERROR")
 
 
@@ -180,11 +189,11 @@ def test_mark_complete_out_of_range_does_not_raise():
 
 def test_replay_reconstructs_a_run_with_no_model(tmp_path):
     log = tmp_path / "calls.jsonl"
-    tools.set_call_log(log)
+    s = _session(log)
 
     from coursekit.providers import ToolCall
 
-    handled = tools.run_tool_calls([
+    handled = s.run_tool_calls([
         ToolCall(id="call_1", name="create_question_group", arguments=json.dumps({
             "group_id": "c1", "concept_title": "Loops", "question_type": "multiple_choice"})),
         ToolCall(id="call_2", name="add_multiple_choice_variant", arguments=json.dumps({
@@ -197,24 +206,54 @@ def test_replay_reconstructs_a_run_with_no_model(tmp_path):
     assert [call_id for call_id, _ in handled] == ["call_1", "call_2"]
     assert all(not content.startswith("ERROR") for _, content in handled)
 
-    bankmod.reset()
-    tools.set_call_log(None)
-    results = tools.replay(log)
+    s = _session()
+    results = s.replay(log)
     assert len(results) == 2
-    assert bankmod.get().groups["c1"].variants["A"].correct_index == 0
+    assert s.draft.bank.groups["c1"].variants["A"].correct_index == 0
 
 
-def test_open_response_variant_records_with_its_criteria():
+def test_open_response_variant_records_with_its_criteria(s):
     # ASMT-3: the model records the EU transfer task through the dispatcher like any other variant.
-    _dispatch_one("create_question_group", json.dumps(
+    _dispatch_one(s, "create_question_group", json.dumps(
         {"group_id": "eu", "concept_title": "Enduring understanding",
          "question_type": "open_response"}))
-    out = _dispatch_one("add_open_response_variant", json.dumps(
+    out = _dispatch_one(s, "add_open_response_variant", json.dumps(
         {"group_id": "eu", "variant_label": "A",
          "question_text": "Apply the idea to a new situation and justify your design.",
          "variant_summary": "EU transfer task",
          "rubric_criteria": ["applies it correctly", "justifies the choice"]}))
     assert not out.startswith("ERROR")
-    v = bankmod.get().groups["eu"].variants["A"]
+    v = s.draft.bank.groups["eu"].variants["A"]
     assert v.kind == "open_response"
     assert v.rubric_criteria == ["applies it correctly", "justifies the choice"]
+
+
+# ---- two banks at once: each session writes only to its own draft and checklist (CORE-3) ----
+
+def test_two_banks_built_at_once_do_not_touch_each_other(tmp_path):
+    from coursekit.providers import ToolCall
+
+    def call(name, **args):
+        return ToolCall(id="c", name=name, arguments=json.dumps(args))
+
+    def variant(group, label, correct):
+        return call("add_multiple_choice_variant", group_id=group, variant_label=label,
+                    question_text=f"Question {label} about {group}?", variant_summary=f"Angle {label}",
+                    options=["a", "b", "c", "d"], correct_index=correct)
+
+    a = tools.QuizTools(bankmod.BankDraft.new("a", tmp_path / "a"), call_log=tmp_path / "a" / "calls.jsonl")
+    b = tools.QuizTools(bankmod.BankDraft.new("b", tmp_path / "b"), call_log=tmp_path / "b" / "calls.jsonl")
+    a.run_tool_calls([call("create_checklist", descriptions=["only a"]),
+                      call("create_question_group", group_id="ga", concept_title="A", question_type="multiple_choice")])
+    b.run_tool_calls([call("create_question_group", group_id="gb", concept_title="B", question_type="multiple_choice")])
+    a.run_tool_calls([variant("ga", "A", 0), call("finalize_bank")])
+    b.run_tool_calls([variant("gb", "A", 0)])
+    assert "ERROR" in b.run_tool_calls([variant("ga", "B", 1)])[0][1]    # a's group is not b's to write
+
+    assert list(a.draft.bank.groups) == ["ga"] and a.draft.is_finalized()
+    assert list(b.draft.bank.groups) == ["gb"] and not b.draft.is_finalized()
+    assert a.checklist == ["only a"] and b.checklist == []
+    assert json.loads((tmp_path / "a" / "bank.json").read_text())["run_id"] == "a"
+    assert not (tmp_path / "b" / "bank.json").exists()
+    assert len((tmp_path / "a" / "calls.jsonl").read_text().splitlines()) == 4
+    assert len((tmp_path / "b" / "calls.jsonl").read_text().splitlines()) == 3
