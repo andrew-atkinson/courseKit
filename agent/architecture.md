@@ -240,7 +240,6 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
 - **The transcriber still carries its own copies** of provider, prompts, RAM check, and project-root logic (the diverged rows above). `courseconfig` is the surface it *can* adopt, but the adoption is its own increment in that repo — this side only built the target.
 - **Interactive prompt authoring** (`_author_new_prompt` / `_edit_existing_prompt`) lives only in `vt_prompts.py`.
   Persisting a choice back to config is no longer deferred on this side: `settings.py` writes coursekit's own files (never `context.yaml`).
-- **An unreadable `domain.md` or `voice.md` still counts as absent** (`CORE-1.6`), the one case left of a broken input being read as a missing one.
 - **A pass's tool subset is only a suggestion.**
   The fix, EU, decompose, and glossary passes offer the model a subset of the tools, but dispatch runs any of them; closing that changes behaviour, so it is its own item (`CORE-3.1`).
 - **Three page critics read only each unit's teaching page.**

@@ -99,8 +99,8 @@ Rewriting a file drops any comments you added by hand, so keep notes somewhere e
 
 A settings file that doesn't exist just means "use the defaults".
 A file that exists but can't be read, or holds a value coursekit can't use, stops the run with a message naming the file, the key, the value, and what's allowed — it is never quietly ignored.
-The one exception for now: an unreadable `domain.md` or `voice.md` is treated as if it weren't there, and `check` doesn't look at them.
-To check every file at once after editing (tool settings, `style.yaml`, page supplements, the structure overlay, concept maps):
+That includes `domain.md` and `voice.md`: a missing one just means no profile, but one that can't be read as UTF-8 text stops the run with a message naming it.
+To check every file at once after editing (tool settings, `style.yaml`, page supplements, the structure overlay, concept maps, and the domain and voice profiles):
 
 ```bash
 uv run coursekit check "/path/to/course"

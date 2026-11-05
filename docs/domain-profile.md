@@ -58,6 +58,7 @@ No profile means no steer: the neutral brief still generates, just without a dis
 
 That's it.
 There's no schema and nothing to enable — if the file exists, every generator uses it; if it doesn't, nothing changes.
+A file that exists but can't be read as UTF-8 text stops the run with a message naming it, rather than quietly running without the profile; `coursekit check` finds that ahead of time.
 
 ## What it does not do
 

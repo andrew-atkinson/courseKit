@@ -199,3 +199,43 @@ def test_an_unreadable_file_in_a_deep_proposal_is_recorded(tmp_path, monkeypatch
     with _captured() as report:
         assert propose_model._peek(tmp_path / "Broken.pdf") == ""
     assert [w.code for w in report.warnings] == ["propose.peek_failed"]
+
+
+# ------------------------------------------------------------------ G. unreadable profiles (CORE-1.6)
+@pytest.mark.parametrize("name", ["domain.md", "voice.md"])
+def test_an_unreadable_profile_is_an_error_naming_the_file_not_no_profile(tmp_path, name):
+    from coursekit import courseconfig
+    u = _unit(tmp_path)
+    profile = name.removesuffix(".md")
+    assert getattr(courseconfig.load(u.transcript_path), profile) == ""     # absent: still no profile
+    path = u.course_root / ".vtconfig" / name
+    path.write_bytes(b"\xff\xfe not text")
+    with pytest.raises(CoursekitError) as e:
+        getattr(courseconfig.load(u.transcript_path), profile)
+    assert e.value.code == "config.unreadable" and e.value.details["path"] == str(path)
+    assert "UTF-8" in str(e.value)
+
+
+def test_a_run_stops_on_an_unreadable_profile_before_calling_the_model(tmp_path):
+    from coursekit.generate.quiz.generator import QuizGenerator
+    from coursekit.pipeline import run_unit
+    u = _unit(tmp_path)
+    (u.course_root / ".vtconfig" / "domain.md").write_bytes(b"\xff not text")
+
+    class _NeverCalled:
+        def chat_with_tools(self, **kw):
+            raise AssertionError("the model was called")
+
+    with pytest.raises(CoursekitError, match="domain.md"):
+        run_unit(u, _NeverCalled(), "m", QuizGenerator())
+
+
+def test_check_reports_an_unreadable_profile(tmp_path):
+    from coursekit import schemas
+    vt = _unit(tmp_path).course_root / ".vtconfig"
+    (vt / "domain.md").write_text("This course teaches p5.js.", encoding="utf-8")
+    (vt / "voice.md").write_bytes(b"\xff not text")
+    checked, errors = schemas.check(vt.parent)
+    assert {vt / "domain.md", vt / "voice.md"} <= set(checked)
+    assert [e.details["path"] for e in errors] == [str(vt / "voice.md")]
+

@@ -182,6 +182,6 @@ A `coursekit/settings.py` module owns every write to a coursekit-owned file:
 7. **Unreadable vs absent concept map** — so `decompose` stops advising `analyze` for a corrupt file. ✅ done in CORE-1.5.
 8. **Dead code** — the pyyaml guards and the `artifacts_subdir` default. ✅ done in CORE-1.5 (the `artifacts_subdir` default turned out not to be dead — see its row).
 
-9. **Unreadable `domain.md` / `voice.md`** — ⬜ open, added 2026-11-04 as `CORE-1.6`: in the feature table above from the start, but missed by this list. Rare (encoding errors), and it silently removes the domain guard.
+9. **Unreadable `domain.md` / `voice.md`** — ✅ done in CORE-1.6 (2026-11-05): in the feature table above from the start, but missed by this list until 2026-11-04. Absent is still no profile; unreadable is an error naming the file, and `coursekit check` reports it.
 
 Each fix gets the feature-on test: switched on, it produces its artifact or fails loudly — never a no-op.

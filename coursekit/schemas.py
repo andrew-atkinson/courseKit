@@ -299,8 +299,10 @@ def load(path, model: type[BaseModel]) -> dict:
 
 # --------------------------------------------------------------- checking a whole course
 def check(root) -> tuple[list[Path], list[CoursekitError]]:
-    """Validate every coursekit settings file under `<root>/.vtconfig/`. Returns (files checked,
-    errors) — every file is checked, so one bad file doesn't hide the next."""
+    """Validate every coursekit settings file under `<root>/.vtconfig/`, and check the domain and voice
+    profiles read as text. Returns (files checked, errors) — every file is checked, so one bad file
+    doesn't hide the next."""
+    from coursekit.courseconfig import read_profile
     from coursekit.generate.page.concept_map import ConceptMap
 
     vt = Path(root) / ".vtconfig"
@@ -317,4 +319,10 @@ def check(root) -> tuple[list[Path], list[CoursekitError]]:
                 validate(path, data, model)
         except CoursekitError as e:
             errors.append(e)
-    return [p for p, _ in targets], errors
+    profiles = [p for p in (vt / "domain.md", vt / "voice.md") if p.exists()]
+    for path in profiles:
+        try:
+            read_profile(path)
+        except CoursekitError as e:
+            errors.append(e)
+    return [p for p, _ in targets] + profiles, errors

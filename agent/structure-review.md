@@ -5,7 +5,7 @@ Several recent bugs were silent (a feature switched on that quietly did nothing)
 This review asks why, starting from what coursekit is trying to become rather than from the bugs.
 It is a proposal: [architecture.md](architecture.md) stays the description of what *is*, and is updated as each item below lands.
 The roadmap carries the work as the `CORE` area.
-Status 2026-11-05: `CORE-2` and `CORE-3` are complete and `CORE-1` has one small item left, so §3 and §4 describe the starting point; the [roadmap](roadmap.md) has where each item stands.
+Status 2026-11-05: `CORE-1`, `CORE-2`, and `CORE-3` are complete, so §3 and §4 describe the starting point; the [roadmap](roadmap.md) has where each item stands.
 
 ## 1. What coursekit is trying to be
 

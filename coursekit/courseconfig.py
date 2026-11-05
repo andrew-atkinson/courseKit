@@ -93,17 +93,9 @@ class CourseConfig:
         things: fixes the knowledge domain, tells the model what a page should foreground (code,
         images, technique, cases, plain explanation…) so the shipped prompts stay discipline-neutral,
         and lets the generator correct a source that has drifted (a transcript that slips from p5.js
-        into Processing). Never raises.
+        into Processing). Absent means no profile; a file that can't be read raises (see read_profile).
         """
-        if self.root is None:
-            return ""
-        path = self.root / VTCONFIG_DIR_NAME / "domain.md"
-        if not path.is_file():
-            return ""
-        try:
-            return path.read_text(encoding="utf-8").strip()
-        except Exception:
-            return ""
+        return read_profile(self.root / VTCONFIG_DIR_NAME / "domain.md") if self.root is not None else ""
 
     @property
     def voice(self) -> str:
@@ -113,17 +105,28 @@ class CourseConfig:
         stance, hedging, rhythm, signature moves — before cleanup sands the spoken voice). Prepended
         to the PROSE generators so output sounds like the instructor, not a textbook. It governs tone
         only — never correctness, structure, or domain (see `voice_preface`) — and is NOT given to the
-        critics, since voice is not a correctness axis. Never raises.
+        critics, since voice is not a correctness axis. Absent means no profile; a file that can't be read
+        raises (see read_profile).
         """
-        if self.root is None:
-            return ""
-        path = self.root / VTCONFIG_DIR_NAME / "voice.md"
-        if not path.is_file():
-            return ""
-        try:
-            return path.read_text(encoding="utf-8").strip()
-        except Exception:
-            return ""
+        return read_profile(self.root / VTCONFIG_DIR_NAME / "voice.md") if self.root is not None else ""
+
+
+def read_profile(path: Path) -> str:
+    """A course profile's text (`domain.md`, `voice.md`), or '' when the course has none. One that exists
+    but can't be read is an error naming the file (CORE-1.6): read as '', it used to drop the domain
+    guard or the voice from every generator without a word."""
+    from coursekit.outcomes import CoursekitError
+    if not path.exists():
+        return ""
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except UnicodeDecodeError as e:
+        raise CoursekitError(f"{path} is not UTF-8 text (byte {e.start} can't be decoded) — save it as UTF-8, "
+                             f"or remove it to run without it.", code="config.unreadable",
+                             details={"path": str(path)}) from e
+    except OSError as e:
+        raise CoursekitError(f"{path} could not be read: {e.strerror or e}", code="config.unreadable",
+                             details={"path": str(path)}) from e
 
 
 # Prepended to a generator's system prompt when the course declares a domain. Framed as authoritative
