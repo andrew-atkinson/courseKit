@@ -124,15 +124,49 @@ def test_quiz_introduction_gives_a_reason_not_just_grading():
     assert "Auto-generated" not in desc                       # the old bureaucratic opener is gone
     assert "another look" in desc                             # a reason: self-check, spot what to revisit
     assert "rewards understanding" in desc                    # per-student variants framed as a benefit
-    assert "4 concept" in desc and "4 point" in desc          # still names scope + grading
-    # XML-safe: a hostile source survives escaping into a well-formed meta document.
-    d = bankmod.BankDraft.new("run2", None, title="t", source='A & B <x> "q"')
+    assert "key ideas: 4 questions." in desc                  # names the scope
+    assert "week-3" not in desc                               # SHIP-10: never a file or slug the student can't place
+    assert "Grading:&lt;/strong&gt; 4 points, marked automatically. One attempt." in desc
+    # XML-safe: a hostile title survives escaping into a well-formed meta document.
+    d = bankmod.BankDraft.new("run2", None, title='A & B <x> "q"', source="s.md")
     d.create_group("c1", "C", "multiple_choice")
     d.put_variant(bankmod.MCVariant(group_id="c1", label="A", variant_summary="c1 a",
                                     question_text="Q c1A: what is x?", options=["a", "b"],
                                     correct_index=0))
     b2, quiz2 = d.bank, d.pick_quiz(seed=1)
     ET.fromstring(qti.emit_assessment_meta(b2, quiz2))        # raises if the escaped description broke it
+
+
+def _with_open_question(b):
+    d = bankmod.BankDraft.adopt(b)
+    d.create_group("enduring_understanding", "Enduring Understanding", "open_response")
+    d.put_variant(bankmod.OpenResponseVariant(group_id="enduring_understanding", label="A",
+                                              variant_summary="transfer", question_text="Build it.",
+                                              rubric_criteria=["applies it"]))
+    return d.bank, d.pick_quiz(seed=1)
+
+
+def _html_of(desc):
+    return ET.fromstring(f"<d>{desc}</d>").text
+
+
+def test_an_open_question_is_named_and_its_points_are_the_instructors():
+    # the real CC101 week 7: seven auto-marked questions and one open response read as "8 concepts,
+    # 1 point per question" — as if all eight were marked by Canvas
+    b, quiz = _with_open_question(_mc_bank(n_groups=3)[0])
+    html_level = _html_of(qti._description(b, quiz, qti._points_possible(quiz)))
+    assert "3 questions, then one open question to answer in writing" in html_level
+    assert html_level.endswith("<p><strong>Grading:</strong> 3 points marked automatically; the open "
+                               "question (1 point) is marked by your instructor. One attempt.</p>")
+
+
+def test_the_banks_own_intro_replaces_the_default_and_the_grading_line_stays():
+    b, quiz = _mc_bank(n_groups=2)
+    b.intro = "So this week we've kind of moved to `for` loops.\n\nA low-stakes check: x < y?"
+    html_level = _html_of(qti._description(b, quiz, 2.0))
+    assert html_level == ("<p>So this week we've kind of moved to <code>for</code> loops.</p>"
+                          "<p>A low-stakes check: x &lt; y?</p>"
+                          "<p><strong>Grading:</strong> 2 points, marked automatically. One attempt.</p>")
 
 
 # ---------------------------------------------------- zip integrity

@@ -54,6 +54,8 @@ def test_a_missing_map_is_none_but_a_broken_one_is_an_error(tmp_path):
 
 # ------------------------------------------------------------------ B. the EU path
 class _Cfg:
+    domain = voice = ""
+
     def __init__(self, **values):
         self.values = values
 
@@ -64,13 +66,14 @@ class _Cfg:
 def _postprocess(u, monkeypatch, *, made=True):
     from types import SimpleNamespace
 
-    from coursekit.generate.quiz import eu
+    from coursekit.generate.quiz import eu, intro
     from coursekit.generate.quiz.generator import QuizGenerator
     calls = []
     gen = QuizGenerator()
     gen.tools = None
     gen.draft = SimpleNamespace(is_finalized=lambda: True, finalize=lambda: calls.append("finalize"))
     monkeypatch.setattr(eu, "generate_eu_question", lambda *a, **k: calls.append("eu") or made)
+    monkeypatch.setattr(intro, "write_intro", lambda *a, **k: False)   # the EU path alone; the intro has its own tests
     with _captured() as report:
         gen.postprocess(u, None, "m", _Cfg(eu_question=True), "material")
     return calls, report

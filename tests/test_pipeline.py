@@ -772,7 +772,7 @@ def test_the_eu_pass_joins_the_runs_call_log(tmp_path):
     gen = QuizGenerator()
     gen.reset(unit, unit.output_dir)
     gen.draft.bank.finalized = True
-    gen.postprocess(unit, FakeClient(script=EU_SCRIPT), "m", SimpleNamespace(value=lambda key: key == "eu_question"), "material")
+    gen.postprocess(unit, FakeClient(script=EU_SCRIPT), "m", SimpleNamespace(value=lambda key: key == "eu_question", domain="", voice=""), "material")
 
     assert "enduring_understanding" in gen.draft.bank.groups
     logged = [json.loads(line)["name"] for line in (unit.output_dir / "calls.jsonl").read_text().splitlines()]

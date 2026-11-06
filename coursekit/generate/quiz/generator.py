@@ -67,6 +67,20 @@ class QuizGenerator:
         )
 
     def postprocess(self, unit, provider, model, cfg, transcript) -> None:
+        """After the quiz is finished: its enduring-understanding question when switched on, then the
+        student-facing introduction (SHIP-10), written last so it knows whether there is an open
+        question. Each re-finalizes on success, so it lands in bank.json/quiz.json/gift."""
+        self._add_eu_question(unit, provider, model, cfg, transcript)
+        if not self.draft.is_finalized():
+            return
+        from coursekit.generate.page.concept_map import load_for_unit
+        from coursekit.generate.quiz import intro
+        cm = load_for_unit(unit)
+        if intro.write_intro(self.draft, provider, model, cm.enduring_understanding if cm is not None else "",
+                             domain=cfg.domain, voice=cfg.voice, project_root=unit.course_root):
+            self.draft.finalize()
+
+    def _add_eu_question(self, unit, provider, model, cfg, transcript) -> None:
         """ASMT-3 (opt-in `eu_question: true`): add the enduring-understanding transfer task through
         the DETERMINISTIC EU pass — the program fixes the type to open_response, the model writes only
         the content — then re-finalize so it lands in bank.json/quiz.json/gift. Only runs on a bank the

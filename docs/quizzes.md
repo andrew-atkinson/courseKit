@@ -23,6 +23,21 @@ uv run python -m coursekit.generate.quiz.eu "/path/to/course" --week 3
 ```
 
 It adds the question to that week's existing `bank.json` in place (or writes an EU-only bank if none exists), and re-running replaces the question rather than duplicating it.
+
+### The quiz introduction
+
+The last step of a quiz run is the introduction a student reads in Canvas before starting: two or three sentences on what the unit was about and why the quiz is worth taking, written in the course's voice (`.vtconfig/voice.md`).
+The model sees only the unit's title, the topics, the big idea, and whether there is an open question, so it can't point the student at a file; a reply that names a file or a link is not kept.
+It is saved as `intro` in `bank.json`, where you can edit it, and the next `emit` uses your edit.
+The grading line under it is written by coursekit, not the model, so the points and who marks what are always right — for example "7 points marked automatically; the open question (1 point) is marked by your instructor."
+A quiz without an introduction (one made before this, or a run whose intro failed, which prints a warning) gets a plain default.
+To write just the introduction for a week's existing quiz, without regenerating it:
+
+```bash
+uv run python -m coursekit.generate.quiz.intro "/path/to/course" --week 7
+```
+
+The brief is `prompts/quiz/intro.md`; a course can override it at `.vtconfig/prompts/quiz/intro.md`.
 The model commits each question through a tool call — prose is scratch, so a revision overwrites rather than piling up.
 
 The canonical artifact is `bank.json`; the emitters (GIFT, QTI) read only it.

@@ -318,6 +318,7 @@ class Bank(BaseModel):
     run_id: str
     title: str = "Question bank"
     source: str | None = None
+    intro: str | None = None   # the student-facing quiz introduction, in the instructor's voice (SHIP-10)
     groups: dict[str, Group] = Field(default_factory=dict)
     finalized: bool = False
 

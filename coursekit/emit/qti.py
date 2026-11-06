@@ -704,20 +704,41 @@ def emit_assessment(bank, quiz: dict) -> str:
 
 
 def _description(bank, quiz: dict, points: float) -> str:
-    """A student-facing quiz introduction — a reason to take it, not just the grading line (ASMT-2).
-    HTML, then XML-escaped for the text/html field."""
-    n = len(_quiz_groups(quiz))
-    src = f" from <em>{html.escape(bank.source)}</em>" if bank.source else " from this week's material"
-    html_body = (
-        f"<p>A quick check on the key ideas{src} — {n} concept"
-        f"{'s' if n != 1 else ''}, one question each. Take it to see what's landed and spot what's "
-        f"worth another look before you move on.</p>"
-        f"<p>Every student gets a different version, so it rewards understanding the ideas over "
-        f"recognizing a particular answer.</p>"
-        f"<p><strong>Grading:</strong> {points:.0f} point"
-        f"{'s' if points != 1 else ''} total, 1 point per question, single attempt.</p>"
-    )
-    return _xml(html_body)
+    """The student-facing quiz introduction (ASMT-2, SHIP-10): the bank's own intro, written in the
+    instructor's voice at generation time, or a default when it has none; then the grading line, which
+    is always the program's, so the points and who marks what are right. HTML, then XML-escaped for the
+    text/html field."""
+    groups = _quiz_groups(quiz)
+    is_open = [bank.groups[g["group_id"]].question_type == "open_response" for g in groups]
+    marked = sum(g.get("pick_count", 1) * g.get("points", 1) for g, o in zip(groups, is_open) if o)
+    n_open, n_auto = sum(is_open), len(groups) - sum(is_open)
+
+    if bank.intro:
+        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", bank.intro) if p.strip()]
+        lead = "".join(f"<p>{_md_segment(p)}</p>" for p in paragraphs)
+    else:
+        shape = _count(n_auto, "question") if n_auto else ""
+        if n_open:
+            shape += (", then " if shape else "") + ("one open question" if n_open == 1
+                                                     else f"{n_open} open questions") + " to answer in writing"
+        # no title: Canvas shows the quiz's own just above, and a unit's title can be a bare slug
+        lead = (f"<p>A quick check on the key ideas: {shape}. Take it to see what's landed and spot "
+                f"what's worth another look before you move on.</p>"
+                f"<p>Every student gets a different version, so it rewards understanding the ideas over "
+                f"recognizing a particular answer.</p>")
+
+    if marked:
+        which = "the open question" if n_open == 1 else "the open questions"
+        verb = "is" if n_open == 1 else "are"
+        grading = (f"{_count(points - marked, 'point')} marked automatically; {which} "
+                   f"({_count(marked, 'point')}) {verb} marked by your instructor")
+    else:
+        grading = f"{_count(points, 'point')}, marked automatically"
+    return _xml(f"{lead}<p><strong>Grading:</strong> {grading}. One attempt.</p>")
+
+
+def _count(n: float, noun: str) -> str:
+    return f"{n:g} {noun}{'' if n == 1 else 's'}"
 
 
 def emit_assessment_meta(bank, quiz: dict, *, assignment_group_id: str | None = None) -> str:
