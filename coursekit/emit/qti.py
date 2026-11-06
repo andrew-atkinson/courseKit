@@ -65,16 +65,68 @@ def _fix_escapes(text: str) -> str:
 
 # ----------------------------------------------------------------- escaping
 
+# The Markdown a stem is written in under [markdown] — the same text Moodle renders from the GIFT, so
+# Canvas must get it as HTML too, or "### Title", "**bold**" and "1. step" ship as literal characters.
+# Emphasis needs non-space just inside its markers, so prose like "2 * 3 * 4" is never italicised.
+_HEADING = re.compile(r"(#{1,6})\s+(.+)")
+_LIST_ITEM = re.compile(r"(\d+[.)]|[-*+])\s+(.+)")
+_BOLD = re.compile(r"\*\*(?=\S)(.+?)(?<=\S)\*\*")
+_ITALIC = re.compile(r"(?<![\w*])\*(?=[^\s*])(.+?)(?<=[^\s*])\*(?![\w*])")
+_STASHED = re.compile("\x00(\\d+)\x00")
+
+
 def _md_segment(text: str) -> str:
-    """A non-fenced markdown run: inline `code` → <code>, math $…$ → \\(…\\), and newlines → <br/> so
-    a multi-line stem doesn't collapse to one line (HTML folds whitespace)."""
-    parts, pos = [], 0
-    for m in _BACKTICK.finditer(text):
-        parts.append(_mathjax(html.escape(text[pos:m.start()], quote=False)).replace("\n", "<br/>"))
-        parts.append(f"<code>{html.escape(m.group(1), quote=False)}</code>")
-        pos = m.end()
-    parts.append(_mathjax(html.escape(text[pos:], quote=False)).replace("\n", "<br/>"))
-    return "".join(parts)
+    """A non-fenced markdown run → HTML: inline `code` → <code>, math $…$ → \\(…\\), **bold** /
+    *italic*, `#` heading lines, `1.` / `-` list lines; other newlines → <br/> so a multi-line stem
+    doesn't collapse to one line (HTML folds whitespace). Code and math are set aside first so
+    nothing inside them is read as emphasis."""
+    held: list[str] = []
+
+    def hold(markup: str) -> str:
+        held.append(markup)
+        return f"\x00{len(held) - 1}\x00"
+
+    text = _BACKTICK.sub(lambda m: hold(f"<code>{html.escape(m.group(1), quote=False)}</code>"), text)
+
+    def inline(line: str) -> str:
+        s = _QUIZ_MATH.sub(lambda m: hold(f"\\({m.group(1)}\\)"), html.escape(line, quote=False))
+        s = _ITALIC.sub(r"<em>\1</em>", _BOLD.sub(r"<strong>\1</strong>", s))
+        return _STASHED.sub(lambda m: held[int(m.group(1))], s)
+
+    def kind(line: str) -> str | None:
+        m = _LIST_ITEM.fullmatch(line.strip())
+        return None if m is None else ("ol" if m.group(1)[0].isdigit() else "ul")
+
+    parts: list[tuple[bool, str]] = []          # (is a block element, html)
+    lines, i = text.split("\n"), 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if heading := _HEADING.fullmatch(line):
+            level = min(6, max(3, len(heading.group(1))))     # below the quiz's own title
+            parts.append((True, f"<h{level}>{inline(heading.group(2))}</h{level}>"))
+            i += 1
+        elif tag := kind(line):
+            items = []
+            while i < len(lines):
+                if kind(lines[i]) == tag:
+                    items.append(f"<li>{inline(_LIST_ITEM.fullmatch(lines[i].strip()).group(2))}</li>")
+                    i += 1
+                elif not lines[i].strip() and any(kind(n) == tag for n in lines[i + 1:i + 2]):
+                    i += 1                      # a blank line between items doesn't restart the count
+                else:
+                    break
+            parts.append((True, f"<{tag}>{''.join(items)}</{tag}>"))
+        else:
+            parts.append((False, inline(lines[i])))
+            i += 1
+
+    # A block element breaks the line itself, so the blank lines around it add no <br/>.
+    keep = [p for k, p in enumerate(parts)
+            if p[0] or p[1] or not any(q[0] for q in parts[max(0, k - 1):k + 2])]
+    out = [keep[0][1]] if keep else []
+    for prev, cur in zip(keep, keep[1:]):
+        out.append(cur[1] if prev[0] or cur[0] else "<br/>" + cur[1])
+    return "".join(out)
 
 
 _LINE_COMMENT = re.compile(r"//.*$")
@@ -508,7 +560,9 @@ def _essay_body(v) -> str:
     body = mattext(v.question_text, v.text_format)
     crit = getattr(v, "rubric_criteria", None)
     if crit:
-        items = "".join(f"<li>{c}</li>" for c in crit)
+        # written in the stem's own format, so converted (and escaped) the same way
+        line = _md_segment if v.text_format == "markdown" else (lambda c: _mathjax(html.escape(c, quote=False)))
+        items = "".join(f"<li>{line(c)}</li>" for c in crit)
         body += _xml(f"<p><strong>Your response will be assessed on:</strong></p><ul>{items}</ul>")
     return body
 

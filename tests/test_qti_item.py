@@ -56,6 +56,40 @@ def test_markdown_fenced_block_becomes_pre_preserving_line_breaks():
     assert "Complete the loop:<br/>" in html_level    # the stem's own newline became a <br/>
 
 
+def _html_level(text, fmt="markdown"):
+    return ET.fromstring(f"<m>{qti.mattext(text, fmt)}</m>").text
+
+
+def test_markdown_headings_bold_and_lists_become_html():
+    # the real CC101 enduring-understanding stem shipped "### Title", "**bold**" and "1. step" to Canvas
+    # as literal characters — only `code` was converted. A blank line between items keeps one list.
+    stem = ("### The Challenge\n\nImagine `starX` grows.\n\n**Address the following:**\n\n"
+            "1. **Data:** why objects?\n\n2. **Scale:** why arrays?\n\n**Explain each point.**")
+    assert _html_level(stem) == (
+        "<div><h3>The Challenge</h3>Imagine <code>starX</code> grows.<br/><br/>"
+        "<strong>Address the following:</strong>"
+        "<ol><li><strong>Data:</strong> why objects?</li><li><strong>Scale:</strong> why arrays?</li></ol>"
+        "<strong>Explain each point.</strong></div>")
+    assert _html_level("- one\n- *two*") == "<div><ul><li>one</li><li><em>two</em></li></ul></div>"
+
+
+def test_plain_lines_code_and_math_are_not_read_as_markdown():
+    # every stem without headings/emphasis/lists must emit exactly as before (the real-course baseline)
+    assert _html_level("line one\nline two\n") == "<div>line one<br/>line two<br/></div>"
+    assert _html_level("2 * 3 * 4 is 24") == "<div>2 * 3 * 4 is 24</div>"          # not italic
+    assert _html_level("use `a**b**c` here") == "<div>use <code>a**b**c</code> here</div>"
+    assert _html_level("area $a*b*c_1$") == "<div>area \\(a*b*c_1\\)</div>"
+
+
+def test_essay_criteria_are_converted_and_escaped_like_the_stem():
+    # the criteria were dropped into <li> raw: `map()` kept its backticks and a '<' was unescaped
+    from types import SimpleNamespace                 # the essay body reads only these three fields
+    essay = SimpleNamespace(question_text="Why?", text_format="markdown",
+                            rubric_criteria=["Describes how `map()` works", "Keeps i < 10"])
+    html_level = ET.fromstring(f"<m>{qti._essay_body(essay)}</m>").text
+    assert "<li>Describes how <code>map()</code> works</li><li>Keeps i &lt; 10</li>" in html_level
+
+
 def test_fenced_code_indentation_is_re_flushed():
     # the real quiz bug: models mis-indent code — line 1 flush, the rest shoved right, and often
     # INCONSISTENTLY (here the gap line sits deeper than its sibling rect). Re-indenting by brace

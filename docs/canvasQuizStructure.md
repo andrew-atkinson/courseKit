@@ -93,7 +93,9 @@ Canvas honours the pick: students get a random variant per group.
 `<mattext texttype="text/html">` holds **HTML that is then XML-escaped**.
 So `x < 10` becomes HTML `x &lt; 10`, then XML `x &amp;lt; 10`.
 The tell in Canvas's own output is `&amp;nbsp;` — an HTML `&nbsp;` escaped once more.
-Wrap the body in a `<div>`; markdown code spans become `<code>`.
+Wrap the body in a `<div>`.
+A `[markdown]` stem is converted to the HTML that Moodle renders from the same GIFT text: code spans become `<code>`, fenced blocks `<pre>`, `#` lines headings (`<h3>` or smaller), `**bold**` and `*italic*` `<strong>`/`<em>`, `1.` and `-` lines `<ol>`/`<ul>`, and other newlines `<br/>`.
+An essay's grading criteria are converted the same way.
 
 ## Item structures by question type
 
