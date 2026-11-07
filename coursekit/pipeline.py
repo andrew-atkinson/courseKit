@@ -39,11 +39,14 @@ def _looks_like_model_error(exc: Exception) -> bool:
 
 
 def abort_if_model_error(provider, model, exc) -> None:
-    """A model that won't load is INFRA, not a per-item failure — re-raise it as `ModelLoadError` so the
-    whole run aborts with a clear message, rather than reporting every item as failed. A content-level
-    exception returns, and the caller handles just that item. (Used by the fix loops and the critics.)"""
+    """A model that won't load, or an endpoint that isn't there, is INFRA, not a per-item failure —
+    re-raise it as `ModelLoadError` so the whole run aborts with a clear message, rather than reporting
+    every item as failed. A timeout or a content-level exception returns, and the caller handles just
+    that item. (Used by the fix loops, the critics, and the quiz intro.)"""
     if _looks_like_model_error(exc):
         raise ModelLoadError(_model_error_message(provider, model, exc)) from exc
+    if not _looks_like_timeout(exc) and _looks_like_unreachable(exc):
+        raise ModelLoadError(_unreachable_message(provider, model, exc)) from exc
 
 
 def _looks_like_timeout(exc: Exception) -> bool:
@@ -64,6 +67,16 @@ def _looks_like_unreachable(exc: Exception) -> bool:
     return (type(exc).__name__.lower().endswith("connectionerror")
             or "connection error" in s or "connection refused" in s
             or "connection reset" in s or "failed to establish a connection" in s)
+
+
+def _unreachable_message(provider, model: str, exc: Exception) -> str:
+    """Nothing answered at the model's address — name the address, and the likely cause."""
+    url = getattr(provider, "base_url", None)
+    where = f" at {url}" if url else ""
+    return (f"Could not reach the model server{where} for '{model}' ({type(exc).__name__}: {exc}).\n"
+            "Nothing answered there: the local server (e.g. LM Studio) isn't running, or the address is wrong.\n"
+            "Fix: start the server (in LM Studio, the Developer tab → Start Server), "
+            "or set LOCAL_HOST_URL in .env to its address.")
 
 
 def _model_error_message(provider, model: str, exc: Exception) -> str:
@@ -119,10 +132,7 @@ def loop(messages, provider, model, gen: Generator, *,
             # clear message instead of N misleading per-unit 'timed out's. Checked after timeout so a
             # genuinely slow reply isn't mistaken for a dead server.
             if _looks_like_unreachable(exc):
-                raise ModelLoadError(
-                    f"Could not reach the model endpoint for '{model}': {exc}\n"
-                    "Fix: start the local server (e.g. LM Studio) and check its address "
-                    "(LOCAL_HOST_URL / base_url).") from exc
+                raise ModelLoadError(_unreachable_message(provider, model, exc)) from exc
             raise
 
         if reply.wants_tools:

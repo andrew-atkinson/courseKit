@@ -387,7 +387,7 @@ def test_loop_aborts_the_batch_on_an_unreachable_endpoint(gen):
     client = RaisingClient(_APIConnectionError("Connection error."))
     with pytest.raises(ModelLoadError) as ei:
         loop(_msgs(), client, "m", gen)
-    assert "Could not reach the model endpoint" in str(ei.value)
+    assert "Could not reach the model server" in str(ei.value) and "LM Studio" in str(ei.value)
 
 
 def test_stop_turn_is_reappended_as_a_plain_dict_not_the_native_message(gen):

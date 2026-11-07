@@ -35,6 +35,8 @@ def write_intro(draft, provider, model, eu: str, *, domain: str = "", voice: str
             {"role": "system", "content": system},
             {"role": "user", "content": unit_facts(draft.bank, eu)}]).strip()
     except Exception as e:                       # optional: the default intro stands in, but say so
+        from coursekit.pipeline import abort_if_model_error
+        abort_if_model_error(provider, model, e)  # …unless the server is down or the model won't load
         outcomes.warn("quiz.intro_failed", f"  quiz intro skipped ({type(e).__name__}: {e}) — "
                                            "the export uses its default intro.", error_type=type(e).__name__)
         return False

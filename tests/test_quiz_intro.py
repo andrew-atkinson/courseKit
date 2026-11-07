@@ -107,3 +107,28 @@ def test_the_intro_script_adds_an_intro_to_an_existing_quiz_in_place(tmp_path, m
     saved = bank.Bank.model_validate_json((unit.output_dir / "bank.json").read_text())
     assert saved.intro == INTRO and set(saved.groups) == {"c1"}
     assert json.loads((unit.output_dir / "quiz.json").read_text()) == before   # the draw is unchanged
+
+
+def test_a_server_that_isnt_running_is_named_not_skipped(tmp_path):
+    # the real failure: LM Studio's server was off, and the intro script said only "Connection error."
+    # A down server is not an unusable reply — say where nothing answered, and how to start it.
+    import httpx
+    import openai
+    import pytest
+    from coursekit.pipeline import ModelLoadError
+    from coursekit.generate.quiz.bank import BankDraft
+
+    down = openai.APIConnectionError(request=httpx.Request("POST", "http://localhost:1234/v1/chat"))
+    endpoint = _Endpoint(reply=down)
+    endpoint.base_url = "http://localhost:1234/v1/"        # where the provider was pointed
+    draft = BankDraft.new("r", tmp_path, title="Week 7")
+    with pytest.raises(ModelLoadError) as ei:
+        intro.write_intro(draft, OpenAICompatProvider(client=endpoint, name="fake"), "m", "")
+    msg = str(ei.value)
+    assert "http://localhost:1234/v1/" in msg and "LM Studio" in msg and "Start Server" in msg
+    assert draft.bank.intro is None
+    # a slow reply is still the quiet, optional skip — not a dead server
+    with outcomes.capture(sink=lambda n: None) as report:
+        assert not intro.write_intro(draft, OpenAICompatProvider(
+            client=_Endpoint(reply=openai.APITimeoutError(request=down.request)), name="fake"), "m", "")
+    assert [w.code for w in report.warnings] == ["quiz.intro_failed"]

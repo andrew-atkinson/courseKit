@@ -40,6 +40,11 @@ class OpenAICompatProvider(Provider):
         self.name = name
         self.is_local = is_local
 
+    @property
+    def base_url(self):
+        """The address requests go to, for an error that has to say where nothing answered."""
+        return getattr(self._client, "base_url", None)
+
     @staticmethod
     def _wire(spec: dict) -> dict:
         """Neutral {name, description, parameters} -> OpenAI's function envelope.
