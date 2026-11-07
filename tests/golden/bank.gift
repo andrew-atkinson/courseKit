@@ -36,6 +36,41 @@ $CATEGORY: top/coursekit/demo/c1 Anatomy and purpose of a for loop
     ~The loop increments by 1 automatically
 }
 
+$CATEGORY: top/coursekit/demo/c5 Code completion
+// Code completion
+
+// [id:c5-A] [tag:c5] [tag:multiple_choice]
+::c5-A Gap in the loop condition (A)::[markdown]Complete the loop to draw circles\: `for (let x \= 20; ___; x +\= 30) \{ circle(x, 70); \}` (variant A) {
+    ~[markdown]`x < 400`
+    =[markdown]`x <\= 400`
+    ~[markdown]`x \= 400`
+    ~[markdown]`x < 370`
+}
+
+// [id:c5-B] [tag:c5] [tag:multiple_choice]
+::c5-B Gap in the loop condition (B)::[markdown]Complete the loop to draw circles\: `for (let x \= 20; ___; x +\= 30) \{ circle(x, 70); \}` (variant B) {
+    ~[markdown]`x < 400`
+    ~[markdown]`x <\= 400`
+    ~[markdown]`x \= 400`
+    =[markdown]`x < 370`
+}
+
+// [id:c5-C] [tag:c5] [tag:multiple_choice]
+::c5-C Gap in the loop condition (C)::[markdown]Complete the loop to draw circles\: `for (let x \= 20; ___; x +\= 30) \{ circle(x, 70); \}` (variant C) {
+    =[markdown]`x < 400`
+    ~[markdown]`x <\= 400`
+    ~[markdown]`x \= 400`
+    ~[markdown]`x < 370`
+}
+
+// [id:c5-D] [tag:c5] [tag:multiple_choice]
+::c5-D Gap in the loop condition (D)::[markdown]Complete the loop to draw circles\: `for (let x \= 20; ___; x +\= 30) \{ circle(x, 70); \}` (variant D) {
+    ~[markdown]`x < 400`
+    ~[markdown]`x <\= 400`
+    =[markdown]`x \= 400`
+    ~[markdown]`x < 370`
+}
+
 $CATEGORY: top/coursekit/demo/c2 Infinite loops
 // Infinite loops
 
@@ -96,41 +131,6 @@ $CATEGORY: top/coursekit/demo/c4 Nested loop iterations
 
 // [id:c4-D] [tag:c4] [tag:numerical]
 ::c4-D Total iterations, set D::An outer loop runs and an inner loop runs. Total iterations? (set D) {#6}
-
-$CATEGORY: top/coursekit/demo/c5 Code completion
-// Code completion
-
-// [id:c5-A] [tag:c5] [tag:multiple_choice]
-::c5-A Gap in the loop condition (A)::[markdown]Complete the loop to draw circles\: `for (let x \= 20; ___; x +\= 30) \{ circle(x, 70); \}` (variant A) {
-    ~[markdown]`x < 400`
-    =[markdown]`x <\= 400`
-    ~[markdown]`x \= 400`
-    ~[markdown]`x < 370`
-}
-
-// [id:c5-B] [tag:c5] [tag:multiple_choice]
-::c5-B Gap in the loop condition (B)::[markdown]Complete the loop to draw circles\: `for (let x \= 20; ___; x +\= 30) \{ circle(x, 70); \}` (variant B) {
-    ~[markdown]`x < 400`
-    ~[markdown]`x <\= 400`
-    ~[markdown]`x \= 400`
-    =[markdown]`x < 370`
-}
-
-// [id:c5-C] [tag:c5] [tag:multiple_choice]
-::c5-C Gap in the loop condition (C)::[markdown]Complete the loop to draw circles\: `for (let x \= 20; ___; x +\= 30) \{ circle(x, 70); \}` (variant C) {
-    =[markdown]`x < 400`
-    ~[markdown]`x <\= 400`
-    ~[markdown]`x \= 400`
-    ~[markdown]`x < 370`
-}
-
-// [id:c5-D] [tag:c5] [tag:multiple_choice]
-::c5-D Gap in the loop condition (D)::[markdown]Complete the loop to draw circles\: `for (let x \= 20; ___; x +\= 30) \{ circle(x, 70); \}` (variant D) {
-    ~[markdown]`x < 400`
-    ~[markdown]`x <\= 400`
-    =[markdown]`x \= 400`
-    ~[markdown]`x < 370`
-}
 
 $CATEGORY: top/coursekit/demo/c6 Naming the parts
 // Naming the parts

@@ -16,6 +16,11 @@ import zipfile
 from pathlib import Path
 
 from coursekit.course import ir_files
+from coursekit.generate.quiz.bank import default_order, shape_phrase
+
+# How many tries a student gets. One value for the setting and for the sentence that states it, so they
+# can't disagree; STRC-8 makes it a course/unit setting.
+ALLOWED_ATTEMPTS = 1
 
 QTI_NS = ('xmlns="http://www.imsglobal.org/xsd/ims_qtiasiv1p2" '
           'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"')
@@ -692,7 +697,7 @@ def emit_assessment(bank, quiz: dict) -> str:
     <qtimetadata>
       <qtimetadatafield>
         <fieldlabel>cc_maxattempts</fieldlabel>
-        <fieldentry>1</fieldentry>
+        <fieldentry>{ALLOWED_ATTEMPTS}</fieldentry>
       </qtimetadatafield>
     </qtimetadata>
     <section ident="root_section">
@@ -717,10 +722,7 @@ def _description(bank, quiz: dict, points: float) -> str:
         paragraphs = [p.strip() for p in re.split(r"\n\s*\n", bank.intro) if p.strip()]
         lead = "".join(f"<p>{_md_segment(p)}</p>" for p in paragraphs)
     else:
-        shape = _count(n_auto, "question") if n_auto else ""
-        if n_open:
-            shape += (", then " if shape else "") + ("one open question" if n_open == 1
-                                                     else f"{n_open} open questions") + " to answer in writing"
+        shape = shape_phrase(is_open, _count(n_auto, "question"))
         # no title: Canvas shows the quiz's own just above, and a unit's title can be a bare slug
         lead = (f"<p>A quick check on the key ideas: {shape}. Take it to see what's landed and spot "
                 f"what's worth another look before you move on.</p>"
@@ -734,7 +736,8 @@ def _description(bank, quiz: dict, points: float) -> str:
                    f"({_count(marked, 'point')}) {verb} marked by your instructor")
     else:
         grading = f"{_count(points, 'point')}, marked automatically"
-    return _xml(f"{lead}<p><strong>Grading:</strong> {grading}. One attempt.</p>")
+    tries = "One attempt" if ALLOWED_ATTEMPTS == 1 else f"{ALLOWED_ATTEMPTS} attempts"
+    return _xml(f"{lead}<p><strong>Grading:</strong> {grading}. {tries}.</p>")
 
 
 def _count(n: float, noun: str) -> str:
@@ -757,7 +760,7 @@ def emit_assessment_meta(bank, quiz: dict, *, assignment_group_id: str | None = 
   <scoring_policy>keep_highest</scoring_policy>
   <quiz_type>assignment</quiz_type>
   <points_possible>{points:.1f}</points_possible>
-  <allowed_attempts>1</allowed_attempts>
+  <allowed_attempts>{ALLOWED_ATTEMPTS}</allowed_attempts>
   <available>false</available>
   <one_question_at_a_time>false</one_question_at_a_time>
   <show_correct_answers>true</show_correct_answers>
@@ -880,8 +883,7 @@ def _quiz_for(bank, quiz_json_path: Path) -> dict:
     if quiz_json_path.exists():
         return json.loads(quiz_json_path.read_text(encoding="utf-8"))
     return {"title": bank.title,
-            "groups": [{"group_id": gid, "pick_count": 1, "points": 1}
-                       for gid in sorted(bank.groups)]}
+            "groups": [{"group_id": gid, "pick_count": 1, "points": 1} for gid in default_order(bank)]}
 
 
 def _incomplete_reason(bank) -> str | None:
@@ -906,7 +908,11 @@ def _quiz_bank_mismatch(bank, quiz: dict) -> str | None:
     has — emitting it would `KeyError` in `emit_assessment`. Catch it so one out-of-sync week is
     skipped with a clear reason, not fatal to the whole-course package. (Seen 2026-07-31: an
     interrupted week-7 quiz left a one-group bank beside a stale five-group quiz.json.)"""
-    referenced = {g["group_id"] for g in quiz.get("groups", [])} | set(quiz.get("picks", {}))
+    listed = [g["group_id"] for g in quiz.get("groups", [])]
+    if len(set(listed)) != len(listed):          # a hand-edited order that names a group twice
+        twice = sorted({g for g in listed if listed.count(g) > 1})
+        return f"quiz.json lists group(s) {twice} more than once — each group belongs in the order once"
+    referenced = set(listed) | set(quiz.get("picks", {}))
     missing = sorted(referenced - set(bank.groups))
     if missing:
         return (f"quiz.json references group(s) {missing} not in bank.json — the quiz is out of sync "

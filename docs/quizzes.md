@@ -38,6 +38,16 @@ uv run python -m coursekit.generate.quiz.intro "/path/to/course" --week 7
 ```
 
 The brief is `prompts/quiz/intro.md`; a course can override it at `.vtconfig/prompts/quiz/intro.md`.
+
+### The question order
+
+A quiz's order lives in its `quiz.json`, as the `groups` list, and every export follows it: Canvas, the GIFT quiz paper, and `bank.gift` for Moodle.
+The default is the order the questions were written in, with open questions last.
+To put them in your own order, reorder the `groups` list and set `"order_from": "instructor"`; a later fix, enduring-understanding pass, or intro run keeps your order (and each group's points), adding any new group at the end.
+Without that marker, the next of those runs puts the default order back.
+A whole new `generate` starts from the default again, since its questions are new.
+The introduction describes where the open question sits, so after moving one, re-run the intro command to match.
+Programs (and a future front-end) set an order with `coursekit.generate.quiz.bank.set_order`, which refuses a list that misses or repeats a group.
 The model commits each question through a tool call — prose is scratch, so a revision overwrites rather than piling up.
 
 The canonical artifact is `bank.json`; the emitters (GIFT, QTI) read only it.
@@ -96,7 +106,7 @@ done
 ```
 <course root>/quizzes/week-3/
 ├── bank.json          # canonical: every concept and variant
-├── quiz.json          # which variants a quiz draws, and the seed
+├── quiz.json          # the quiz: question order, which variants it draws, points, and the seed
 ├── bank.gift          # all questions, GIFT (plain text)
 ├── quiz_<seed>.gift   # one deterministic paper
 ├── calls.jsonl        # every tool call, replayable without the model

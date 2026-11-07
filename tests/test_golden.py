@@ -5,8 +5,8 @@ markdown options. Any change to the emitter that alters real output shows up her
 diff instead of as a surprise at import time.
 
 To re-bless after an intentional change:
-    uv run python -c "import json,bank,gift; \
-        b=bank.Bank.model_validate_json(open('tests/golden/bank.json').read()); \
+    uv run python -c "from coursekit.emit import gift; from coursekit.generate.quiz.bank import Bank; \
+        b=Bank.model_validate_json(open('tests/golden/bank.json').read()); \
         open('tests/golden/bank.gift','w').write(gift.emit_bank(b))"
 """
 

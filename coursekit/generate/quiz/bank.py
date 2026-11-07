@@ -499,22 +499,47 @@ class BankDraft:
         return problems
 
 
+    def _saved_quiz(self) -> dict:
+        """The quiz.json an in-place edit (fix, the EU or intro pass) is about to replace. A fresh run's
+        is ignored: its groups are new content, so an old order would land on the wrong questions."""
+        if self.staged or self.out_dir is None:
+            return {}
+        try:
+            return json.loads((self.out_dir / "quiz.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+
+    def quiz_groups(self, pick_count: int = 1) -> tuple[list[dict], str]:
+        """The quiz's groups in order, and who set the order (ASMT-21). An instructor's order is kept,
+        with any new group at the end; otherwise the default. A kept group keeps its entry (points)."""
+        default = default_order(self.bank)
+        saved = self._saved_quiz()
+        entries = {e["group_id"]: e for e in saved.get("groups", []) if e.get("group_id") in default}
+        kept = list(entries)
+        # a quiz.json from before ASMT-21 has no order_from; its order was alphabetical unless edited
+        by = saved.get("order_from") or ("instructor" if kept != sorted(kept) else "default")
+        order = kept + [g for g in default if g not in entries] if by == "instructor" else default
+        return ([entries.get(g, {"group_id": g, "pick_count": pick_count, "points": 1}) for g in order],
+                "instructor" if by == "instructor" else "default")
+
     def pick_quiz(self, seed: int, pick_count: int = 1) -> dict:
         """Choose variants deterministically. Recorded in quiz.json so the pick reproduces."""
+        groups, order_from = self.quiz_groups(pick_count)
+        counts = {e["group_id"]: e.get("pick_count", pick_count) for e in groups}
         rng = random.Random(seed)
         picks = {}
-        for gid in sorted(self.bank.groups):
+        for gid in sorted(self.bank.groups):        # sorted, so the draw is the same whatever the order
             labels = sorted(self.bank.groups[gid].variants)
             if labels:
-                picks[gid] = rng.sample(labels, min(pick_count, len(labels)))
+                picks[gid] = rng.sample(labels, min(counts.get(gid, pick_count), len(labels)))
         return {
             "quiz_id": f"quiz-{self.bank.run_id}",
             "bank_id": self.bank.run_id,
             "title": self.bank.title,
             "seed": seed,
             "picks": picks,
-            "groups": [{"group_id": gid, "pick_count": pick_count, "points": 1}
-                       for gid in sorted(self.bank.groups) if self.bank.groups[gid].variants],
+            "order_from": order_from,
+            "groups": groups,
         }
 
 
@@ -538,12 +563,62 @@ class BankDraft:
             return "OK bank valid (no output directory set, nothing written)."
 
         (self.out_dir / "quiz.json").write_text(json.dumps(quiz, indent=2), encoding="utf-8")
-        (self.out_dir / "bank.gift").write_text(gift.emit_bank(self.bank), encoding="utf-8")
+        order = [e["group_id"] for e in quiz["groups"]]
+        (self.out_dir / "bank.gift").write_text(gift.emit_bank(self.bank, order), encoding="utf-8")
         (self.out_dir / f"quiz_{seed}.gift").write_text(gift.emit_quiz(quiz, self.bank), encoding="utf-8")
 
         n = sum(len(g.variants) for g in self.bank.groups.values())
         return (f"OK finalized: {len(self.bank.groups)} groups, {n} variants -> "
                 f"bank.json, quiz.json, bank.gift, quiz_{seed}.gift. Stop now.")
+
+
+def default_order(bank: Bank) -> list[str]:
+    """The program's question order (ASMT-21): as written, open questions last. An instructor's
+    order (`set_order`) replaces it."""
+    ids = [gid for gid, g in bank.groups.items() if g.variants]
+    return sorted(ids, key=lambda gid: bank.groups[gid].question_type == "open_response")
+
+
+def shape_phrase(is_open: list[bool], short: str) -> str:
+    """Where the open questions sit, in words, from the quiz's real order — so an introduction never
+    says the quiz ends with an open question that opens it. `short` names the other questions."""
+    n = sum(is_open)
+    if not n:
+        return short
+    opens = ("one open question" if n == 1 else f"{n} open questions") + " to answer in writing"
+    if n == len(is_open):
+        return opens
+    if not any(is_open[:len(is_open) - n]):
+        return f"{short}, then {opens}"
+    if not any(is_open[n:]):
+        return f"{opens} first, then {short}"
+    return f"{short}, with {opens} partway through"
+
+
+def set_order(quiz_dir, group_ids: list[str]) -> dict:
+    """Put a quiz's questions in an instructor's order (ASMT-21) — the one way a script or a GUI
+    reorders a quiz. `group_ids` must name exactly the quiz's groups, once each. Writes quiz.json and
+    its two GIFT files atomically, marked so later edits (fix, the intro pass) keep the order."""
+    from coursekit.emit import gift
+    from coursekit.outcomes import CoursekitError
+
+    quiz_dir = Path(quiz_dir)
+    quiz = json.loads((quiz_dir / "quiz.json").read_text(encoding="utf-8"))
+    bank = Bank.model_validate_json((quiz_dir / "bank.json").read_text(encoding="utf-8"))
+    entries = {e["group_id"]: e for e in quiz.get("groups", [])}
+    if len(set(group_ids)) != len(group_ids) or set(group_ids) != set(entries):
+        raise CoursekitError(
+            f"An order must name each of the quiz's groups exactly once: {sorted(entries)}.",
+            code="quiz.order_invalid", details={"quiz": str(quiz_dir), "given": list(group_ids)})
+    quiz["groups"] = [entries[g] for g in group_ids]
+    quiz["order_from"] = "instructor"
+    for name, text in (("quiz.json", json.dumps(quiz, indent=2)),
+                       ("bank.gift", gift.emit_bank(bank, group_ids)),
+                       (f"quiz_{quiz['seed']}.gift", gift.emit_quiz(quiz, bank))):
+        tmp = quiz_dir / f".{name}.tmp"
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, quiz_dir / name)
+    return quiz
 
 
 def build_variant(kind: str, **kwargs) -> Variant:
@@ -558,5 +633,5 @@ def build_variant(kind: str, **kwargs) -> Variant:
 __all__ = [
     "Bank", "Group", "Pair", "Variant", "ValidationError",
     "MCVariant", "MAVariant", "TFVariant", "SAVariant", "NumVariant", "MatchVariant",
-    "BankDraft", "build_variant",
+    "BankDraft", "build_variant", "default_order", "shape_phrase", "set_order",
 ]

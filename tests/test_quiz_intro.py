@@ -83,15 +83,19 @@ def test_a_failed_or_unusable_reply_leaves_the_quiz_without_an_intro(tmp_path):
         assert [w.code for w in report.warnings] == [code]
 
 
-def test_the_model_is_told_about_an_open_question_but_given_no_counts():
+def test_the_model_is_told_where_the_open_question_sits_but_given_no_counts():
+    # the model was told "then one open question" while the quiz opened with it (ASMT-21): the shape
+    # line now comes from the quiz's real order
     b = bank.Bank(run_id="r", title="Week 7: Objects", groups={
         "g1": bank.Group(group_id="g1", concept_title="Arrays", question_type="multiple_choice"),
         "enduring_understanding": bank.Group(group_id="enduring_understanding",
                                              concept_title="Enduring Understanding",
                                              question_type="open_response")})
-    facts = intro.unit_facts(b, "Structure lets systems scale.")
+    facts = intro.unit_facts(b, "Structure lets systems scale.", ["g1", "enduring_understanding"])
     assert facts == ("Unit: Week 7: Objects\nTopics: Arrays\nBig idea: Structure lets systems scale.\n"
-                     "The quiz: short questions, then one open question answered in writing")
+                     "The quiz: short questions, then one open question to answer in writing")
+    assert intro.unit_facts(b, "", ["enduring_understanding", "g1"]).endswith(
+        "The quiz: one open question to answer in writing first, then short questions")
 
 
 def test_the_intro_script_adds_an_intro_to_an_existing_quiz_in_place(tmp_path, monkeypatch):

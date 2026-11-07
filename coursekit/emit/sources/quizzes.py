@@ -38,7 +38,7 @@ def _assessment_stub(qid: str, title: str) -> str:
             f'      </qtimetadatafield>\n'
             f'      <qtimetadatafield>\n'
             f'        <fieldlabel>cc_maxattempts</fieldlabel>\n'
-            f'        <fieldentry>1</fieldentry>\n'
+            f'        <fieldentry>{qti.ALLOWED_ATTEMPTS}</fieldentry>\n'
             f'      </qtimetadatafield>\n'
             f'    </qtimetadata>\n'
             f'    <section ident="root_section"/>\n'

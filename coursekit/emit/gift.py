@@ -247,8 +247,8 @@ def emit_variant(v, tags: list[str] | None = None) -> str:
     ])
 
 
-def emit_bank(bank) -> str:
-    """Every variant, one $CATEGORY per concept.
+def emit_bank(bank, order: list[str] | None = None) -> str:
+    """Every variant, one $CATEGORY per concept, in the quiz's order (ASMT-21; the default order without one).
 
     $CATEGORY is sticky, so each category line applies to the questions that follow it.
     Import once, then build a quiz with one 'random question from category' slot per
@@ -256,10 +256,9 @@ def emit_bank(bank) -> str:
     the only way GIFT can express the variation. GIFT has no assessment construct.
     """
     chunks = [f"// Question bank: {bank.title}\n// run: {bank.run_id}"]
-    for gid in sorted(bank.groups):
+    from coursekit.generate.quiz.bank import default_order
+    for gid in order or default_order(bank):
         g = bank.groups[gid]
-        if not g.variants:
-            continue
         # Moodle strips '//' lines before reading the chunk, so the concept comment can
         # ride along with the category line rather than forming an empty question.
         chunks.append(f"$CATEGORY: {_category(bank.run_id, gid, g.concept_title)}"
@@ -276,7 +275,8 @@ def emit_quiz(quiz: dict, bank) -> str:
     random slots; this is a single realisation of it.
     """
     chunks = [f"// {quiz['title']}\n// seed: {quiz['seed']}"]
-    for gid in sorted(quiz["picks"]):
+    order = [e["group_id"] for e in quiz.get("groups", []) if e["group_id"] in quiz["picks"]]
+    for gid in order or sorted(quiz["picks"]):          # the quiz's own order (ASMT-21)
         g = bank.groups[gid]
         for lbl in quiz["picks"][gid]:
             chunks.append(emit_variant(g.variants[lbl], tags=[gid, g.question_type]))

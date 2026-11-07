@@ -11,16 +11,18 @@ warning, and the quiz itself is untouched.
 import re
 
 from coursekit import courseconfig, outcomes, prompts
+from coursekit.generate.quiz.bank import default_order, shape_phrase
 
 # What a student must never be pointed at: links, and the files the course is built from.
 _UNUSABLE = re.compile(r"https?:|://|\b[\w-]+\.(?:md|json|ya?ml|txt|pdf|gift|zip|vtt|srt)\b", re.I)
 
 
-def unit_facts(bank, eu: str) -> str:
-    """The model's whole view of the quiz: what it covers and its shape, with no counts and no files."""
-    topics = [g.concept_title for g in bank.groups.values() if g.question_type != "open_response"]
-    open_q = any(g.question_type == "open_response" for g in bank.groups.values())
-    shape = "short questions" + (", then one open question answered in writing" if open_q else "")
+def unit_facts(bank, eu: str, order: list[str] | None = None) -> str:
+    """The model's whole view of the quiz: what it covers and its shape, in the quiz's real order (ASMT-21),
+    with no counts and no files."""
+    groups = [bank.groups[g] for g in (order or default_order(bank))]
+    topics = [g.concept_title for g in groups if g.question_type != "open_response"]
+    shape = shape_phrase([g.question_type == "open_response" for g in groups], "short questions")
     return (f"Unit: {bank.title}\nTopics: {', '.join(topics) or '(not listed)'}\n"
             f"Big idea: {eu or '(none stated)'}\nThe quiz: {shape}")
 
@@ -33,7 +35,8 @@ def write_intro(draft, provider, model, eu: str, *, domain: str = "", voice: str
     try:
         text = provider.chat(model=model, temperature=0.4, messages=[
             {"role": "system", "content": system},
-            {"role": "user", "content": unit_facts(draft.bank, eu)}]).strip()
+            {"role": "user", "content": unit_facts(
+                draft.bank, eu, [e["group_id"] for e in draft.quiz_groups()[0]])}]).strip()
     except Exception as e:                       # optional: the default intro stands in, but say so
         from coursekit.pipeline import abort_if_model_error
         abort_if_model_error(provider, model, e)  # …unless the server is down or the model won't load
