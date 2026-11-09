@@ -12,6 +12,7 @@ core is worth extracting once a third consumer appears — not before (same disc
 
 from pathlib import Path
 
+from coursekit import atomic
 from coursekit.generate.quiz.evaluate import (
     DEFAULT_READS,
     READ_TEMPERATURE,
@@ -134,6 +135,5 @@ def evaluate_course_pages(path, *, weeks=None, provider, model, out_path=None,
     if out_path is None:
         out_path = items[0][1].parent.parent / "page-review.md"     # the course's pages/ tree
     out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(render_review(findings, title="Page review", noun="section"), encoding="utf-8")
+    atomic.write(out_path, render_review(findings, title="Page review", noun="section"))
     return findings, out_path

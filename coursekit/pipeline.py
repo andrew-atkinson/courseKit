@@ -11,7 +11,7 @@ pipeline is testable with a fake and carries no env or network assumptions of it
 from dataclasses import replace
 from pathlib import Path
 
-from coursekit import courseconfig
+from coursekit import atomic, courseconfig
 from coursekit import outcomes, records
 from coursekit.outcomes import CoursekitError
 from coursekit.discover import Unit, find_units, slugify
@@ -214,7 +214,7 @@ def run_unit(unit: Unit, provider, model, gen: Generator, *,
     brief = records.digest(messages)
 
     reply = loop(messages, provider, model, gen, max_iters=max_iters)
-    (out / "reply.txt").write_text(reply, encoding="utf-8")
+    atomic.write(out / "reply.txt", reply)
     record_step = getattr(gen, "record_step", None)     # optional seam, like postprocess
     if record_step is not None and gen.is_finalized():
         record_step(unit, brief=brief, read=read, model=model, overrides=config_overrides)

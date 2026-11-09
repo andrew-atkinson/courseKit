@@ -14,7 +14,7 @@ NOT here — real spacing is a course-schedule property, a future course-level e
 import re
 from dataclasses import dataclass, field
 
-from coursekit import prompts
+from coursekit import atomic, prompts
 from coursekit.generate.critic import ask as ask_critic
 from coursekit.generate.page.evaluate import _format_block
 from coursekit.generate.quiz.evaluate import READ_TEMPERATURE
@@ -125,6 +125,5 @@ def evaluate_course_pedagogy(path, *, weeks=None, provider, model, out_path=None
     if out_path is None:
         out_path = Path(units[0].output_dir).parent / "page-pedagogy.md"
     out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text("\n".join(render_rubric(r) for r in rubrics), encoding="utf-8")
+    atomic.write(out_path, "\n".join(render_rubric(r) for r in rubrics))
     return rubrics, out_path

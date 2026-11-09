@@ -19,7 +19,7 @@ import json
 import re
 from pathlib import Path
 
-from coursekit import prompts
+from coursekit import atomic, prompts
 
 MATERIALS_SUFFIX = ".materials.json"
 
@@ -92,16 +92,25 @@ def build_messages(chunks: list[str], cm, *, project_root=None) -> list[dict]:
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
-def segment_week(text: str, cm, provider, model, *, project_root=None) -> dict[str, str]:
-    """Segment the week text into per-concept material. Returns {concept_name: material}, or {} when
-    there is nothing to segment. Best-effort — a parse or model hiccup yields {} (the caller degrades)."""
-    chunks = chunk_text(text)
-    if not chunks or not cm.concepts:
-        return {}
-    reply = provider.chat(model=model, messages=build_messages(chunks, cm, project_root=project_root),
-                          temperature=0.2)
-    starts = parse_boundaries(reply, len(cm.concepts), len(chunks))
-    return materials_from_boundaries(chunks, starts, cm)
+def brief(unit):
+    """What segmenting `unit` shows the model, from its saved concept map and its text: (map, chunks,
+    messages), or None when there is nothing to segment. The run and a record's check both build it here."""
+    from coursekit import records
+    from coursekit.generate.page.concept_map import load_for_unit
+    cm = load_for_unit(unit)
+    records.note(unit.transcript_path)
+    chunks = chunk_text(Path(unit.transcript_path).read_text(encoding="utf-8"))
+    if cm is None or not chunks or not cm.concepts:
+        return None
+    return cm, chunks, build_messages(chunks, cm, project_root=unit.course_root)
+
+
+def segment(plan, provider, model) -> dict[str, str]:
+    """Segment a unit's text (`plan` from `brief`) into per-concept material: {concept_name: material}.
+    Best-effort — a parse or model hiccup yields {} or a partial map (the caller degrades)."""
+    cm, chunks, messages = plan
+    reply = provider.chat(model=model, messages=messages, temperature=0.2)
+    return materials_from_boundaries(chunks, parse_boundaries(reply, len(cm.concepts), len(chunks)), cm)
 
 
 def materials_path(course_root, week_key: str) -> Path:
@@ -109,14 +118,13 @@ def materials_path(course_root, week_key: str) -> Path:
 
 
 def save_materials(mats: dict, path) -> Path:
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(mats, indent=2, ensure_ascii=False), encoding="utf-8")
-    return p
+    return atomic.write(path, json.dumps(mats, indent=2, ensure_ascii=False))
 
 
 def load_materials(path) -> dict | None:
+    from coursekit import records
     p = Path(path)
+    records.note(p)
     if not p.exists():
         return None
     try:

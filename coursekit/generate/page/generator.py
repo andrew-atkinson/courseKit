@@ -51,6 +51,12 @@ class PageGenerator:
     def is_finalized(self) -> bool:
         return self.draft.is_finalized()
 
+    def record_step(self, unit, *, brief: str, read: dict, model: str, overrides=None) -> None:
+        """A finished page's record (CORE-4.2), called by the run with the brief it sent."""
+        from coursekit.generate.page import record
+        record.write_page(self.draft.out_dir, unit, [{"step": "generate", "brief": brief}], read=read, model=model,
+                          options=record.options(unit, "monolithic", overrides=overrides))
+
     def postprocess(self, unit, provider, model, cfg, transcript) -> None:
         return   # pages have no post-generation pass
 

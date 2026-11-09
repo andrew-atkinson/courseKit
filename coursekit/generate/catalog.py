@@ -16,6 +16,8 @@ COMP-3 (pedagogically-driven composition — pick components by `Component.funct
 
 from dataclasses import dataclass
 
+from coursekit import atomic
+
 # ---- the pedagogic FUNCTIONS a component can serve (the project's CLT + UDL frames) ----------------
 # Named so composition (COMP-3) and evaluation (EVAL-10/12) can reason about a component's FIT, not
 # just its presence. A component earns its place by serving one of these; design that serves none
@@ -238,7 +240,7 @@ def _repo_root():
 def write_doc() -> str:
     """Write docs/components.md from the catalog; returns the path written."""
     p = _repo_root() / DOC_PATH
-    p.write_text(render_markdown(), encoding="utf-8")
+    atomic.write(p, render_markdown())
     return str(p)
 
 

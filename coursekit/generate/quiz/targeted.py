@@ -13,7 +13,7 @@ on it. The course's `domain.md` / voice / `quiz.yaml` still apply — they resol
 from dataclasses import replace
 from pathlib import Path
 
-from coursekit import courseconfig, coursestructure, outcomes
+from coursekit import atomic, courseconfig, coursestructure, outcomes
 from coursekit.course import Course
 from coursekit.discover import slugify
 from coursekit.ingest.extract import SUPPORTED_SUFFIXES, extract_text, is_supported
@@ -100,11 +100,10 @@ def generate_targeted_quiz(source, provider, model, *, output_root=None, max_ite
     from coursekit.generate.quiz.generator import QuizGenerator
 
     unit, text = prepare(source, output_root=output_root)
-    unit.output_dir.mkdir(parents=True, exist_ok=True)
     # Persist the extracted text beside the quiz — also a record of exactly what was quizzed. Re-running
     # overwrites it. The quiz's SHAPE stays the document's own: concept_shape=False keeps the unit's
     # concept list out of a single reading's brief.
-    unit.transcript_path.write_text(text, encoding="utf-8")
+    atomic.write(unit.transcript_path, text)
     kw = {} if max_iters is None else {"max_iters": max_iters}
     return pipeline.run_unit(unit, provider, model,
                              QuizGenerator(concept_shape=False, source=Path(source).expanduser().resolve()), **kw)

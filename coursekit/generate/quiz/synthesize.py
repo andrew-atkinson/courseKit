@@ -29,6 +29,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from coursekit import atomic
 from coursekit.generate.quiz.bank import Bank, Group, MCVariant
 
 # The four labels the critic is meant to catch, matching examples/synthetic/*/expected.json.
@@ -165,14 +166,9 @@ def write_fixtures(root: Path) -> list[Path]:
     written: list[Path] = []
     for ds in synthesize_all().values():
         base = Path(root) / ds.name
-        (base / "quizzes" / "week-1").mkdir(parents=True, exist_ok=True)
-        (base / "output").mkdir(parents=True, exist_ok=True)
-        bank_p = base / "quizzes" / "week-1" / "bank.json"
-        bank_p.write_text(json.dumps(ds.bank.model_dump(), indent=2), encoding="utf-8")
-        exp_p = base / "expected.json"
-        exp_p.write_text(json.dumps(ds.expected, indent=2), encoding="utf-8")
-        tx_p = base / "output" / "week-1.md"
-        tx_p.write_text(ds.transcript, encoding="utf-8")
+        bank_p = atomic.write(base / "quizzes" / "week-1" / "bank.json", json.dumps(ds.bank.model_dump(), indent=2))
+        exp_p = atomic.write(base / "expected.json", json.dumps(ds.expected, indent=2))
+        tx_p = atomic.write(base / "output" / "week-1.md", ds.transcript)
         written += [bank_p, exp_p, tx_p]
     return written
 

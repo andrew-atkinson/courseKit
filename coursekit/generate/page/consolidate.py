@@ -61,18 +61,29 @@ def _extract_json(reply: str) -> dict:
     return data
 
 
-def _call(prompt_name: str, user_content: str, provider, model: str, *, week: str, domain: str,
-          project_root) -> ConceptMap:
-    """Shared model call: domain-aware system prompt + a user message → a validated `ConceptMap`. The
-    week label is set by us, not the model — one less thing for it to get wrong."""
+def _messages(prompt_name: str, user_content: str, *, domain: str, project_root) -> list[dict]:
     system = prompts.load(PAGE_CATEGORY, prompt_name, project_root=project_root)
-    system_message = courseconfig.domain_preface(domain) + system.body
-    messages = [{"role": "system", "content": system_message},
-                {"role": "user", "content": user_content}]
-    reply = provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE)
+    return [{"role": "system", "content": courseconfig.domain_preface(domain) + system.body},
+            {"role": "user", "content": user_content}]
+
+
+def _parse(reply: str, week: str) -> ConceptMap:
+    """The model's reply → a validated `ConceptMap`. The week label is set by us, not the model — one
+    less thing for it to get wrong."""
     data = _extract_json(reply)
     data["week"] = week
     return ConceptMap.model_validate(data)
+
+
+def _call(prompt_name: str, user_content: str, provider, model: str, *, week: str, domain: str,
+          project_root) -> ConceptMap:
+    """Shared model call: domain-aware system prompt + a user message → a validated `ConceptMap`."""
+    messages = _messages(prompt_name, user_content, domain=domain, project_root=project_root)
+    return _parse(provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE), week)
+
+
+def _material(text: str) -> str:
+    return f"The week's teaching material:\n<material>\n{text}\n</material>"
 
 
 def consolidate(wk: WeekKnowledge, provider, model: str, *, week: str = "", domain: str = "",
@@ -92,8 +103,7 @@ def build_concept_map_from_text(text: str, provider, model: str, *, week: str = 
     """The fallback producer for a course with NO transcriber knowledge.json: read the week's teaching
     text directly and build the same `ConceptMap` (identify concepts, roll up components, name the
     enduring understanding). Same schema, same downstream consumers — only the source differs."""
-    user = f"The week's teaching material:\n<material>\n{text}\n</material>"
-    return _call("extract", user, provider, model, week=week, domain=domain, project_root=project_root)
+    return _call("extract", _material(text), provider, model, week=week, domain=domain, project_root=project_root)
 
 
 def build_concept_map(path, provider, model: str, *, week: str = "", domain: str = "",
@@ -108,3 +118,48 @@ def build_concept_map(path, provider, model: str, *, week: str = "", domain: str
     text = Path(path).read_text(encoding="utf-8") if Path(path).is_file() else ""
     return build_concept_map_from_text(text, provider, model, week=week, domain=domain,
                                        project_root=project_root)
+
+
+# --------------------------------------------------------------------------- `analyze`, one unit
+def analyze_brief(unit) -> list[dict]:
+    """What `analyze` shows the model for `unit`: the transcriber's knowledge components when there are
+    any, else the unit's own text. The run and a record's check both build it here (CORE-4.2)."""
+    from pathlib import Path
+
+    from coursekit import records
+    cfg = courseconfig.load(unit.transcript_path, config_name="page.yaml")
+    wk = read_week_knowledge(unit.transcript_path, week=unit.week_label or unit.week_slug)
+    if wk.kcs:
+        return _messages("consolidate", _bundle_for_prompt(wk), domain=cfg.domain, project_root=unit.course_root)
+    records.note(unit.transcript_path)
+    text = Path(unit.transcript_path).read_text(encoding="utf-8")
+    return _messages("extract", _material(text), domain=cfg.domain, project_root=unit.course_root)
+
+
+def analyze_unit(unit, provider, model: str):
+    """`analyze` for one unit: build its concept map and save it, then split its text into per-concept
+    material beside it (best-effort — a failure only warns, and decomposition falls back to slicing).
+    Each step is recorded. Returns (map, path, material spans written)."""
+    from coursekit import outcomes, records
+    from coursekit.generate.page import concept_map as cmap
+    from coursekit.generate.page import record
+    from coursekit.generate.page import segment as seg
+
+    with records.reading() as read:
+        messages = analyze_brief(unit)
+    cm = _parse(provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE),
+                unit.week_label or unit.week_slug)
+    path = cmap.save_concept_map(cm, cmap.concept_map_path(unit.course_root, unit.week_num))
+    record.write_map(unit, "analyze", messages, read, model, fresh=True)
+    try:
+        with records.reading() as read:
+            plan = seg.brief(unit)
+        mats = seg.segment(plan, provider, model) if plan else {}
+        if mats:
+            seg.save_materials(mats, seg.materials_path(unit.course_root, unit.week_num))
+            record.write_map(unit, "segment", plan[2], read, model)
+    except Exception as e:
+        mats = {}
+        outcomes.warn("analyze.segment_skipped", f"  (segmentation skipped for {unit.week_label or unit.week_slug}: "
+                                                 f"{type(e).__name__}: {e})", unit=unit.week_slug)
+    return cm, path, len(mats)

@@ -34,6 +34,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from coursekit import atomic
+
 # knowledge.json names its concrete examples differently by domain: the `coding` extract prompt uses
 # `code_examples`, the subject-neutral default uses `examples_and_demonstrations`. Read either.
 _EXAMPLE_KEYS = ("code_examples", "examples_and_demonstrations")
@@ -143,7 +145,9 @@ def read_week_knowledge(path, *, week: str = "") -> WeekKnowledge:
     p = Path(path)
     folder = p if p.is_dir() else p.parent
     kcs, prereqs, toward, material, sources = [], [], [], [], []
+    from coursekit import records
     for kf in sorted(folder.glob(f"*{KNOWLEDGE_SUFFIX}")):
+        records.note(kf)
         try:
             data = json.loads(kf.read_text())
         except (json.JSONDecodeError, OSError):
@@ -197,12 +201,9 @@ def save_concept_map(cm: ConceptMap, path) -> Path:
     """Write a concept map to its yaml, creating `.vtconfig/concepts/` if needed. Block style with
     field order preserved, so an instructor edits a readable file, not a flow-style blob."""
     import yaml
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
     dumped = yaml.safe_dump(cm.model_dump(exclude_none=True), sort_keys=False,
                             default_flow_style=False, allow_unicode=True)
-    p.write_text(dumped)
-    return p
+    return atomic.write(path, dumped)
 
 
 def load_for_unit(unit) -> ConceptMap | None:

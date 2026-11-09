@@ -16,7 +16,7 @@ so evaluate/fix/emit see every function uniformly. Returns a RunResult like the 
 
 from pathlib import Path
 
-from coursekit import courseconfig, outcomes
+from coursekit import atomic, courseconfig, outcomes
 from coursekit.generate.base import RunResult
 from coursekit.generate.page import decompose, glossary as glossary_mod, route
 from coursekit.generate.page.concept_map import load_for_unit
@@ -34,8 +34,7 @@ def _write_page(page, out_dir: Path, project_root) -> None:
     from coursekit.emit import html as html_emit
     from coursekit.generate.page.renderer import load_supplements
     from coursekit.generate.page.style import load_style
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "page.json").write_text(page.model_dump_json(indent=2), encoding="utf-8")
+    atomic.write(out_dir / "page.json", page.model_dump_json(indent=2))
     supp = load_supplements(project_root, page.week_ref or page.slug)
     html_emit.write_html(page, out_dir, supp, load_style(project_root))
 
@@ -75,18 +74,20 @@ def build_page_unit(unit, provider, model, *, function: str = "teaching", genera
                          counts={"blocks": len(pg.blocks)}, problems=problems)
 
     if function in DETERMINISTIC_FUNCTIONS:
-        from coursekit.generate.overview import build_week_overview, build_week_recap
-        builder = build_week_overview if function == "overview" else build_week_recap
         cm = load_for_unit(unit)
         if cm is None or not cm.concepts:        # these pages are built FROM the map — refuse, don't ship an intro
             raise CoursekitError(f"{unit.week_slug}: a {function} page is built from the concept map, and "
                                  f"{'there is none (run `analyze` first)' if cm is None else 'it lists no concepts'}.",
                                  code="concept_map.missing", category="source",
                                  details={"unit": unit.week_slug, "function": function})
-        page = builder(unit.course_title or "Course", unit.week_num,
-                       unit.week_label or unit.week_slug, unit.module or "", cm)
+        from coursekit import records
+        from coursekit.generate.page import record
+        with records.reading() as read:
+            page = record.deterministic(unit, function)
         out = parent / f"{unit.week_slug}-{function}"
         _write_page(page, out, project_root)
+        record.write_page(out, unit, [{"step": "build", "brief": records.digest(page.model_dump(mode="json"))}],
+                          read=read, by="coursekit", options=record.options(unit, function))
         return RunResult(unit, finalized=True, output_dir=out, counts={"blocks": len(page.blocks)})
 
     # teaching — the program picks the mechanism unless the caller forces it

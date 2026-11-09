@@ -118,6 +118,11 @@ def _material_chunks(material: str, budget: int) -> list[str]:
     return chunks
 
 
+def pass_messages(system: str, user: str) -> list[dict]:
+    """The messages one pass opens with — what a record fingerprints for it."""
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
 def _run_pass(session, provider, model, system: str, user: str, *, max_turns: int = 8,
               max_nudges: int = 3, stats: dict | None = None, specs: list | None = None) -> int:
     """Drive one bounded tool-call pass that writes blocks into the session's page. Returns the number
@@ -128,7 +133,7 @@ def _run_pass(session, provider, model, system: str, user: str, *, max_turns: in
     specs = specs or _ADD_SPECS
     blocks = session.draft.page.blocks
     before = len(blocks)
-    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    messages = pass_messages(system, user)
     nudges = 0
     for _ in range(max_turns):
         try:
@@ -178,25 +183,21 @@ def _neighbour_context(concepts, i: int) -> str:
             f'but teach ONLY "{concepts[i].name}", never a neighbour.')
 
 
-def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=None, neighbours=True):
-    """Build the page for `unit` by frame → per-concept → close passes into `out_dir`. Returns
-    (page, problems) where problems is `validate_final()` (empty means it finalized). `neighbours` adds
-    the prev/next coherence window to each concept pass (name+gist only)."""
+def plan(unit, *, project_root=None, neighbours=True) -> list[dict]:
+    """Every pass a decomposed page makes, from today's files, in order: the frame, one section per
+    concept (its material in bounded parts), and the close. Each is {"step", "concept", "passes": [(system,
+    user), …]}, a section also its material's size and source. The run and a record's check both build
+    it here (CORE-4.2), so they can't disagree about what the model is shown."""
+    from coursekit import records
+    from coursekit.generate.page import segment as seg
     project_root = project_root or unit.course_root
     cfg = courseconfig.load(unit.transcript_path, config_name="page.yaml")   # page settings, not quiz.yaml
     cm = load_for_unit(unit)
     if cm is None or not cm.concepts:
         raise CoursekitError(f"{unit.week_slug}: no concept map (run `analyze` first).",
                              code="concept_map.missing", category="source", details={"unit": unit.week_slug})
+    records.note(unit.transcript_path)
     transcript = Path(unit.transcript_path).read_text(encoding="utf-8", errors="replace")
-
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    slug = slugify(unit.week_label) if unit.week_label else unit.week_slug
-    draft = pageir.PageDraft.new(f"{unit.course_slug}-{unit.week_slug}", out_dir,
-                                 title=unit.week_label or unit.week_slug, page_type="week_intro",
-                                 week_ref=unit.week_slug, slug=slug)
-    session = tools.PageTools(draft, call_log=out_dir / "calls.jsonl")
 
     dpre, vpre = courseconfig.domain_preface(cfg.domain), courseconfig.voice_preface(cfg.voice)
     # A concept pass fills a section BODY, so it composes from fewer components than a whole page —
@@ -210,59 +211,86 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
 
     names = ", ".join(c.name for c in cm.concepts)
     eu = cm.enduring_understanding or "(none stated)"
-    stats: dict = {}                                   # tallies pass errors (candidate timeouts) across the run
-    empties: list[str] = []
-
-    n = _run_pass(session, provider, model, sysmsg("frame"),
-                  f"Topic: {unit.week_label or unit.week_slug}\nEnduring understanding: {eu}\n"
-                  f"Concepts this week: {names}", stats=stats)
-    outcomes.info("page.frame", f"  frame: +{n} block(s)", blocks=n)
+    steps = [{"step": "frame", "concept": None, "passes": [(sysmsg("frame"),
+              f"Topic: {unit.week_label or unit.week_slug}\nEnduring understanding: {eu}\n"
+              f"Concepts this week: {names}")]}]
 
     # Boundary-correct per-concept material from `analyze` (one contiguous verbatim span per concept, so
     # the example travels with its definition); fall back to the keyword slicer per concept when absent.
-    from coursekit.generate.page import segment as seg
     materials = seg.load_materials_for_unit(unit) or {}
     budget = int(cfg.value("max_pass_chars", DEFAULT_PASS_CHARS))   # measured per model, not assumed
-
-    full = len(transcript)
     for i, c in enumerate(cm.concepts):
+        material = materials.get(c.name) or slice_material(transcript, c)
+        chunks = _material_chunks(material, budget)   # oversized span → bounded sub-passes, nothing dropped
+        passes = []
+        for k, chunk in enumerate(chunks):
+            # neighbour window only on the first sub-pass; later sub-passes are pure continuation
+            window = ("\n\n" + _neighbour_context(cm.concepts, i)) if (neighbours and k == 0) else ""
+            cont = ("" if len(chunks) == 1 else
+                    f"\n\nThis is part {k + 1} of {len(chunks)} of this concept's material — CONTINUE "
+                    f"the same section: do not add a heading and do not re-introduce the concept.")
+            passes.append((sysmsg("concept_section"), f"{_brief(c)}{window}{cont}\n\nThe material for this "
+                                                      f"part:\n<material>\n{chunk}\n</material>"))
+        steps.append({"step": f"section: {c.name}", "concept": c, "passes": passes, "chars": len(material),
+                      "of": len(transcript), "src": "map" if materials.get(c.name) else "slice"})
+    steps.append({"step": "close", "concept": None, "passes": [(sysmsg("close"),
+                  f"Concepts this week: {names}\nEnduring understanding: {eu}")]})
+    return steps
+
+
+def step_messages(step: dict) -> list[list[dict]]:
+    """What one planned step shows the model: each pass's opening messages."""
+    return [pass_messages(s, u) for s, u in step["passes"]]
+
+
+def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=None, neighbours=True):
+    """Build the page for `unit` by frame → per-concept → close passes into `out_dir`. Returns
+    (page, problems) where problems is `validate_final()` (empty means it finalized). `neighbours` adds
+    the prev/next coherence window to each concept pass (name+gist only)."""
+    from coursekit import records
+    from coursekit.generate.page import record
+    project_root = project_root or unit.course_root
+    with records.reading() as read:
+        steps = plan(unit, project_root=project_root, neighbours=neighbours)
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    slug = slugify(unit.week_label) if unit.week_label else unit.week_slug
+    draft = pageir.PageDraft.new(f"{unit.course_slug}-{unit.week_slug}", out_dir,
+                                 title=unit.week_label or unit.week_slug, page_type="week_intro",
+                                 week_ref=unit.week_slug, slug=slug)
+    session = tools.PageTools(draft, call_log=out_dir / "calls.jsonl")
+    stats: dict = {}                                   # tallies pass errors (candidate timeouts) across the run
+    empties: list[str] = []
+
+    def run(step) -> int:
+        return sum(_run_pass(session, provider, model, s, u, stats=stats) for s, u in step["passes"])
+
+    frame, *sections, close = steps
+    n = run(frame)
+    outcomes.info("page.frame", f"  frame: +{n} block(s)", blocks=n)
+    for i, st in enumerate(sections):
+        c = st["concept"]
         # The heading text IS the concept name — place it deterministically (in order), so every
         # concept becomes its own titled section and the model only has to fill the content beneath it.
         draft.put_block(pageir.build_block("heading", block_id=f"sec-{i}", text=c.name, role="concept"))
-        material = materials.get(c.name) or slice_material(transcript, c)
-        src = "map" if materials.get(c.name) else "slice"
-        chunks = _material_chunks(material, budget)   # oversized span → bounded sub-passes, nothing dropped
-
-        def _fill_concept():
-            got = 0
-            for k, chunk in enumerate(chunks):
-                # neighbour window only on the first sub-pass; later sub-passes are pure continuation
-                window = ("\n\n" + _neighbour_context(cm.concepts, i)) if (neighbours and k == 0) else ""
-                cont = ("" if len(chunks) == 1 else
-                        f"\n\nThis is part {k + 1} of {len(chunks)} of this concept's material — CONTINUE "
-                        f"the same section: do not add a heading and do not re-introduce the concept.")
-                got += _run_pass(session, provider, model, sysmsg("concept_section"),
-                                 f"{_brief(c)}{window}{cont}\n\nThe material for this part:\n"
-                                 f"<material>\n{chunk}\n</material>", stats=stats)
-            return got
-
-        added = _fill_concept()
+        added = run(st)
         retries = 0
         while added == 0 and retries < RETRY_EMPTY:   # an empty section is a flaky pass — try again fresh
             retries += 1
-            added = _fill_concept()
+            added = run(st)
         if added == 0:
             empties.append(c.name)
-        tag = src + (f",{len(chunks)}×" if len(chunks) > 1 else "") + (f",retry{retries}" if retries else "")
-        outcomes.info("page.section", f"  {c.name[:24]:24s} [{tag}]: {len(material):6d}/{full} chars → "
+        k = len(st["passes"])
+        tag = st["src"] + (f",{k}×" if k > 1 else "") + (f",retry{retries}" if retries else "")
+        outcomes.info("page.section", f"  {c.name[:24]:24s} [{tag}]: {st['chars']:6d}/{st['of']} chars → "
                       f"+{added} content block(s)", concept=c.name, blocks=added)
 
     # Same deterministic-heading treatment as the concepts — place the summary heading first so the
     # close pass can only add content beneath it (last run it emitted the heading last → empty section).
     draft.put_block(pageir.build_block("heading", block_id="sec-summary", text="Wrapping Up",
                                        role="summary"))
-    n = _run_pass(session, provider, model, sysmsg("close"),
-                  f"Concepts this week: {names}\nEnduring understanding: {eu}", stats=stats)
+    n = run(close)
     outcomes.info("page.close", f"  close: +{n} content block(s)", blocks=n)
 
     if stats.get("errors"):                            # the timeout/overheating signal, aggregated
@@ -277,6 +305,9 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
     problems = draft.validate_final()
     if not problems:
         draft.finalize()
+        record.write_page(out_dir, unit, [{"step": st["step"], "brief": records.digest(step_messages(st))}
+                                          for st in steps], read=read, model=model,
+                          options=record.options(unit, "decompose", neighbours=neighbours))
     else:
         outcomes.warn("page.not_finalized", "  (did not finalize: " + "; ".join(problems) + ")",
                       problems=problems)

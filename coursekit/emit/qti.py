@@ -15,6 +15,7 @@ import textwrap
 import zipfile
 from pathlib import Path
 
+from coursekit import atomic
 from coursekit.course import ir_files
 from coursekit.generate.quiz.bank import default_order, shape_phrase
 
@@ -868,8 +869,7 @@ def write_imscc(bank, quiz: dict, out_path) -> Path:
     out_path = Path(out_path)
     if out_path.suffix != ".zip":
         out_path = out_path.with_suffix(".zip")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
+    with atomic.replacing(out_path) as tmp, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
         for arc, data in files.items():
             z.writestr(arc, data)
     return out_path
@@ -964,8 +964,7 @@ def bundle(path, out_path=None, title=None) -> tuple:
     out_path = Path(out_path)
     if out_path.suffix != ".zip":
         out_path = out_path.with_suffix(".zip")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
+    with atomic.replacing(out_path) as tmp, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
         for arc, data in files.items():
             z.writestr(arc, data)
     return out_path, [bj for _, _, bj in entries], skipped

@@ -17,12 +17,13 @@ Two rules are load-bearing:
 """
 
 import json
-import os
 import re
 from pathlib import Path
 from typing import Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+
+from coursekit import atomic
 
 __all__ = ["ValidationError"]
 
@@ -262,11 +263,12 @@ class PageDraft:
         staged build reaches `page.json` (atomically) only once finalized."""
         if self.out_dir is None:
             return
-        self.out_dir.mkdir(parents=True, exist_ok=True)
-        partial = self.out_dir / "page.partial.json"
-        partial.write_text(json.dumps(self.page.model_dump(), indent=2), encoding="utf-8")
+        text = json.dumps(self.page.model_dump(), indent=2)
         if self.page.finalized or not self.staged:
-            os.replace(partial, self.out_dir / "page.json")
+            atomic.write(self.out_dir / "page.json", text)
+            (self.out_dir / "page.partial.json").unlink(missing_ok=True)
+        else:
+            atomic.write(self.out_dir / "page.partial.json", text)
 
     def put_block(self, block: Block) -> str:
         """Store a block, REPLACING any block already at block_id (revision without pile-up)."""

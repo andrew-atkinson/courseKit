@@ -12,6 +12,7 @@ Reuses the domain-aware review loader (`_critic_body`) and the whole-page render
 import re
 from dataclasses import dataclass, field
 
+from coursekit import atomic
 from coursekit.generate.critic import ask as ask_critic
 from coursekit.generate.page.pedagogy import _render_page
 from coursekit.generate.quiz.evaluate import READ_TEMPERATURE, _critic_body
@@ -128,6 +129,5 @@ def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None
     if out_path is None:
         out_path = Path(units[0].output_dir).parent / "page-concepts.md"
     out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text("\n".join(render_concepts(r) for r in results), encoding="utf-8")
+    atomic.write(out_path, "\n".join(render_concepts(r) for r in results))
     return results, out_path

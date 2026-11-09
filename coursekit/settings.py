@@ -20,12 +20,11 @@ file don't survive a write — PyYAML drops them — so a writer that wants a no
 `header`; anything that must persist belongs in a setting, not a comment.
 """
 
-import os
 from pathlib import Path
 
 import yaml
 
-from coursekit import courseconfig, schemas
+from coursekit import atomic, courseconfig, schemas
 from coursekit.outcomes import CoursekitError
 
 DOCS = {
@@ -89,10 +88,7 @@ def write(root, doc: str, data: dict, *, header: str = "") -> dict:
     path, model = _doc(root, doc)
     stored = schemas.validate(path, data, model).model_dump(exclude_defaults=True)
     body = yaml.safe_dump(stored, sort_keys=False, allow_unicode=True, default_flow_style=False) if stored else ""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.tmp")
-    tmp.write_text(header + body, encoding="utf-8")
-    os.replace(tmp, path)                                   # atomic: readers see old or new, never half
+    atomic.write(path, header + body)                      # readers see old or new, never half
     return stored
 
 

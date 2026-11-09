@@ -10,10 +10,11 @@ composable A/B). Runs live with the course, never in this repo.
 """
 
 import json
-import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
+
+from coursekit import atomic
 
 
 def coursekit_commit() -> str:
@@ -45,12 +46,12 @@ def archive_evaluation(course_root, *, model: str, reviews, metrics: dict) -> Pa
     for rp in reviews:
         rp = Path(rp)
         if rp.exists():
-            shutil.copy2(rp, run_dir / rp.name)
+            atomic.write(run_dir / rp.name, rp.read_bytes())
 
     commit = coursekit_commit()
-    (run_dir / "summary.json").write_text(
-        json.dumps({"timestamp": ts, "coursekit_commit": commit, "model": model,
-                    "metrics": metrics}, indent=2), encoding="utf-8")
+    atomic.write(run_dir / "summary.json",
+                 json.dumps({"timestamp": ts, "coursekit_commit": commit, "model": model,
+                             "metrics": metrics}, indent=2))
 
     # One flat row per run — a ledger you can read as a table / plot as a trend.
     row = {"timestamp": ts, "commit": commit, "model": model}

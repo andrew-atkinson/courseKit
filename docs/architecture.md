@@ -108,7 +108,8 @@ Nothing here is coursekit-specific; it is what the instructor already has.
 
 - **the `.vtconfig/` reference:** `context.yaml` (course · weeks · modules) and the per-tool config (`quiz.yaml`, `page.yaml`, `style.yaml`, the per-week supplements, prompt overrides). The tools create these, but they are **faculty-editable** — a professor changes a theme, tunes a prompt, adds a supplement link, or fixes a week title by hand in an ordinary text editor. It is a *local reference coursekit both writes and reads*, not a hidden store.
 - **the generated files:** `week-N.md` (the unit's text), the `bank.json` / `page.json` / `assignment.json` IR, the emitted artifacts (`.gift`, QTI `.zip`, `.html`, `.imscc`), and the census (`census.json` + `census.md`).
-  Beside each quiz, a `record.json` says what it was made from and how (CORE-4); pages, assignments, overviews, and concept maps get one next. No emitter reads it.
+  Beside every artifact coursekit makes, a record says what it was made from and how (CORE-4): `record.json` in each quiz, page, and assignment folder, and `<name>.record.json` beside each overview page and concept map. No emitter reads it.
+  Every file coursekit writes is written whole or not at all (`coursekit/atomic.py`), so a crash or a full disk leaves the previous file, never half of one.
 
 Everything is plain, versionable files in the course folder — never a database. coursekit **writes** here (week text, concept maps, IR, artifacts, and its own settings) and **reads** here (config); the transcriber writes here too (`context.yaml`, `week-N.md`).
 That file boundary is why the two tools stay separate repos with disjoint runtimes — the transcriber keeps `mlx-whisper` and its Apple-Silicon stack; coursekit stays pydantic + stdlib — and neither imports the other.

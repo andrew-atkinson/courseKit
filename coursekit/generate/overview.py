@@ -16,7 +16,7 @@ import argparse
 import os
 from pathlib import Path
 
-from coursekit import courseconfig, outcomes, prompts
+from coursekit import atomic, courseconfig, outcomes, prompts
 from coursekit.discover import slugify
 from coursekit.generate.page import concept_map as cmap
 from coursekit.generate.page.page import Page, build_block
@@ -97,13 +97,23 @@ def build_module_overview(course_title: str, module: str, weeks, *, framing: str
 def _render_overview(page, out_dir: Path, root) -> Path:
     from coursekit.emit import html as html_emit
     from coursekit.generate.page.style import load_style
-    (out_dir / f"{page.slug}.json").write_text(page.model_dump_json(indent=2), encoding="utf-8")
+    atomic.write(out_dir / f"{page.slug}.json", page.model_dump_json(indent=2))
     return html_emit.write_html(page, out_dir, {}, load_style(root))
 
 
-def generate_overviews(course_path, *, provider=None, model=None, framing: bool = True) -> list[Path]:
-    """Build every week 'Start Here' + every module overview for a course, writing them to
-    `<course>/overview/`. Deterministic assembly; `framing` adds a light model intro per page."""
+def _frame_messages(cfg, root, title: str, topics: str, eu: str) -> list[dict]:
+    system = (courseconfig.domain_preface(cfg.domain) + courseconfig.voice_preface(cfg.voice)
+              + prompts.load("page", "overview_frame", project_root=root).body)
+    return [{"role": "system", "content": system},
+            {"role": "user", "content": f"Title: {title}\nTopics: {topics}\nBig idea: {eu or '(none stated)'}"}]
+
+
+def plan(course_path, *, framing: bool = True) -> tuple:
+    """Every overview page for a course, from today's files, in order: each week with a concept map, then
+    each module. Each is {"unit", "build": framing → Page, "frame": the framing pass's messages (when
+    `framing`), "maps": the concept maps it is built from}, or {"unit", "skip": why}. The run and a record's check both build it here (CORE-4.2).
+    Returns (root, entries)."""
+    from functools import partial
     cfg = courseconfig.load(course_path)
     root = cfg.root
     if not root:
@@ -112,25 +122,6 @@ def generate_overviews(course_path, *, provider=None, model=None, framing: bool 
     course_title = cfg.course_title or "Course"
     weeks = (cfg.context or {}).get("weeks") or {}
 
-    sys_frame = None
-    if framing and provider:
-        sys_frame = (courseconfig.domain_preface(cfg.domain) + courseconfig.voice_preface(cfg.voice)
-                     + prompts.load("page", "overview_frame", project_root=root).body)
-
-    def frame(title: str, topics: str, eu: str) -> str:
-        if not sys_frame:
-            return ""
-        try:
-            out = provider.chat(model=model, temperature=0.4, messages=[
-                {"role": "system", "content": sys_frame},
-                {"role": "user", "content": f"Title: {title}\nTopics: {topics}\nBig idea: {eu or '(none stated)'}"},
-            ]).strip()
-            return "" if ("http" in out or "://" in out) else out   # framing carries no links
-        except Exception as e:                   # optional: the default intro stands in, but say so
-            outcomes.warn("overview.framing_failed", f"  {title}: framing skipped ({type(e).__name__}: {e}) "
-                                                     f"— using the default intro.", page=title)
-            return ""
-
     parsed = []
     for key, meta in weeks.items():
         num = courseconfig.week_key(key)
@@ -138,29 +129,86 @@ def generate_overviews(course_path, *, provider=None, model=None, framing: bool 
         parsed.append((num, (meta or {}).get("title") or key, (meta or {}).get("module") or "", cm))
     parsed.sort(key=lambda t: int(t[0]) if t[0] and str(t[0]).isdigit() else 999)
 
-    out_dir = Path(root) / "overview"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    written: list[Path] = []
+    def entry(unit, build, title, topics, eu, weeks):
+        return {"unit": unit, "build": build, "title": title, "maps": [cmap.concept_map_path(root, n) for n in weeks],
+                "frame": _frame_messages(cfg, root, title, topics, eu) if framing else None}
 
+    entries = []
     for num, title, module, cm in parsed:
         if cm is None or not cm.concepts:        # nothing to orient toward without a concept map
-            outcomes.warn("overview.skipped", f"  week {num} ({title}): no overview — "
-                          f"{'no concept map; run `coursekit analyze`' if cm is None else 'its concept map lists no concepts'}.",
-                          unit=num)
+            entries.append({"unit": num, "skip": f"week {num} ({title}): no overview — "
+                            f"{'no concept map; run `coursekit analyze`' if cm is None else 'its concept map lists no concepts'}."})
             continue
-        f = frame(f"Week {num}: {title}", ", ".join(c.name for c in cm.concepts), cm.enduring_understanding)
-        written.append(_render_overview(build_week_overview(course_title, num, title, module, cm, framing=f),
-                                        out_dir, root))
-
+        entries.append(entry(num, partial(build_week_overview, course_title, num, title, module, cm),
+                             f"Week {num}: {title}", ", ".join(c.name for c in cm.concepts), cm.enduring_understanding,
+                             [num]))
     modules: dict[str, list] = {}
     for num, title, module, cm in parsed:
         if module and cm is not None:
             modules.setdefault(module, []).append((num, title, cm.enduring_understanding))
     for module, wks in modules.items():
-        f = frame(module, "; ".join(t for _, t, _ in wks), "")
-        written.append(_render_overview(build_module_overview(course_title, module, wks, framing=f),
-                                        out_dir, root))
+        entries.append(entry(None, partial(build_module_overview, course_title, module, wks),
+                             module, "; ".join(t for _, t, _ in wks), "", [n for n, _, _ in wks]))
+    return root, entries
+
+
+def generate_overviews(course_path, *, provider=None, model=None, framing: bool = True) -> list[Path]:
+    """Build every week 'Start Here' + every module overview for a course, writing them to
+    `<course>/overview/`, each with its record (`<slug>.record.json`). Deterministic assembly; `framing`
+    adds a light model intro per page."""
+    from coursekit import records
+    with records.reading() as read:
+        root, entries = plan(course_path, framing=bool(framing and provider))
+    every_map = {str(cmap.concept_map_path(root, courseconfig.week_key(k)).resolve())
+                 for k in (courseconfig.load(course_path).context or {}).get("weeks") or {}}
+
+    def frame(e) -> str:
+        if not e["frame"]:
+            return ""
+        try:
+            out = provider.chat(model=model, temperature=0.4, messages=e["frame"]).strip()
+            return "" if ("http" in out or "://" in out) else out   # framing carries no links
+        except Exception as ex:                  # optional: the default intro stands in, but say so
+            outcomes.warn("overview.framing_failed", f"  {e['title']}: framing skipped ({type(ex).__name__}: {ex}) "
+                                                     f"— using the default intro.", page=e["title"])
+            return ""
+
+    out_dir = Path(root) / "overview"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    for e in entries:
+        if "skip" in e:
+            outcomes.warn("overview.skipped", f"  {e['skip']}", unit=e["unit"])
+            continue
+        f = frame(e)
+        page = e["build"](framing=f)
+        written.append(_render_overview(page, out_dir, root))
+        mine = {str(m.resolve()) for m in e["maps"]}                # every page reads the course's settings,
+        own = {k: h for k, h in read.items() if k not in every_map or k in mine}   # but only its own weeks' maps
+        steps = [{"step": "build", "by": "coursekit", "brief": records.digest(_built(e)), "read": own,
+                  "options": {"slug": page.slug}}]
+        if f:
+            steps.append({"step": "frame", "by": "model", "brief": records.digest(e["frame"]), "read": own,
+                          "model": model, "options": {"slug": page.slug}})
+        records.write_steps(out_dir, steps, kind="overview", unit=e["unit"], outputs=(f"{page.slug}.json",),
+                            fresh=True, name=records.name_for(f"{page.slug}.json"))
     return written
+
+
+def _built(e) -> dict:
+    """What the program assembles for an overview, apart from the model's framing."""
+    return e["build"]().model_dump(mode="json")
+
+
+def rebuild(rec: dict, step: dict, art_dir):
+    """What `step` of an overview's record would produce today: the page as assembled, or the framing
+    pass's messages."""
+    from coursekit import records
+    _, entries = plan(records._root(Path(art_dir)), framing=step["step"] == "frame")
+    for e in entries:
+        if "skip" not in e and e["build"]().slug == step["options"]["slug"]:
+            return e["frame"] if step["step"] == "frame" else _built(e)
+    raise LookupError(f"{step['options']['slug']!r} is no longer one of the course's overviews")
 
 
 def main() -> int:

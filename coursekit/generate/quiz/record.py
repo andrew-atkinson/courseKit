@@ -5,8 +5,7 @@ agent/core-4-design.md.
 
 Every rebuild calls the same function the run did — `QuizGenerator.build_messages`, `eu.eu_brief`,
 `intro.intro_brief` — so the check and the run can't disagree about what the model is shown.
-
-    uv run python -m coursekit.generate.quiz.record "/path/to/course"     # each quiz's status
+`python -m coursekit.records PATH` shows every artifact's status.
 """
 
 import json
@@ -31,15 +30,10 @@ def options(unit, *, concept_shape: bool = True, source=None, overrides: dict | 
 
 
 def _unit_and_text(opts: dict, art_dir: Path):
-    root = records._root(art_dir)
     if "source" in opts:                                   # a single-document quiz: rebuild from the document
         from coursekit.generate.quiz import targeted
-        return targeted.prepare(records._resolve(opts["source"], root))
-    from coursekit.discover import find_units
-    path = records._resolve(opts["text"], root)
-    records.note(path)
-    (unit,) = find_units(path)                             # the unit whose text this is, as a run finds it
-    return unit, path.read_text(encoding="utf-8")
+        return targeted.prepare(records._resolve(opts["source"], records._root(art_dir)))
+    return records.unit_for(opts["text"], art_dir)
 
 
 def _cfg(unit, opts: dict):
@@ -55,7 +49,7 @@ def _eu(unit) -> str:
     return cm.enduring_understanding if cm is not None else ""
 
 
-def rebuild(step: dict, art_dir) -> list[dict]:
+def rebuild(rec: dict, step: dict, art_dir) -> list[dict]:
     """The messages `step` would send today."""
     from coursekit.generate.quiz import eu, intro
     from coursekit.generate.quiz.bank import Bank
@@ -89,35 +83,11 @@ def write(art_dir, unit, step: str, *, opts: dict | None = None, model: str | No
     rebuilding it here, from the files just written; `generate` passes the digest of what it sent."""
     if brief is None and step in ("eu", "intro"):
         with records.reading() as read:
-            brief = records.digest(rebuild({"step": step, "options": opts or {}}, art_dir))
+            brief = records.digest(rebuild({}, {"step": step, "options": opts or {}}, art_dir))
     records.write_step(art_dir, kind="quiz", unit=(unit.week_num or unit.week_slug) if unit else None,
                        step=step, by=by, outputs=OUTPUTS, brief=brief, read=read, model=model,
                        options=opts, fresh=fresh, edited=edited)
 
 
 def status(art_dir) -> records.Status:
-    return records.status(art_dir, lambda rec, step: rebuild(step, art_dir))
-
-
-def main() -> int:
-    import argparse
-
-    from coursekit import outcomes
-    from coursekit.course import Course
-
-    ap = argparse.ArgumentParser(description="Show whether each quiz still matches its course (CORE-4).")
-    ap.add_argument("course")
-    args = ap.parse_args()
-    with outcomes.capture(sink=lambda n: None):
-        quizzes = Course.load(args.course).artifacts_for(kind="quiz")
-    for a in quizzes:
-        st = status(a.path.parent)
-        print(f"{a.slug:32} {st.state}{' + edited' if st.edited else ''}")
-        for r in st.reasons:
-            print(f"    {r}")
-    return 0
-
-
-if __name__ == "__main__":
-    from coursekit.console import run
-    raise SystemExit(run(main))
+    return records.status(art_dir)

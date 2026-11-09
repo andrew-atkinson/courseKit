@@ -20,6 +20,7 @@ wrong SOURCE (upstream); tension + facticity FAIL ≈ a model error to fix.
 import re
 from dataclasses import dataclass, field
 
+from coursekit import atomic
 from coursekit.generate.critic import ask as ask_critic
 from coursekit.generate.page.evaluate import _SKIP_KINDS, _format_block
 from coursekit.generate.quiz.evaluate import READ_TEMPERATURE, _critic_body
@@ -182,6 +183,5 @@ def evaluate_course_groundedness(path, *, weeks=None, provider, model, out_path=
     if out_path is None:
         out_path = Path(units[0].output_dir).parent / "page-groundedness.md"
     out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text("\n".join(render_groundedness(r) for r in results), encoding="utf-8")
+    atomic.write(out_path, "\n".join(render_groundedness(r) for r in results))
     return results, out_path

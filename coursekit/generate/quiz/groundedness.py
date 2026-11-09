@@ -16,6 +16,7 @@ Discovery reuses `_iter_quiz_banks`, so it covers whole-week AND targeted quizze
 import re
 from dataclasses import dataclass, field
 
+from coursekit import atomic
 from coursekit.generate.critic import ask as ask_critic
 from coursekit.generate.quiz.evaluate import (
     READ_TEMPERATURE,
@@ -154,6 +155,5 @@ def evaluate_course_groundedness(path, *, weeks=None, provider, model, out_path=
     if not results:
         return [], None
     out_path = Path(out_path) if out_path else root / "quizzes" / "quiz-groundedness.md"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text("\n".join(render_groundedness(r) for r in results), encoding="utf-8")
+    atomic.write(out_path, "\n".join(render_groundedness(r) for r in results))
     return results, out_path

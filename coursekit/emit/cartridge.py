@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from coursekit import courseconfig
+from coursekit import atomic, courseconfig
 from coursekit.emit import cc
 
 
@@ -257,8 +257,7 @@ def write_course_imscc(path, out_path=None, title=None, sources=None) -> Path | 
     out_path = Path(out_path)
     if out_path.suffix != ".imscc":
         out_path = out_path.with_suffix(".imscc")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
+    with atomic.replacing(out_path) as tmp, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
         for arc, data in files.items():
             z.writestr(arc, data)
     return out_path

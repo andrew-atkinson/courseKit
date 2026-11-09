@@ -1,7 +1,7 @@
 # CORE-4 design — artifact records (2026-11-07)
 
 The fourth step of [structure-review.md](structure-review.md): beside each generated artifact, a small record of what it was made from and how, so coursekit can tell when an artifact no longer matches its course.
-This is the design pass; nothing is built yet. The user settled decisions 1, 4, and 5 on 2026-11-07 and added the atomic writes to step 2; the others stand as recommended.
+Steps 1 and 2 are built (2026-11-07, 2026-11-08). The user settled decisions 1, 4, and 5 on 2026-11-07 and added the atomic writes to step 2; the others stand as recommended.
 Facts below were read from `main` at `2a0b346` and from both real courses (read only); counts are snapshots.
 
 ## 1. What exists today
@@ -134,13 +134,21 @@ Every step keeps these **goldens** identical to `main`, captured once before ste
    The EU and intro briefs became `eu.eu_brief` and `intro.intro_brief`, and `targeted.prepare` works out a document quiz's unit and text without writing, so the run and the check share one builder each; a document quiz rebuilds from its document, not from its `source.md` copy.
    A later step on an artifact with no record writes nothing, so a quiz made before records stays unknown rather than "current" on the strength of a reorder.
    Two things mutation checks found: the EU rebuild's whitespace only mattered once the test file ended in a newline, as real files do; and the intro's explanation had listed the unit's text, which it is never shown, because finding the unit noted it — finding the unit is now kept out of the intro's `read`.
-   To see it: `python -m coursekit.generate.quiz.record PATH` (step 4 puts status in the census).
+   To see it: `python -m coursekit.records PATH` since step 2 (step 4 puts status in the census).
 2. **`CORE-4.2-records-everywhere` — pages, assignments, overviews, concept maps, and atomic writes.**
    Their briefs (decompose records one per section, from the cached materials), their writers, and upstream staleness (a quiz whose concept map is stale).
    **Every artifact write becomes atomic (user, 2026-11-07).** §1's table lists the writers that aren't: `finalize`'s `quiz.json` and both `.gift` files, `AssignmentDraft.finalize`, `overview._render_overview`, `concept_map.save_concept_map`, and `page/build._write_page`, plus the rendered HTML they write beside it.
    One helper does it (write a temporary file in the same folder, then `os.replace`), and `settings.write`, `set_order`, the drafts' autosave, and `records.write_step` move onto it, so there is one copy of the rule instead of four.
    A record is written only after its artifact is in place, so it never describes a file that isn't there.
    *Pass:* G0 and G1 identical; the step 1 checks for each kind; re-transcribing a unit makes its concept map stale and its quiz and page upstream stale; for each writer, a write made to fail partway leaves the previous file whole and no temporary file behind; a guard test (like `tests/test_outcomes.py`) fails if code under `coursekit/` writes an artifact, a record, or a setting any other way; mutation checks on the helper and the guard.
+   **Done 2026-11-08.** G0: every file inside the 25 export packages from copies of both real courses identical to `main` (a zip's own bytes carry the time it was written, so members are compared). G1: a scripted run of every generator (analyze, a quiz with the EU question and intro, monolithic, decomposed, glossary, overview and recap pages, an assignment, framed course overviews) writes the same 40 files as `main`, plus 11 records, every one current; about 20 ms more per run.
+   The guard is wider than designed: every file write under `coursekit/` goes through `atomic.write` or `atomic.replacing` (reviews, the census, eval snapshots, and the export zips too), so the rule needs no list of which files count; appending a log line is the one exception.
+   Each writer is made to fail at each of its writes in turn, and every file it touches is then whole: old or new, never half.
+   Each kind's brief has one builder the run and the check share: `consolidate.analyze_brief` and `segment.brief` (the map), `decompose.plan` (one step per section), `glossary.passes`, `assignment.build.brief`, `overview.plan`; a model-free page's brief is the page it assembles.
+   Upstream staleness follows the step that wrote the file read: a record's steps can say which outputs they wrote (`wrote`), so a page built from the concept map isn't upstream stale when only the map's material split is.
+   `analyze`'s per-unit work moved from the CLI into `consolidate.analyze_unit`, so the code that writes the map writes its record.
+   An assignment drafted from material a caller passes in (no caller does yet) can't be checked later, so its old record goes and it reads unknown.
+   `python -m coursekit.records PATH` lists every record's status (it replaces the quiz-only command).
 3. **`CORE-4.3-evaluations` — evaluations tied to versions.**
    `evaluate` adds each artifact's result to its record with the hash it judged; `evalstore`'s snapshots stay as they are.
    *Pass:* after an evaluation the artifact reads as evaluated; a later edit makes that evaluation visibly older than the artifact; the review files are byte-identical to `main`.

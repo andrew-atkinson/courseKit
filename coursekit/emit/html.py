@@ -10,6 +10,7 @@ from pathlib import Path
 
 from markupsafe import escape
 
+from coursekit import atomic
 from coursekit.generate.page.renderer import load_supplements, render_body
 
 _DOC = """<!doctype html>
@@ -42,11 +43,7 @@ def render_document(page, supplements: dict | None = None, style: dict | None = 
 
 def write_html(page, out_dir, supplements: dict | None = None, style: dict | None = None) -> Path:
     """Write `<slug>.html` beside the page's other artifacts. Returns the path."""
-    out = Path(out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    path = out / f"{page.slug}.html"
-    path.write_text(render_document(page, supplements, style), encoding="utf-8")
-    return path
+    return atomic.write(Path(out_dir) / f"{page.slug}.html", render_document(page, supplements, style))
 
 
 def reemit(path) -> list[tuple[Path, Path]]:

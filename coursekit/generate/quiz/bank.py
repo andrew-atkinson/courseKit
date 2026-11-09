@@ -8,7 +8,6 @@ Knows nothing about GIFT. See gift.py for serialisation.
 """
 
 import json
-import os
 import random
 import re
 from pathlib import Path
@@ -21,6 +20,8 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+
+from coursekit import atomic
 
 QuestionType = Literal["multiple_choice", "multiple_answer", "true_false", "short_answer",
                        "numerical", "matching", "open_response"]
@@ -357,11 +358,12 @@ class BankDraft:
         in-place edit of an adopted one — so readers never see a half-built bank."""
         if self.out_dir is None:
             return
-        self.out_dir.mkdir(parents=True, exist_ok=True)
-        partial = self.out_dir / "bank.partial.json"
-        partial.write_text(json.dumps(self.bank.model_dump(), indent=2), encoding="utf-8")
+        text = json.dumps(self.bank.model_dump(), indent=2)
         if self.bank.finalized or not self.staged:
-            os.replace(partial, self.out_dir / "bank.json")
+            atomic.write(self.out_dir / "bank.json", text)
+            (self.out_dir / "bank.partial.json").unlink(missing_ok=True)
+        else:
+            atomic.write(self.out_dir / "bank.partial.json", text)
 
     def create_group(self, group_id: str, concept_title: str, question_type: str) -> str:
         if question_type not in _KIND_TO_TOOL:
@@ -566,10 +568,10 @@ class BankDraft:
         if self.out_dir is None:
             return "OK bank valid (no output directory set, nothing written)."
 
-        (self.out_dir / "quiz.json").write_text(json.dumps(quiz, indent=2), encoding="utf-8")
         order = [e["group_id"] for e in quiz["groups"]]
-        (self.out_dir / "bank.gift").write_text(gift.emit_bank(self.bank, order), encoding="utf-8")
-        (self.out_dir / f"quiz_{seed}.gift").write_text(gift.emit_quiz(quiz, self.bank), encoding="utf-8")
+        atomic.write(self.out_dir / "quiz.json", json.dumps(quiz, indent=2))
+        atomic.write(self.out_dir / "bank.gift", gift.emit_bank(self.bank, order))
+        atomic.write(self.out_dir / f"quiz_{seed}.gift", gift.emit_quiz(quiz, self.bank))
 
         n = sum(len(g.variants) for g in self.bank.groups.values())
         return (f"OK finalized: {len(self.bank.groups)} groups, {n} variants -> "
@@ -622,9 +624,7 @@ def set_order(quiz_dir, group_ids: list[str]) -> dict:
     for name, text in (("quiz.json", json.dumps(quiz, indent=2)),
                        ("bank.gift", gift.emit_bank(bank, group_ids)),
                        (f"quiz_{quiz['seed']}.gift", gift.emit_quiz(quiz, bank))):
-        tmp = quiz_dir / f".{name}.tmp"
-        tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, quiz_dir / name)
+        atomic.write(quiz_dir / name, text)
     record.write(quiz_dir, None, "reorder", by="instructor", edited=edited)
     return quiz
 

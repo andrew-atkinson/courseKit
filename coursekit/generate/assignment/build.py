@@ -13,7 +13,7 @@ change here.
 
 from pathlib import Path
 
-from coursekit import prompts
+from coursekit import atomic, prompts
 from coursekit.generate import dispatch
 from coursekit.generate.assignment.assignment import (Assignment, Rubric, RubricCriterion,
                                                       RubricRating)
@@ -80,7 +80,7 @@ class AssignmentDraft:
             return "ERROR: add at least one rubric criterion (add_rubric_criterion) before finalizing."
         self.finalized = True
         if self.out_dir is not None:
-            (self.out_dir / "assignment.json").write_text(a.model_dump_json(indent=2), encoding="utf-8")
+            atomic.write(self.out_dir / "assignment.json", a.model_dump_json(indent=2))
         return f"OK finalized: {a.title!r}, {len(a.rubric.criteria)} criteria, {a.effective_points:.0f} pts."
 
 
@@ -175,32 +175,58 @@ class _AssignmentGenerator:
 
 
 # --------------------------------------------------------------- driver
+def brief(unit, *, material: str | None = None, scope: str = "this week", project_root=None) -> list[dict]:
+    """What drafting `unit`'s assignment shows the model: the scope and the material (by default the
+    week's text). The run and a record's check both build it here (CORE-4.2)."""
+    from coursekit import courseconfig, records
+    project_root = project_root or unit.course_root
+    if material is None:
+        records.note(unit.transcript_path)
+        material = Path(unit.transcript_path).read_text(encoding="utf-8", errors="replace")
+    cfg = courseconfig.load(unit.transcript_path, config_name="assignment.yaml")
+    system = (courseconfig.domain_preface(cfg.domain) + courseconfig.voice_preface(cfg.voice)
+              + prompts.load("assignment", "default", project_root=project_root).body)
+    user = (f"Scope: {scope}.\n\nThe material to base the assignment on:\n<material>\n{material}\n"
+            f"</material>\n\nDraft the assignment now.")
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
 def build_assignment(unit, provider, model, out_dir, *, material: str | None = None,
                      scope: str = "this week", project_root=None):
     """Draft one assignment for `unit` from `material` (defaults to the week's transcript). `scope`
-    names what the assignment covers, woven into the brief. Returns (Assignment|None, problems)."""
+    names what the assignment covers, woven into the brief. Returns (Assignment|None, problems). A
+    finished assignment made from the week's text gets a record; one made from material the caller
+    passed in can't be checked later, so any old record goes (its status is then unknown)."""
+    from coursekit import courseconfig, records
     from coursekit.pipeline import loop
 
-    project_root = project_root or unit.course_root
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    material = material if material is not None else Path(unit.transcript_path).read_text(
-        encoding="utf-8", errors="replace")
+    with records.reading() as read:
+        messages = brief(unit, material=material, scope=scope, project_root=project_root)
+    fingerprint = records.digest(messages)
 
-    from coursekit import courseconfig
     cfg = courseconfig.load(unit.transcript_path, config_name="assignment.yaml")
     points = float(cfg.value("assignment_points") or 10)
     base = (unit.week_slug or "assignment")
     draft = AssignmentDraft(assignment_id=f"{unit.course_slug}-{base}", slug=f"{base}-assignment",
                             week_ref=unit.week_slug, default_points=points, out_dir=out_dir)
-
-    system = (courseconfig.domain_preface(cfg.domain) + courseconfig.voice_preface(cfg.voice)
-              + prompts.load("assignment", "default", project_root=project_root).body)
-    user = (f"Scope: {scope}.\n\nThe material to base the assignment on:\n<material>\n{material}\n"
-            f"</material>\n\nDraft the assignment now.")
-    loop([{"role": "system", "content": system}, {"role": "user", "content": user}],
-         provider, model, _AssignmentGenerator(AssignmentTools(draft)), max_iters=12)
+    loop(messages, provider, model, _AssignmentGenerator(AssignmentTools(draft)), max_iters=12)
 
     a = draft.assignment
     problems = [] if (a and draft.is_finalized()) else ["assignment did not finalize"]
+    if not problems and material is None:
+        opts = {"text": str(Path(unit.transcript_path).resolve()), **({"scope": scope} if scope != "this week" else {})}
+        records.write_step(out_dir, step="generate", by="model", brief=fingerprint, read=read, model=model,
+                           options=opts, kind="assignment", unit=unit.week_num or unit.week_slug,
+                           outputs=("assignment.json",), fresh=True)
+    elif not problems:
+        (out_dir / records.RECORD).unlink(missing_ok=True)
     return a, problems
+
+
+def rebuild(rec: dict, step: dict, art_dir) -> list[dict]:
+    """What `step` (the assignment's `generate`) would show the model today."""
+    from coursekit import records
+    unit, _ = records.unit_for(step["options"]["text"], art_dir)
+    return brief(unit, scope=step["options"].get("scope", "this week"))

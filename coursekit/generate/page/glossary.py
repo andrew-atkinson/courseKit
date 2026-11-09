@@ -38,13 +38,40 @@ def _harvest_new_glossary(pg) -> list[dict]:
     return out
 
 
+def passes(unit, *, project_root=None) -> list[tuple[str, str]]:
+    """The glossary's passes, from today's files: (system, user) per bounded chunk of the unit's text. The
+    run and a record's check both build them here (CORE-4.2)."""
+    from coursekit import records
+    project_root = project_root or unit.course_root
+    cfg = courseconfig.load(unit.transcript_path, config_name="page.yaml")   # page settings, not quiz.yaml
+    records.note(unit.transcript_path)
+    transcript = Path(unit.transcript_path).read_text(encoding="utf-8", errors="replace")
+    system = (courseconfig.domain_preface(cfg.domain)
+              + prompts.load("page", "glossary", project_root=project_root).body)
+    budget = int(cfg.value("max_pass_chars", decompose.DEFAULT_PASS_CHARS))
+    chunks = decompose._material_chunks(transcript, budget)   # long weeks → bounded passes, nothing dropped
+    out = []
+    for k, chunk in enumerate(chunks):
+        cont = ("" if len(chunks) == 1 else
+                f"\n\n(This is part {k + 1} of {len(chunks)} of the material; add any NEW terms it "
+                f"introduces — do not repeat terms already covered.)")
+        out.append((system, f"The week's material:\n<material>\n{chunk}\n</material>{cont}"))
+    return out
+
+
+def step_messages(ps) -> list[list[dict]]:
+    return [decompose.pass_messages(s, u) for s, u in ps]
+
+
 def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
     """Build the week's glossary companion into `out_dir`. Returns (page, problems); problems empty
     means it finalized. One `add_glossary` pass per material chunk; terms are harvested per chunk and
     deduped into one glossary block deterministically."""
+    from coursekit import records
+    from coursekit.generate.page import record
     project_root = project_root or unit.course_root
-    cfg = courseconfig.load(unit.transcript_path, config_name="page.yaml")   # page settings, not quiz.yaml
-    transcript = Path(unit.transcript_path).read_text(encoding="utf-8", errors="replace")
+    with records.reading() as read:
+        ps = passes(unit, project_root=project_root)
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -57,21 +84,12 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
     # No heading block: the glossary block is self-labeling (a framed "Key Terms" box), so a separate
     # heading would just repeat that label — and once carried role="review", which mis-rendered the
     # terms as a "Key Terms Recap" container. The pass only fills the terms; the box IS the section.
-    system = (courseconfig.domain_preface(cfg.domain)
-              + prompts.load("page", "glossary", project_root=project_root).body)
-    budget = int(cfg.value("max_pass_chars", decompose.DEFAULT_PASS_CHARS))
-    chunks = decompose._material_chunks(transcript, budget)   # long weeks → bounded passes, nothing dropped
     stats: dict = {}
 
     def _extract() -> list[dict]:
         collected: list[dict] = []
-        for k, chunk in enumerate(chunks):
-            cont = ("" if len(chunks) == 1 else
-                    f"\n\n(This is part {k + 1} of {len(chunks)} of the material; add any NEW terms it "
-                    f"introduces — do not repeat terms already covered.)")
-            decompose._run_pass(session, provider, model, system,
-                                f"The week's material:\n<material>\n{chunk}\n</material>{cont}",
-                                specs=_GLOSSARY_SPECS, stats=stats)
+        for system, user in ps:
+            decompose._run_pass(session, provider, model, system, user, specs=_GLOSSARY_SPECS, stats=stats)
             collected += _harvest_new_glossary(draft.page)
         return collected
 
@@ -87,7 +105,7 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
     if seen:
         draft.put_block(pageir.build_block("glossary", block_id="terms", entries=list(seen.values())))
     outcomes.info("page.glossary_terms", f"  glossary: {len(seen)} term(s){f' (retry{retries})' if retries else ''}"
-                  f"{f' over {len(chunks)} chunk(s)' if len(chunks) > 1 else ''}", terms=len(seen))
+                  f"{f' over {len(ps)} chunk(s)' if len(ps) > 1 else ''}", terms=len(seen))
 
     if stats.get("errors"):
         from collections import Counter
@@ -98,6 +116,8 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
     problems = draft.validate_final()
     if not problems:
         draft.finalize()
+        record.write_page(out_dir, unit, [{"step": "glossary", "brief": records.digest(step_messages(ps))}],
+                          read=read, model=model, options=record.options(unit, "glossary"))
     else:
         outcomes.warn("page.not_finalized", "  (did not finalize: " + "; ".join(problems) + ")",
                       problems=problems)

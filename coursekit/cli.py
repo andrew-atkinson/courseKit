@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-from coursekit import console, courseconfig, pipeline
+from coursekit import atomic, console, courseconfig, pipeline
 from coursekit.emit import cc as cc_emit
 from coursekit.emit import html as html_emit
 from coursekit.emit import qti
@@ -408,35 +408,11 @@ def _cmd_analyze(args) -> int:
         if not key:
             print(f"  [skip] {label}: could not resolve a week number for the filename")
             continue
-        cfg = courseconfig.load(u.transcript_path, config_name="page.yaml")
-        wk = cmap.read_week_knowledge(u.transcript_path, week=label)
-        if wk.kcs:
-            cmp = con.consolidate(wk, provider, model, week=label, domain=cfg.domain,
-                                  project_root=u.course_root)
-            via = f"from {len(wk.kcs)} knowledge components"
-        else:
-            # No transcriber knowledge.json — fall back to extracting from the week text itself, so a
-            # PDF/readings course (no transcripts) still gets a map. Same schema, same consumers.
-            from pathlib import Path as _P
-            text = _P(u.transcript_path).read_text(encoding="utf-8")
-            cmp = con.build_concept_map_from_text(text, provider, model, week=label,
-                                                  domain=cfg.domain, project_root=u.course_root)
-            via = "from the week text (no knowledge.json)"
-        out = cmap.save_concept_map(cmp, cmap.concept_map_path(u.course_root, key))
-        # Boundary-correct per-concept material for the decomposed generator: partition the week text
-        # into one contiguous span per concept and store it beside the map. Best-effort — its absence
-        # (or a segmentation hiccup) just falls back to the keyword slicer at generation time.
-        try:
-            from pathlib import Path as _P
-
-            from coursekit.generate.page import segment as seg
-            week_text = _P(u.transcript_path).read_text(encoding="utf-8")
-            mats = seg.segment_week(week_text, cmp, provider, model, project_root=u.course_root)
-            if mats:
-                seg.save_materials(mats, seg.materials_path(u.course_root, key))
-                via += f"; {len(mats)}/{len(cmp.concepts)} material span(s)"
-        except Exception as e:
-            print(f"  (segmentation skipped for {label}: {type(e).__name__}: {e})")
+        kcs = len(cmap.read_week_knowledge(u.transcript_path).kcs)
+        via = f"from {kcs} knowledge components" if kcs else "from the week text (no knowledge.json)"
+        cmp, out, spans = con.analyze_unit(u, provider, model)
+        if spans:
+            via += f"; {spans}/{len(cmp.concepts)} material span(s)"
         eu = " + enduring understanding" if cmp.enduring_understanding else ""
         print(f"  [OK] {label}: {len(cmp.concepts)} concept(s){eu} {via} -> {out}")
         wrote += 1
@@ -470,7 +446,7 @@ def _review_targeted_quiz(res, provider) -> None:
         print(f"  [{f.verdict}] {f.group_id}/{f.label}: {f.concern}")
     if flagged:
         review = res.output_dir / "quiz-review.md"
-        review.write_text(ev.render_review(findings), encoding="utf-8")
+        atomic.write(review, ev.render_review(findings))
         print(f"-> {review}")
 
 

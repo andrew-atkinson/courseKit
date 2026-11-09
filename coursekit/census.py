@@ -22,7 +22,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from coursekit import courseconfig, coursestructure, outcomes
+from coursekit import atomic, courseconfig, coursestructure, outcomes
 
 _ARTIFACT_LABELS = ("page", "quiz", "assignment", "concept map")
 
@@ -350,8 +350,7 @@ def write_census(course_path, *, out_dir=None) -> tuple[Census, Path, Path]:
     root = courseconfig.find_root(Path(course_path)) or Path(course_path).expanduser().resolve()
     base = Path(out_dir) if out_dir else root
     census = build_census(course_path)
-    base.mkdir(parents=True, exist_ok=True)
     jp, mp = base / "census.json", base / "census.md"
-    jp.write_text(census.model_dump_json(indent=2), encoding="utf-8")
-    mp.write_text(render_report(census), encoding="utf-8")
+    atomic.write(jp, census.model_dump_json(indent=2))
+    atomic.write(mp, render_report(census))
     return census, jp, mp

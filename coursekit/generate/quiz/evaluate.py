@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from coursekit import prompts
+from coursekit import atomic, prompts
 
 EVALUATE_CATEGORY = "quiz"
 
@@ -211,8 +211,7 @@ def evaluate_course(path, *, weeks=None, provider, model, out_path=None,
         root = courseconfig.find_root(path) or Path(path).expanduser().resolve()
         out_path = root / "quizzes" / "quiz-review.md"
     out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(render_review(findings), encoding="utf-8")
+    atomic.write(out_path, render_review(findings))
     return findings, out_path
 
 

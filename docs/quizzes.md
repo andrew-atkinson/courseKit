@@ -122,8 +122,10 @@ Each quiz's `record.json` keeps a fingerprint of exactly what the model was show
 To see whether each quiz still matches its course, with no model:
 
 ```bash
-uv run python -m coursekit.generate.quiz.record "/path/to/course"
+uv run python -m coursekit.records "/path/to/course"
 ```
+
+The same command lists every page, assignment, overview, and concept map too ([pages.md](pages.md#is-a-page-still-up-to-date)).
 
 A quiz is **current** when coursekit would brief the model exactly as before; **stale** when the course changed underneath it, with the files named ("`output/week-7.md` changed"); **outdated** when only a newer coursekit's own prompts would brief it differently; and **edited** when someone changed `bank.json` or `quiz.json` by hand since coursekit last wrote them.
 A change that doesn't reach the model, like adding another unit to `context.yaml`, changes nothing.

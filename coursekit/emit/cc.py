@@ -29,6 +29,8 @@ import hashlib
 import zipfile
 from pathlib import Path
 
+from coursekit import atomic
+
 # Canvas's own cccv1p0 namespace (module_meta.xml). Distinct from the IMS manifest namespaces.
 CANVAS_NS = ('xmlns="http://canvas.instructure.com/xsd/cccv1p0" '
              'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
@@ -338,8 +340,7 @@ def write_imscc(path, out_path=None, title=None) -> Path | None:
     out_path = Path(out_path)
     if out_path.suffix != ".imscc":
         out_path = out_path.with_suffix(".imscc")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
+    with atomic.replacing(out_path) as tmp, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
         for arc, data in files.items():
             z.writestr(arc, data)
     return out_path

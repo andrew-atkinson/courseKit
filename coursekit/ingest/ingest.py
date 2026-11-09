@@ -10,7 +10,7 @@ one model call. No network.
 import re
 from pathlib import Path
 
-from coursekit import courseconfig, coursestructure, prompts
+from coursekit import atomic, courseconfig, coursestructure, prompts
 from coursekit.ingest.extract import extract_text, is_supported
 
 SHAPE_CATEGORY = "ingest"
@@ -153,8 +153,7 @@ def ingest(path, *, out_dir=None, raw: bool = False, provider=None,
             # stays SOURCE-ADDRESSABLE (a targeted quiz / a source-scoped page can still find it) —
             # structure preserved, not a flat blob (FLOW-2 / PAGE-13).
             body = "\n\n".join(f"## {s.stem}\n\n{_text(s).strip()}" for s in sources)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(body.strip() + "\n", encoding="utf-8")
+        atomic.write(dest, body.strip() + "\n")
         for s in sources:
             written.append((s, dest))
     return written
