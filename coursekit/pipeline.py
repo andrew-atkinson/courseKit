@@ -12,7 +12,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from coursekit import courseconfig
-from coursekit import outcomes
+from coursekit import outcomes, records
 from coursekit.outcomes import CoursekitError
 from coursekit.discover import Unit, find_units, slugify
 from coursekit.generate.base import Generator, RunResult
@@ -202,14 +202,22 @@ def run_unit(unit: Unit, provider, model, gen: Generator, *,
     # and supplies the project root for file overrides. Load it per-generator, not from unit.config
     # (which discover binds to quiz.yaml) — a combined run drives both generators over one unit, and
     # the page pass must read page.yaml, not the quiz's. Absent config degrades to defaults.
-    cfg = courseconfig.load(unit.transcript_path, config_name=f"{gen.category}.yaml")
-    if config_overrides:
-        cfg = replace(cfg, config={**(cfg.config or {}), **config_overrides})
-    transcript = unit.transcript_path.read_text(encoding="utf-8")
-    messages = gen.build_messages(unit, transcript, cfg)
+    # Everything the brief is built from is read inside `records.reading()`, and the brief is fingerprinted
+    # before the loop adds to it: a generator that keeps a record (CORE-4) saves both once it finishes.
+    with records.reading() as read:
+        cfg = courseconfig.load(unit.transcript_path, config_name=f"{gen.category}.yaml")
+        if config_overrides:
+            cfg = replace(cfg, config={**(cfg.config or {}), **config_overrides})
+        records.note(unit.transcript_path)
+        transcript = unit.transcript_path.read_text(encoding="utf-8")
+        messages = gen.build_messages(unit, transcript, cfg)
+    brief = records.digest(messages)
 
     reply = loop(messages, provider, model, gen, max_iters=max_iters)
     (out / "reply.txt").write_text(reply, encoding="utf-8")
+    record_step = getattr(gen, "record_step", None)     # optional seam, like postprocess
+    if record_step is not None and gen.is_finalized():
+        record_step(unit, brief=brief, read=read, model=model, overrides=config_overrides)
 
     post = getattr(gen, "postprocess", None)   # optional seam; a generator may have no post-step
     if post:

@@ -333,6 +333,7 @@ class BankDraft:
         self.bank = bank
         self.out_dir = Path(out_dir) if out_dir else None
         self.staged = staged
+        self.edited = False          # an adopted artifact edited by hand since coursekit wrote it (CORE-4)
 
     @classmethod
     def new(cls, run_id: str, out_dir: Path | None = None, title: str = "Question bank",
@@ -341,7 +342,10 @@ class BankDraft:
 
     @classmethod
     def adopt(cls, bank: Bank, out_dir: Path | None = None) -> "BankDraft":
-        return cls(bank, out_dir)
+        from coursekit import records
+        draft = cls(bank, out_dir)
+        draft.edited = records.is_edited(out_dir)    # seen before this edit overwrites the evidence
+        return draft
 
     def is_finalized(self) -> bool:
         return self.bank.finalized
@@ -599,10 +603,13 @@ def set_order(quiz_dir, group_ids: list[str]) -> dict:
     """Put a quiz's questions in an instructor's order (ASMT-21) — the one way a script or a GUI
     reorders a quiz. `group_ids` must name exactly the quiz's groups, once each. Writes quiz.json and
     its two GIFT files atomically, marked so later edits (fix, the intro pass) keep the order."""
+    from coursekit import records
     from coursekit.emit import gift
+    from coursekit.generate.quiz import record
     from coursekit.outcomes import CoursekitError
 
     quiz_dir = Path(quiz_dir)
+    edited = records.is_edited(quiz_dir)
     quiz = json.loads((quiz_dir / "quiz.json").read_text(encoding="utf-8"))
     bank = Bank.model_validate_json((quiz_dir / "bank.json").read_text(encoding="utf-8"))
     entries = {e["group_id"]: e for e in quiz.get("groups", [])}
@@ -618,6 +625,7 @@ def set_order(quiz_dir, group_ids: list[str]) -> dict:
         tmp = quiz_dir / f".{name}.tmp"
         tmp.write_text(text, encoding="utf-8")
         os.replace(tmp, quiz_dir / name)
+    record.write(quiz_dir, None, "reorder", by="instructor", edited=edited)
     return quiz
 
 

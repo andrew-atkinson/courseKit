@@ -27,16 +27,21 @@ def unit_facts(bank, eu: str, order: list[str] | None = None) -> str:
             f"Big idea: {eu or '(none stated)'}\nThe quiz: {shape}")
 
 
+def intro_brief(bank, eu: str, order: list[str], *, domain: str = "", voice: str = "",
+                project_root=None) -> list[dict]:
+    """The messages the intro sends — shared by the pass and its record's check (CORE-4)."""
+    system = (courseconfig.domain_preface(domain) + courseconfig.voice_preface(voice)
+              + prompts.load("quiz", "intro", project_root=project_root).body)
+    return [{"role": "system", "content": system}, {"role": "user", "content": unit_facts(bank, eu, order)}]
+
+
 def write_intro(draft, provider, model, eu: str, *, domain: str = "", voice: str = "",
                 project_root=None) -> bool:
     """Ask the model for the intro and keep it on the bank. Returns True when one was kept."""
-    system = (courseconfig.domain_preface(domain) + courseconfig.voice_preface(voice)
-              + prompts.load("quiz", "intro", project_root=project_root).body)
+    order = [e["group_id"] for e in draft.quiz_groups()[0]]
     try:
-        text = provider.chat(model=model, temperature=0.4, messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": unit_facts(
-                draft.bank, eu, [e["group_id"] for e in draft.quiz_groups()[0]])}]).strip()
+        text = provider.chat(model=model, temperature=0.4, messages=intro_brief(
+            draft.bank, eu, order, domain=domain, voice=voice, project_root=project_root)).strip()
     except Exception as e:                       # optional: the default intro stands in, but say so
         from coursekit.pipeline import abort_if_model_error
         abort_if_model_error(provider, model, e)  # …unless the server is down or the model won't load
@@ -92,6 +97,8 @@ def main() -> int:
         print("No introduction was written (see the warning above).")
         return 1
     print(draft.finalize())
+    from coursekit.generate.quiz import record
+    record.write(unit.output_dir, unit, "intro", opts=record.options(unit), model=model, edited=draft.edited)
     print(f"\n{draft.bank.intro}")
     return 0
 

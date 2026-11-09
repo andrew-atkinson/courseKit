@@ -115,7 +115,9 @@ def read_profile(path: Path) -> str:
     """A course profile's text (`domain.md`, `voice.md`), or '' when the course has none. One that exists
     but can't be read is an error naming the file (CORE-1.6): read as '', it used to drop the domain
     guard or the voice from every generator without a word."""
+    from coursekit import records
     from coursekit.outcomes import CoursekitError
+    records.note(path)
     if not path.exists():
         return ""
     try:
@@ -255,7 +257,8 @@ def find_config_file(start: Path, name: str = "config.yaml", *,
 
 def _read_yaml(path: Path | None) -> dict:
     """A yaml mapping, or {} when the file is absent. Present but unreadable raises (see schemas)."""
-    from coursekit import schemas
+    from coursekit import records, schemas
+    records.note(path)                       # an artifact's record explains a changed brief by its files
     return schemas.read_yaml(path) if path is not None else {}
 
 

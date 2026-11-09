@@ -140,6 +140,8 @@ def fix_course(path, *, weeks=None, provider, model, reads: int = ev.DEFAULT_REA
                 progress(f"  → {_outcome_word(o)}")
             outcomes.append(o)
         draft.finalize()                                  # re-emit GIFT + quiz.json (deterministic seed)
+        from coursekit.generate.quiz import record
+        record.write(bj.parent, None, "fix", model=model, edited=draft.edited)
     return outcomes
 
 

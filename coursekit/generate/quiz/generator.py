@@ -22,11 +22,13 @@ class QuizGenerator:
     category = "quiz"
     artifacts_subdir = "quizzes"
 
-    def __init__(self, *, concept_shape: bool = True):
+    def __init__(self, *, concept_shape: bool = True, source=None):
         # concept_shape=False: shape the quiz by the material alone, not the unit's concept map — for a
         # single-document (targeted) quiz, whose unit's concept list is the wrong grain (ASMT-19). The
-        # unit's map is still read for its enduring understanding (postprocess).
+        # unit's map is still read for its enduring understanding (postprocess). `source` is that
+        # document, so the quiz's record can rebuild its brief from it (CORE-4).
         self.concept_shape = concept_shape
+        self.source = source
 
     def reset(self, unit: Unit, out_dir: Path) -> None:
         # Fresh per-unit state: run_course reuses one generator, and one week's groups, checklist, and
@@ -35,6 +37,7 @@ class QuizGenerator:
                                         title=unit.week_label, source=unit.transcript_path.name)
         self.tools = tools.QuizTools(self.draft, call_log=out_dir / "calls.jsonl")
         self._expected_groups = None   # set by build_messages from this unit's brief
+        self._overrides = None         # this run's per-run config, set by record_step
 
     def tool_specs(self) -> list:
         return tools.TOOL_SPECS
@@ -66,6 +69,17 @@ class QuizGenerator:
             questions=int(q) if q else None,
         )
 
+    def _options(self, unit, overrides=None) -> dict:
+        from coursekit.generate.quiz import record
+        return record.options(unit, concept_shape=self.concept_shape, source=self.source, overrides=overrides)
+
+    def record_step(self, unit, *, brief: str, read: dict, model: str, overrides=None) -> None:
+        """The run's own step: a new record for the newly finished quiz, fingerprinting what it sent."""
+        from coursekit.generate.quiz import record
+        self._overrides = overrides     # the EU and intro steps rebuild with the same per-run config
+        record.write(self.draft.out_dir, unit, "generate", opts=self._options(unit, overrides), model=model,
+                     brief=brief, read=read, fresh=True)
+
     def postprocess(self, unit, provider, model, cfg, transcript) -> None:
         """After the quiz is finished: its enduring-understanding question when switched on, then the
         student-facing introduction (SHIP-10), written last so it knows whether there is an open
@@ -75,10 +89,14 @@ class QuizGenerator:
             return
         from coursekit.generate.page.concept_map import load_for_unit
         from coursekit.generate.quiz import intro
+        from coursekit.generate.quiz import record
         cm = load_for_unit(unit)
         if intro.write_intro(self.draft, provider, model, cm.enduring_understanding if cm is not None else "",
                              domain=cfg.domain, voice=cfg.voice, project_root=unit.course_root):
             self.draft.finalize()
+            if self.draft.out_dir is not None:
+                record.write(self.draft.out_dir, unit, "intro", model=model,
+                             opts=self._options(unit, getattr(self, "_overrides", None)))
 
     def _add_eu_question(self, unit, provider, model, cfg, transcript) -> None:
         """ASMT-3 (opt-in `eu_question: true`): add the enduring-understanding transfer task through
@@ -106,6 +124,10 @@ class QuizGenerator:
             return
         if eu_pass.generate_eu_question(self.tools, provider, model, transcript, eu, unit.course_root):
             self.draft.finalize()   # same deterministic seed → re-writes cleanly with the EU group included
+            if self.draft.out_dir is not None:
+                from coursekit.generate.quiz import record
+                record.write(self.draft.out_dir, unit, "eu", model=model,
+                             opts=self._options(unit, getattr(self, "_overrides", None)))
         else:
             outcomes.warn("eu.not_added", f"  {where}: the model didn't write the EU question — the quiz is "
                                           f"saved without it; re-run to try again.", unit=where)

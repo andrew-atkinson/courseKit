@@ -50,12 +50,11 @@ def unit_of(source: Path, struct=None) -> str | None:
     return wk if wk is not None else _week_of(source)
 
 
-def generate_targeted_quiz(source, provider, model, *, output_root=None, max_iters=None):
-    """Generate ONE quiz from a single document; returns the `RunResult`. Extracts the source's text,
-    persists it + `bank.json`/GIFT to `quizzes/<slug>/` under the course (or `output_root`), and drives
-    the standard quiz generator over it."""
-    from coursekit import pipeline
-    from coursekit.generate.quiz.generator import QuizGenerator
+def prepare(source, *, output_root=None):
+    """A single-document quiz's run and its text, writing nothing: the unit the document is filed under,
+    scoped to the document (its own slug, label and folder). Shared by the run and by its record's check
+    (CORE-4), so the two can't disagree about what the model is shown."""
+    from coursekit import records
 
     source = Path(source).expanduser().resolve()
     if not source.is_file():
@@ -65,6 +64,7 @@ def generate_targeted_quiz(source, provider, model, *, output_root=None, max_ite
         raise CoursekitError(f"unsupported source '{source.name}' — need one of "
                              f"{', '.join(sorted(SUPPORTED_SUFFIXES))}", code="source.unsupported",
                              category="source", details={"path": str(source), "allowed": sorted(SUPPORTED_SUFFIXES)})
+    records.note(source)
     text = extract_text(source)
     if not text.strip():
         raise CoursekitError(
@@ -80,21 +80,31 @@ def generate_targeted_quiz(source, provider, model, *, output_root=None, max_ite
     slug = targeted_slug(source, struct)                         # declared unit wins, reusing cfg
     base = Path(output_root).expanduser().resolve() if output_root else (root or source.parent)
     out_dir = base / "quizzes" / slug
-    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # The engine reads a transcript FILE, so persist the extracted text beside the quiz — also a record
-    # of exactly what was quizzed. Re-running overwrites it.
-    material = out_dir / "source.md"
-    material.write_text(text, encoding="utf-8")
-
-    # A run over the unit the document is filed under, scoped to the document: its own slug, label and
-    # folder. The unit number lets unit-keyed lookups (its concept map's enduring understanding, for
-    # `eu_question`) find the unit (ASMT-19 layer 1). The quiz's SHAPE stays the document's own:
-    # concept_shape=False keeps the unit's concept list out of a single reading's brief.
+    # The unit number lets unit-keyed lookups (its concept map's enduring understanding, for
+    # `eu_question`) find the unit (ASMT-19 layer 1). The engine reads a transcript FILE, so the run reads
+    # the extracted text from `source.md` beside the quiz, which `generate_targeted_quiz` writes.
     wk = unit_of(source, struct)
     with outcomes.capture(sink=lambda n: None):
         course = Course.load(source.parent)
-    unit = replace(course.run_target(course.target_unit(wk or slug)), transcript_path=material,
+    unit = replace(course.run_target(course.target_unit(wk or slug)), transcript_path=out_dir / "source.md",
                    week_slug=slug, output_dir=out_dir, week_label=source.stem, week_num=wk, module=None)
+    return unit, text
+
+
+def generate_targeted_quiz(source, provider, model, *, output_root=None, max_iters=None):
+    """Generate ONE quiz from a single document; returns the `RunResult`. Extracts the source's text,
+    persists it + `bank.json`/GIFT to `quizzes/<slug>/` under the course (or `output_root`), and drives
+    the standard quiz generator over it."""
+    from coursekit import pipeline
+    from coursekit.generate.quiz.generator import QuizGenerator
+
+    unit, text = prepare(source, output_root=output_root)
+    unit.output_dir.mkdir(parents=True, exist_ok=True)
+    # Persist the extracted text beside the quiz — also a record of exactly what was quizzed. Re-running
+    # overwrites it. The quiz's SHAPE stays the document's own: concept_shape=False keeps the unit's
+    # concept list out of a single reading's brief.
+    unit.transcript_path.write_text(text, encoding="utf-8")
     kw = {} if max_iters is None else {"max_iters": max_iters}
-    return pipeline.run_unit(unit, provider, model, QuizGenerator(concept_shape=False), **kw)
+    return pipeline.run_unit(unit, provider, model,
+                             QuizGenerator(concept_shape=False, source=Path(source).expanduser().resolve()), **kw)

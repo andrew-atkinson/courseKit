@@ -185,8 +185,9 @@ def load_concept_map(path) -> ConceptMap | None:
     error; the generator falls back to inline derivation). A *present but unreadable or invalid* file
     raises a CoursekitError naming the file and each problem, so a broken hand-edit is surfaced
     rather than silently treated as "no map"."""
-    from coursekit import schemas
+    from coursekit import records, schemas
     p = Path(path)
+    records.note(p)
     if not p.exists():
         return None
     return schemas.validate(p, schemas.read_yaml(p), ConceptMap)

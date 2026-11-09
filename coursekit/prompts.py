@@ -103,6 +103,8 @@ def load(category: str, name: str = "default", *, project_root=None) -> Prompt:
     for root in _roots(project_root):
         path = root / category / f"{name}.md"
         if path.is_file():
+            from coursekit import records
+            records.note(path)
             meta, body = _split_frontmatter(path.read_text(encoding="utf-8"))
             return Prompt(name=meta.get("name", name),
                           category=meta.get("category", category),

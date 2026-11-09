@@ -71,7 +71,7 @@ def _postprocess(u, monkeypatch, *, made=True):
     calls = []
     gen = QuizGenerator()
     gen.tools = None
-    gen.draft = SimpleNamespace(is_finalized=lambda: True, finalize=lambda: calls.append("finalize"))
+    gen.draft = SimpleNamespace(is_finalized=lambda: True, finalize=lambda: calls.append("finalize"), out_dir=None)
     monkeypatch.setattr(eu, "generate_eu_question", lambda *a, **k: calls.append("eu") or made)
     monkeypatch.setattr(intro, "write_intro", lambda *a, **k: False)   # the EU path alone; the intro has its own tests
     with _captured() as report:

@@ -109,11 +109,26 @@ done
 ├── quiz.json          # the quiz: question order, which variants it draws, points, and the seed
 ├── bank.gift          # all questions, GIFT (plain text)
 ├── quiz_<seed>.gift   # one deterministic paper
+├── record.json        # what the quiz was made from, so coursekit can tell when it's out of date
 ├── calls.jsonl        # every tool call, replayable without the model
 └── reply.txt
 ```
 
 Use `--output-root DIR` to redirect elsewhere (e.g. scratch during testing).
+
+### Is a quiz still up to date?
+
+Each quiz's `record.json` keeps a fingerprint of exactly what the model was shown at each step (the main run, the enduring-understanding question, the introduction), and the files it read.
+To see whether each quiz still matches its course, with no model:
+
+```bash
+uv run python -m coursekit.generate.quiz.record "/path/to/course"
+```
+
+A quiz is **current** when coursekit would brief the model exactly as before; **stale** when the course changed underneath it, with the files named ("`output/week-7.md` changed"); **outdated** when only a newer coursekit's own prompts would brief it differently; and **edited** when someone changed `bank.json` or `quiz.json` by hand since coursekit last wrote them.
+A change that doesn't reach the model, like adding another unit to `context.yaml`, changes nothing.
+Moving the open question makes only the introduction stale, since it describes the order; re-run the intro command.
+A quiz made before records reads **unknown** until it's regenerated.
 
 **Question types:** multiple choice, true/false, multiple-answer, short answer, numerical, matching.
 

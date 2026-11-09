@@ -39,6 +39,14 @@ class _EUGenerator:
                 f'"{_EU_GID}", label "A", a question_text, and rubric_criteria. No other tool, no prose.')
 
 
+def eu_brief(material: str, eu: str, project_root=None) -> list[dict]:
+    """The messages the EU pass sends — shared by the pass and its record's check (CORE-4)."""
+    system = prompts.load("quiz", "eu_question", project_root=project_root).body
+    user = (f"The enduring understanding to assess:\n{eu}\n\n"
+            f"The week's material:\n<material>\n{material}\n</material>\n\nWrite the transfer task now.")
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
 def generate_eu_question(session, provider, model, material: str, eu: str, project_root=None) -> bool:
     """Create the open-response EU group deterministically, then have the model fill ONLY its content.
     Returns True if the variant was recorded; leaves the bank exactly as it was on failure."""
@@ -46,12 +54,8 @@ def generate_eu_question(session, provider, model, material: str, eu: str, proje
     draft = session.draft
     draft.bank.groups.pop(_EU_GID, None)     # idempotent: a re-run replaces any prior EU question
     draft.create_group(_EU_GID, "Enduring Understanding", "open_response")
-    system = prompts.load("quiz", "eu_question", project_root=project_root).body
-    user = (f"The enduring understanding to assess:\n{eu}\n\n"
-            f"The week's material:\n<material>\n{material}\n</material>\n\nWrite the transfer task now.")
     try:
-        loop([{"role": "system", "content": system}, {"role": "user", "content": user}],
-             provider, model, _EUGenerator(session), max_iters=6)
+        loop(eu_brief(material, eu, project_root), provider, model, _EUGenerator(session), max_iters=6)
     except CoursekitError:
         raise                                  # infrastructure (a model that won't load) aborts the run
     except Exception as e:                     # anything else: recorded, the finished quiz kept
@@ -117,6 +121,8 @@ def main() -> int:
     transcript = Path(unit.transcript_path).read_text(encoding="utf-8", errors="replace")
     if generate_eu_question(session, provider, model, transcript, eu, unit.course_root):
         print(draft.finalize())
+        from coursekit.generate.quiz import record
+        record.write(out_dir, unit, "eu", opts=record.options(unit), model=model, edited=draft.edited)
         return 0
     print("The EU pass produced no question (model unreachable or refused).")
     return 1
