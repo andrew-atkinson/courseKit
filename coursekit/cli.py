@@ -469,8 +469,8 @@ def _cmd_generate_targeted(args) -> int:
     provider = _build_provider()
     from coursekit.generate.quiz import targeted
     try:
-        res = targeted.generate_targeted_quiz(args.source, provider, model,
-                                              output_root=args.output_root, max_iters=args.max_iters)
+        res = targeted.generate_targeted_quiz(args.source, provider, model, output_root=args.output_root,
+                                              max_iters=args.max_iters, force=getattr(args, "force", False))
     except pipeline.ModelLoadError as e:
         print(str(e))
         return 2
@@ -504,6 +504,8 @@ def _run_assignments(args) -> int:
             print(f"  {u.week_slug} -> {u.output_dir}")
         return 0
 
+    from coursekit import records
+    records.refuse_edited((u.output_dir for u in units), force=getattr(args, "force", False))
     provider = _build_provider()
     model = os.getenv("MODEL_NAME") or courseconfig.load(
         args.path, config_name="assignment.yaml").value("model")
@@ -553,11 +555,18 @@ def _cmd_generate(args) -> int:
                 return pagebuild.build_page_unit(u, provider, _m, function=args.function,
                                                  generator=args.generator, max_iters=args.max_iters)
 
+        target = None
+        if gen.category == "page":
+            from coursekit.generate.page.build import page_dir
+
+            def target(u):
+                return page_dir(u, args.function)
+
         try:
             results = pipeline.run_course(
                 args.path, weeks=weeks, output_root=args.output_root,
                 provider=provider, model=model, dry_run=args.dry_run, max_iters=args.max_iters,
-                generator=gen, unit_runner=unit_runner,
+                generator=gen, unit_runner=unit_runner, force=getattr(args, "force", False), target=target,
             )
         except pipeline.ModelLoadError as e:
             print(str(e))
@@ -996,6 +1005,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help=f"cap model turns per week (default {pipeline.DEFAULT_MAX_ITERS})")
     pg.add_argument("--output-root", metavar="DIR",
                     help="write under DIR/<course>/<week> instead of with the course")
+    pg.add_argument("--force", action="store_true",
+                    help="regenerate even an artifact edited by hand since coursekit made it (discards the edits)")
     pg.add_argument("--no-review", dest="review", action="store_false",
                     help="skip the automatic cold-read review of the generated quizzes")
     pg.set_defaults(func=_cmd_generate, review=True)

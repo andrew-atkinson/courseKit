@@ -121,6 +121,24 @@ def is_edited(art_dir, name: str = RECORD) -> bool:
     return bool(rec) and _outputs(Path(art_dir), rec["output"]) != rec["output"]
 
 
+def refuse_edited(targets, *, force: bool = False) -> None:
+    """Before a regenerate: raise if any target (an artifact folder, or `(folder, record name)`) was edited
+    by hand since coursekit wrote it, unless `force`. A deleted file isn't an edit: there's nothing to lose."""
+    if force:
+        return
+    edited = []
+    for t in targets:
+        art_dir, name = t if isinstance(t, tuple) else (t, RECORD)
+        rec = load(art_dir, name)
+        if rec and any(file_hash(Path(art_dir) / n) not in (h, ABSENT) for n, h in rec["output"].items()):
+            edited.append(str(art_dir))
+    if edited:
+        from coursekit.outcomes import CoursekitError
+        raise CoursekitError(f"edited by hand since coursekit made it, so regenerating would discard the edits: "
+                             f"{', '.join(edited)}. Pass --force to regenerate anyway, or leave those units out.",
+                             code="artifact.edited", details={"paths": edited})
+
+
 def write_step(art_dir, *, step: str, by: str, brief=None, read: dict | None = None, model: str | None = None,
                options: dict | None = None, **record) -> None:
     """Add one step to the artifact's record (see `write_steps`)."""

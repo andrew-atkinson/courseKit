@@ -59,15 +59,20 @@ def route_teaching(unit, *, verbose: bool = True) -> str:
     return choice
 
 
+def page_dir(unit, function: str = "teaching") -> Path:
+    """Where a unit's page for `function` lives: the unit's folder for teaching, a sibling for the others."""
+    out = Path(unit.output_dir)
+    return out if function == "teaching" else out.parent / f"{unit.week_slug}-{function}"
+
+
 def build_page_unit(unit, provider, model, *, function: str = "teaching", generator: str = "auto",
                     max_iters: int | None = None, project_root=None) -> RunResult:
     """Produce one unit's page for the requested `function`, choosing the generator automatically
     (or as forced by `generator`). Returns a RunResult (counts blocks)."""
     project_root = project_root or unit.course_root
-    parent = Path(unit.output_dir).parent
+    out = page_dir(unit, function)
 
     if function == "glossary":
-        out = parent / f"{unit.week_slug}-glossary"
         pg, problems = glossary_mod.build_glossary_page(unit, provider, model, out,
                                                         project_root=project_root)
         return RunResult(unit, finalized=not problems, output_dir=out,
@@ -84,7 +89,6 @@ def build_page_unit(unit, provider, model, *, function: str = "teaching", genera
         from coursekit.generate.page import record
         with records.reading() as read:
             page = record.deterministic(unit, function)
-        out = parent / f"{unit.week_slug}-{function}"
         _write_page(page, out, project_root)
         record.write_page(out, unit, [{"step": "build", "brief": records.digest(page.model_dump(mode="json"))}],
                           read=read, by="coursekit", options=record.options(unit, function))
@@ -92,7 +96,6 @@ def build_page_unit(unit, provider, model, *, function: str = "teaching", genera
 
     # teaching — the program picks the mechanism unless the caller forces it
     which = generator if generator in ("monolithic", "decompose") else route_teaching(unit)
-    out = Path(unit.output_dir)
     if which == "decompose":
         pg, problems = decompose.generate_page_decomposed(unit, provider, model, out,
                                                           project_root=project_root)

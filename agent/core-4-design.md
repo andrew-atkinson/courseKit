@@ -1,7 +1,7 @@
 # CORE-4 design — artifact records (2026-11-07)
 
 The fourth step of [structure-review.md](structure-review.md): beside each generated artifact, a small record of what it was made from and how, so coursekit can tell when an artifact no longer matches its course.
-Steps 1, 2, and 3 are built (2026-11-07, 2026-11-08, 2026-11-09). The user settled decisions 1, 4, and 5 on 2026-11-07 and added the atomic writes to step 2; the others stand as recommended.
+Steps 1 to 4 are built (2026-11-07, 2026-11-08, 2026-11-09, 2026-11-11). The user settled decisions 1, 4, and 5 on 2026-11-07 and added the atomic writes to step 2; the others stand as recommended.
 Facts below were read from `main` at `2a0b346` and from both real courses (read only); counts are snapshots.
 
 ## 1. What exists today
@@ -165,6 +165,14 @@ Every step keeps these **goldens** identical to `main`, captured once before ste
 4. **`CORE-4.4-surfacing` — showing it, and protecting hand edits.**
    The census report gains each artifact's status; `emit` warns on a stale artifact (not on an edited one, which is normal); `generate` refuses to overwrite an edited artifact without `--force`, as `propose` refuses to clobber a draft.
    *Pass:* each shown on copies of both real courses, with all of today's artifacts reading "unknown", never "current"; the refusal is mutation-checked.
+   **Done 2026-11-11.** The census IR gains `artifacts`, each one's path, kind, unit, state, edited, and reasons, and `census.md` a Status section: a count of each state, then each stale, outdated, or edited artifact with why; one made before records is only counted.
+   `emit` warns from `course.ir_files`, the one place every emitter gets its files, so each command warns once per stale artifact and packages it anyway.
+   `generate` checks every target before the model is reached (`records.refuse_edited`, from `run_course`, a document quiz, and assignments) and names every edited one at once; `--force` overrides. A deleted file isn't an edit, since there's nothing to lose, and an artifact with no record regenerates as before.
+   A page's folder depends on its function (`page_dir`, which `build_page_unit` now shares), so a glossary or overview page is checked where it's written.
+   Not covered: `analyze` re-running over a hand-edited concept map, and the course overviews' prototype; neither is `generate`. Parked as `CORE-4.6` (2026-11-12).
+   A gap from step 2, found here: the course index read an overview's `<slug>.record.json` as another overview; it's skipped now.
+   On copies of both real courses: CC101's 40 artifacts all read unknown. PH101's 4 older quizzes read unknown, and its one quiz made since records reads stale, because the PDF it was made from (`…-ocr.pdf`) is no longer in the course. `emit` warns about that one quiz only. Every member of the 16 export packages is byte-identical to `main`'s.
+   21 mutations, all caught.
 5. **Docs** — `docs/architecture.md` (what each command reads and writes), `agent/architecture.md`, `docs/architecture-diagram.html` (a new output beside each artifact), `CLAUDE.md`'s rules, and the roadmap's Shipped line.
 
 ## 6. Decisions

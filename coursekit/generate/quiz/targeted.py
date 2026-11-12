@@ -92,14 +92,15 @@ def prepare(source, *, output_root=None):
     return unit, text
 
 
-def generate_targeted_quiz(source, provider, model, *, output_root=None, max_iters=None):
+def generate_targeted_quiz(source, provider, model, *, output_root=None, max_iters=None, force=False):
     """Generate ONE quiz from a single document; returns the `RunResult`. Extracts the source's text,
     persists it + `bank.json`/GIFT to `quizzes/<slug>/` under the course (or `output_root`), and drives
     the standard quiz generator over it."""
-    from coursekit import pipeline
+    from coursekit import pipeline, records
     from coursekit.generate.quiz.generator import QuizGenerator
 
     unit, text = prepare(source, output_root=output_root)
+    records.refuse_edited([unit.output_dir], force=force)
     # Persist the extracted text beside the quiz — also a record of exactly what was quizzed. Re-running
     # overwrites it. The quiz's SHAPE stays the document's own: concept_shape=False keeps the unit's
     # concept list out of a single reading's brief.

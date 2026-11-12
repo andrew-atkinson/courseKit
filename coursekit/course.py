@@ -47,6 +47,13 @@ class Artifact:
     slug: str
     path: Path
 
+    @property
+    def record(self) -> tuple[Path, str]:
+        """Where its record sits (CORE-4): `record.json` in its folder, or `<stem>.record.json` beside a
+        single-file artifact (a concept map, an overview)."""
+        from coursekit import records
+        return self.path.parent, records.RECORD if self.kind in _IR else records.name_for(self.path)
+
 
 @dataclass
 class Course:
@@ -132,7 +139,20 @@ def ir_files(path, kind: str) -> list[Path]:
         if s.name == name and s.is_relative_to(p):
             outcomes.warn("course.stray_artifact", f"  {s}: outside the course layout (<kind>/<slug>/{name})"
                           f" — not packaged; move it or delete it.", path=str(s))
-    return [a.path for a in course.artifacts_for(kind=kind) if a.path.is_relative_to(p)]
+    found = [a.path for a in course.artifacts_for(kind=kind) if a.path.is_relative_to(p)]
+    _warn_stale(found)
+    return found
+
+
+def _warn_stale(paths: list[Path]) -> None:
+    """An export of an artifact its course has moved on from says so, and packages it anyway; an edited one
+    is normal (instructors edit), and one made before records can't be checked, so neither is mentioned."""
+    from coursekit import records
+    for path in paths:
+        st = records.status(path.parent)
+        if st.state == "stale":
+            outcomes.warn("artifact.stale", f"  {path.parent.name}: stale — {'; '.join(st.reasons)}. Packaged as it "
+                          f"is; regenerate it to bring it up to date.", path=str(path))
 
 
 def review_items(path, kind: str, weeks=None) -> list[tuple]:
@@ -263,6 +283,8 @@ def _artifacts(root: Path, ids: set[str]) -> tuple[list[Artifact], list[Path]]:
     for p in sorted(root.glob(".vtconfig/concepts/week-*.yaml")):
         out.append(Artifact(kind="concept_map", unit=owner(None, p.stem, ids), slug=p.stem, path=p))
     for p in sorted(root.glob("overview/*.json")):
+        if p.name.endswith(".record.json"):                 # an overview's record, beside it — not an overview
+            continue
         out.append(Artifact(kind="overview", unit=owner(_ref(p, unreadable), p.stem, ids), slug=p.stem, path=p))
     return out, unreadable
 

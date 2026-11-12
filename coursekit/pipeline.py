@@ -242,7 +242,7 @@ def _week_matches(ref, unit: Unit) -> bool:
 def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
                dry_run: bool = False, max_iters: int = DEFAULT_MAX_ITERS,
                generator: Generator, config_overrides: dict | None = None,
-               unit_runner=None) -> list[RunResult]:
+               unit_runner=None, force: bool = False, target=None) -> list[RunResult]:
     """Discover units under `path`, optionally filter to `weeks`, and run each with `generator`.
 
     `dry_run` returns the planned units (with resolved output dirs) without calling the model.
@@ -250,6 +250,8 @@ def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
     `unit_runner(unit) -> RunResult` overrides the per-unit action — the page path passes one that
     dispatches by function and routes monolithic/decompose, instead of the default one-conversation
     `run_unit`. Discovery, week-filtering, and dry-run are shared regardless.
+    Before any model call, a unit whose artifact (at `target(unit)`, by default its output folder) was
+    edited by hand stops the run, unless `force` (`records.refuse_edited`).
     """
     # The output tree (quizzes/, pages/, …) is the generator's, so a course can hold both. Read it
     # directly: a generator that forgets `artifacts_subdir` fails loudly instead of writing into quizzes/.
@@ -261,6 +263,7 @@ def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
     if dry_run:
         return [RunResult(u, finalized=False, output_dir=u.output_dir) for u in units]
 
+    records.refuse_edited((target(u) if target else u.output_dir for u in units), force=force)
     if unit_runner is not None:
         return [unit_runner(u) for u in units]
     return [run_unit(u, provider, model, generator, max_iters=max_iters,

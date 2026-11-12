@@ -138,6 +138,14 @@ Reordering the questions doesn't count as a change: the questions it judged are 
 Each critic keeps only its latest result; the full history stays in the course's `evals/` folder.
 A quiz made before records gets no record from an evaluation, so it stays unknown.
 
+The same status shows up where you already look:
+
+- **`census`** adds a Status section to `census.md`: how many artifacts are current, stale, outdated, or unknown, and each one that needs a look, with why.
+- **`emit`** warns about a stale quiz and packages it anyway; an edited one is normal, so it says nothing.
+- **`generate`** won't overwrite a quiz you've edited by hand: it stops before the model runs and names every edited unit.
+  Pass `--force` to regenerate anyway (your edits are discarded), or leave those units out with `--week`.
+  A quiz made before records can't be told apart, so it regenerates as before.
+
 **Question types:** multiple choice, true/false, multiple-answer, short answer, numerical, matching.
 
 ## Exporting to Canvas

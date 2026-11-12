@@ -22,7 +22,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from coursekit import atomic, courseconfig, coursestructure, outcomes
+from coursekit import atomic, courseconfig, coursestructure, outcomes, records
 
 _ARTIFACT_LABELS = ("page", "quiz", "assignment", "concept map")
 
@@ -80,6 +80,17 @@ class ScopeCensus(BaseModel):
     gaps: dict[str, Shortfall] = Field(default_factory=dict)
 
 
+class ArtifactStatus(BaseModel):
+    """Whether one artifact still matches its course (CORE-4), worked out from its record when the census runs."""
+    model_config = ConfigDict(extra="forbid")
+    path: str                                   # course-relative
+    kind: str
+    unit: str | None = None
+    state: str                                  # current | stale | outdated | unknown
+    edited: bool = False
+    reasons: list[str] = Field(default_factory=list)
+
+
 class Census(BaseModel):
     model_config = ConfigDict(extra="forbid")
     course_title: str | None = None
@@ -93,6 +104,7 @@ class Census(BaseModel):
     grading_groups: list[str] = Field(default_factory=list)          # declared group names (STRC-2)
     unused_grading_groups: list[str] = Field(default_factory=list)   # declared groups with no items placed
     unreadable: list[str] = Field(default_factory=list)   # artifact files present but unreadable (counted, flagged)
+    artifacts: list[ArtifactStatus] = Field(default_factory=list)   # every artifact's status, in index order
 
     @property
     def gap_count(self) -> int:
@@ -200,6 +212,10 @@ def build_census(course_path) -> Census:
                     weeks=sorted((w for w in weeks.values()), key=lambda w: _wsort(w.week)),
                     unreadable=[str(Path(u).relative_to(root)) if Path(u).is_relative_to(root) else u
                                 for u in unreadable])
+    for a in course.artifacts:
+        st = records.status(*a.record)
+        census.artifacts.append(ArtifactStatus(path=a.path.relative_to(root).as_posix(), kind=a.kind, unit=a.unit,
+                                               state=st.state, edited=st.edited, reasons=st.reasons))
     _compute_gaps(census, struct, placed)
     return census
 
@@ -309,6 +325,8 @@ def render_report(census: Census) -> str:
                      f"{_cell(w.quizzes)} | {_cell(w.assignments)} | {cm} |")
 
     lines += ["", "## Gaps", ""] + (_gap_lines(census) or ["No gaps found."])
+    if census.artifacts:
+        lines += ["", "## Status", ""] + _status_lines(census.artifacts)
     if census.unreadable:
         lines += ["", "## Unreadable artifacts", "",
                   "Present (so counted above) but their contents couldn't be read — regenerate or repair them:", ""]
@@ -341,6 +359,23 @@ def _gap_lines(census: Census) -> list[str]:
             out.append(f"- **Course** — {_LABEL.get(art, art)}: has {s.has}, expects {s.expects}")
     for name in census.unused_grading_groups:
         out.append(f'- **Grading** — group "{name}" declared but no items are placed in it')
+    return out
+
+
+def _status_lines(arts: list[ArtifactStatus]) -> list[str]:
+    """A count of each state, then every artifact that needs a look, with why; one made before records is
+    only counted, since there's nothing to say about it but that."""
+    counts = {s: n for s in ("current", "stale", "outdated", "unknown") if (n := sum(a.state == s for a in arts))}
+    edited = sum(a.edited for a in arts)
+    out = [f"{len(arts)} artifact{'' if len(arts) == 1 else 's'}: " + " · ".join(f"{n} {s}" for s, n in counts.items())
+           + (f" · {edited} edited by hand" if edited else "")]
+    if counts.get("unknown"):
+        out.append(f"{counts['unknown']} were made before records (or not by coursekit), so whether they still "
+                   f"match the course is unknown until each is regenerated.")
+    flagged = [a for a in arts if a.state in ("stale", "outdated") or a.edited]
+    if flagged:
+        out.append("")
+        out += [f"- `{a.path}` — {a.state}{' + edited' if a.edited else ''}: {'; '.join(a.reasons)}" for a in flagged]
     return out
 
 

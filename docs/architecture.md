@@ -110,6 +110,7 @@ Nothing here is coursekit-specific; it is what the instructor already has.
 - **the generated files:** `week-N.md` (the unit's text), the `bank.json` / `page.json` / `assignment.json` IR, the emitted artifacts (`.gift`, QTI `.zip`, `.html`, `.imscc`), and the census (`census.json` + `census.md`).
   Beside every artifact coursekit makes, a record says what it was made from and how (CORE-4): `record.json` in each quiz, page, and assignment folder, and `<name>.record.json` beside each overview page and concept map. No emitter reads it.
   `evaluate` notes each critic's result in the record of the artifact it judged, with a fingerprint of the version it read, so a later change shows the evaluation is of an earlier version.
+  The census reports each artifact's status from its record, `emit` warns about a stale one, and `generate` won't overwrite one edited by hand without `--force`.
   Every file coursekit writes is written whole or not at all (`coursekit/atomic.py`), so a crash or a full disk leaves the previous file, never half of one.
 
 Everything is plain, versionable files in the course folder — never a database. coursekit **writes** here (week text, concept maps, IR, artifacts, and its own settings) and **reads** here (config); the transcriber writes here too (`context.yaml`, `week-N.md`).

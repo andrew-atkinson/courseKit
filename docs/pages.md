@@ -121,6 +121,8 @@ Concept maps (`.vtconfig/concepts/week-7.record.json`) and course overviews (`ov
 uv run python -m coursekit.records "/path/to/course"
 ```
 
+`census` shows each one's status too, and `emit` warns about a stale page; `generate --pages` won't overwrite a page edited by hand without `--force` ([quizzes.md](quizzes.md#is-a-quiz-still-up-to-date)).
+
 When what a page was built from is itself out of date, the page says so: re-transcribing a lecture makes its concept map **stale**, and the page and quiz built from that map **stale** too ("built from `.vtconfig/concepts/week-7.yaml`, which is itself stale"), even though their own inputs haven't changed.
 Re-run `analyze` first, then regenerate what was built from the map.
 
