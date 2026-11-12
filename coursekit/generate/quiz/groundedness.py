@@ -138,22 +138,29 @@ def evaluate_course_groundedness(path, *, weeks=None, provider, model, out_path=
     quiz-groundedness.md. Returns (per-quiz results, out_path_or_None)."""
     from pathlib import Path
 
-    from coursekit import courseconfig
+    from coursekit import courseconfig, records
     from coursekit.generate.quiz.bank import Bank
 
     root = courseconfig.find_root(path) or Path(path).expanduser().resolve()
-    results = []
+    results, judged = [], []
     for slug, bj, tpath, proot in _iter_quiz_banks(path, weeks):
-        bank = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
+        data = bj.read_bytes()
+        bank = Bank.model_validate_json(data)
         material = tpath.read_text(encoding="utf-8")
         if progress:
             n = sum(len(g.variants) for g in bank.groups.values())
             progress(f"reading {slug} — {n} question(s)…")
-        results.append(evaluate_bank_groundedness(bank, material, provider, model, quiz_id=slug,
-                                                   project_root=proot, progress=progress))
+        bg = evaluate_bank_groundedness(bank, material, provider, model, quiz_id=slug,
+                                        project_root=proot, progress=progress)
+        results.append(bg)
+        judged.append((bj.parent, {bj.name: records.hash_bytes(data)},
+                       {"coverage": round(bg.coverage, 2), "model_knowledge": len(bg.model_supplied),
+                        "unchecked": len(bg.unchecked)}))
 
     if not results:
         return [], None
     out_path = Path(out_path) if out_path else root / "quizzes" / "quiz-groundedness.md"
     atomic.write(out_path, "\n".join(render_groundedness(r) for r in results))
+    for art, files, result in judged:
+        records.add_evaluation(art, critic="groundedness", model=model, judged=files, review=out_path, **result)
     return results, out_path

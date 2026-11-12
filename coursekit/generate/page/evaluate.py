@@ -17,6 +17,7 @@ from coursekit.generate.quiz.evaluate import (
     DEFAULT_READS,
     READ_TEMPERATURE,
     Finding,
+    result,
     _critic_body,
     _parse_verdict,
     _union,
@@ -117,18 +118,24 @@ def evaluate_course_pages(path, *, weeks=None, provider, model, out_path=None,
     """Discover every page in a course (teaching + `-glossary`/`-overview` siblings), pair each
     `page.json` with its week transcript, cold-read every section, and write one `page-review.md`.
     Returns (findings, review_path_or_None). `progress(msg)` gives a per-page / per-section heartbeat."""
+    from coursekit import records
     from coursekit.generate.page.page import Page
 
     items = list(_iter_page_jsons(path, weeks))
     findings: list[Finding] = []
+    judged = []                                   # (page folder, {file: hash it judged}, result)
     for label, pj, tpath, proot, _wk in items:
-        page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
+        data = pj.read_bytes()
+        page = Page.model_validate_json(data)
         material = tpath.read_text(encoding="utf-8")
         n = sum(1 for b in page.blocks.values() if b.kind not in _SKIP_KINDS)
         if progress:
             progress(f"cold-reading {label} — {n} section(s)…")
-        findings += evaluate_page(page, material, provider, model, week=label,
-                                  project_root=proot, reads=reads, progress=progress)
+        found = evaluate_page(page, material, provider, model, week=label,
+                              project_root=proot, reads=reads, progress=progress)
+        findings += found
+        judged.append((pj.parent, {pj.name: records.hash_bytes(data)},
+                       result(found)))
 
     if not findings:
         return [], None
@@ -136,4 +143,6 @@ def evaluate_course_pages(path, *, weeks=None, provider, model, out_path=None,
         out_path = items[0][1].parent.parent / "page-review.md"     # the course's pages/ tree
     out_path = Path(out_path)
     atomic.write(out_path, render_review(findings, title="Page review", noun="section"))
+    for art, files, counts in judged:
+        records.add_evaluation(art, critic="facticity", model=model, judged=files, review=out_path, **counts)
     return findings, out_path

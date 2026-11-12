@@ -185,10 +185,11 @@ def evaluate_course(path, *, weeks=None, provider, model, out_path=None,
     """Discover a course's weeks, pair each `bank.json` with its transcript, cold-read every
     question `reads` times, and write one `quiz-review.md`. Returns (findings, review_path_or_None).
     `progress(msg)` gives a per-week / per-question heartbeat."""
-    from coursekit import courseconfig
+    from coursekit import courseconfig, records
     from coursekit.generate.quiz.bank import Bank
 
     findings: list[Finding] = []
+    judged = []                                   # (quiz folder, {file: hash it judged}, result)
     for slug, bj, tpath, proot in _iter_quiz_banks(path, weeks):
         material = tpath.read_text(encoding="utf-8")
         if not material.strip():
@@ -198,12 +199,16 @@ def evaluate_course(path, *, weeks=None, provider, model, out_path=None,
                 progress(f"skipping {slug} — its source ({tpath.name}) is empty; nothing to evaluate "
                          f"against. Re-generate from a source with extractable text.")
             continue
-        bank = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
+        data = bj.read_bytes()
+        bank = Bank.model_validate_json(data)
         n = sum(len(g.variants) for g in bank.groups.values())
         if progress:
             progress(f"cold-reading {slug} — {n} question(s)…")
-        findings += evaluate_bank(bank, material, provider, model,
-                                  week=slug, project_root=proot, reads=reads, progress=progress)
+        found = evaluate_bank(bank, material, provider, model,
+                              week=slug, project_root=proot, reads=reads, progress=progress)
+        findings += found
+        judged.append((bj.parent, {bj.name: records.hash_bytes(data)},
+                       result(found)))
 
     if not findings:
         return [], None
@@ -212,7 +217,15 @@ def evaluate_course(path, *, weeks=None, provider, model, out_path=None,
         out_path = root / "quizzes" / "quiz-review.md"
     out_path = Path(out_path)
     atomic.write(out_path, render_review(findings))
+    for art, files, counts in judged:
+        records.add_evaluation(art, critic="facticity", model=model, judged=files, review=out_path, **counts)
     return findings, out_path
+
+
+def result(findings: list[Finding]) -> dict:
+    """What a record keeps of a facticity read (CORE-4.3): how many items it read, flagged, and couldn't read."""
+    return {"reviewed": len(findings), "flagged": sum(f.flagged for f in findings),
+            "errors": sum(f.verdict == "ERROR" for f in findings)}
 
 
 def render_review(findings: list[Finding], *, title: str = "Quiz review", noun: str = "question") -> str:

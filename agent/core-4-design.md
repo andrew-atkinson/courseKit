@@ -1,7 +1,7 @@
 # CORE-4 design — artifact records (2026-11-07)
 
 The fourth step of [structure-review.md](structure-review.md): beside each generated artifact, a small record of what it was made from and how, so coursekit can tell when an artifact no longer matches its course.
-Steps 1 and 2 are built (2026-11-07, 2026-11-08). The user settled decisions 1, 4, and 5 on 2026-11-07 and added the atomic writes to step 2; the others stand as recommended.
+Steps 1, 2, and 3 are built (2026-11-07, 2026-11-08, 2026-11-09). The user settled decisions 1, 4, and 5 on 2026-11-07 and added the atomic writes to step 2; the others stand as recommended.
 Facts below were read from `main` at `2a0b346` and from both real courses (read only); counts are snapshots.
 
 ## 1. What exists today
@@ -152,6 +152,16 @@ Every step keeps these **goldens** identical to `main`, captured once before ste
 3. **`CORE-4.3-evaluations` — evaluations tied to versions.**
    `evaluate` adds each artifact's result to its record with the hash it judged; `evalstore`'s snapshots stay as they are.
    *Pass:* after an evaluation the artifact reads as evaluated; a later edit makes that evaluation visibly older than the artifact; the review files are byte-identical to `main`.
+   **Done 2026-11-09.** `records.add_evaluation` notes, on the record of each artifact a critic judged, the critic, model, coursekit commit, review file, its result (counts or a score), and `judged`: the hash of the exact bytes the critic read.
+   All six critics do it from their one course loop (`evaluate_course*`), which `evaluate` and `generate --review` share, right after the review file is written, so a record never names a review that isn't there.
+   A check marks an evaluation current while its judged file is unchanged; a fix or a hand edit makes it "of an earlier version", while a reorder (which leaves `bank.json` alone) doesn't.
+   Each critic keeps its latest entry (the history stays in `evals/`); a regenerate starts a fresh record, so its evaluations go with it.
+   As with every later step, an artifact with no record gets none from an evaluation, so it stays unknown; a pedagogy or concept-delivery call that failed judged nothing and isn't recorded, while a facticity read that failed counts as an error.
+   A single-document quiz's own `generate --review` is recorded the same way (with no review file when nothing is flagged, since it writes none); facticity's counts come from one function, `quiz.evaluate.result`.
+   `fix`'s own check (when it isn't given a review to work from) is recorded too, as of the version it read before fixing, so it reads "of an earlier version" once a fix changes the artifact, and current when it found nothing to fix.
+   Not recorded: the decompose prototype's `--review`.
+   A gap from step 2, found here: a page `fix` rewrote `page.json` without a step, so a page coursekit had fixed read as edited by hand (and step 4 would have refused to regenerate it). `fix --pages` and the decompose prototype's `--fix` now record a `fix` step (`page.record.write_fix`), noting a hand edit found before the fix, as a quiz's `fix` does.
+   Golden: all six critics, with a scripted critic, over copies of both real courses and a small course with records, under `main`'s code and this branch's; all 46 review files byte-identical, no file added to either real course, and the two records differ from `main`'s only in `evaluations`.
 4. **`CORE-4.4-surfacing` — showing it, and protecting hand edits.**
    The census report gains each artifact's status; `emit` warns on a stale artifact (not on an edited one, which is normal); `generate` refuses to overwrite an edited artifact without `--force`, as `propose` refuses to clobber a draft.
    *Pass:* each shown on copies of both real courses, with all of today's artifacts reading "unknown", never "current"; the refusal is mutation-checked.

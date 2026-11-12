@@ -33,6 +33,14 @@ def write_page(out_dir, unit, steps: list[dict], *, read: dict, options: dict, m
                         kind="page", unit=unit.week_num or unit.week_slug, outputs=PAGE_OUTPUTS, fresh=True)
 
 
+def write_fix(out_dir, model: str, *, edited: bool = False) -> None:
+    """A `fix` rewrote sections of a page: a step, so the page reads as coursekit's, not as edited by
+    hand. `edited` notes a hand edit found before the fix. A fix is provenance only (no brief), as for a
+    quiz; a page with no record gets none."""
+    records.write_step(out_dir, step="fix", by="model", model=model, kind="page", unit=None,
+                       outputs=PAGE_OUTPUTS, edited=edited)
+
+
 def write_map(unit, step: str, messages, read: dict, model: str, *, fresh: bool = False) -> None:
     """A step of `analyze` on a unit's concept map, recorded beside it (`week-7.record.json`)."""
     from coursekit.generate.page.concept_map import concept_map_path

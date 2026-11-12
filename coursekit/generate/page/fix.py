@@ -88,21 +88,28 @@ def fix_course_pages(path, *, weeks=None, provider, model, reads: int = pev.DEFA
     outcomes. When `findings` is given (parsed from an existing `page-review.md`), fix exactly those —
     no re-audit; otherwise cold-read every page to find the flags first. `progress(msg)` gives a live
     heartbeat. page.json is autosaved on each fix."""
+    from coursekit import records
     from coursekit.generate.page.page import Page
+    from coursekit.generate.quiz.evaluate import result
     from coursekit.generate.quiz.fix import _outcome_word
 
     outcomes: list[FixOutcome] = []
     for label, pj, tpath, proot, wk in pev._iter_page_jsons(path, weeks):
-        page_obj = Page.model_validate_json(pj.read_text(encoding="utf-8"))
+        data = pj.read_bytes()
+        page_obj = Page.model_validate_json(data)
         material = tpath.read_text(encoding="utf-8")
         if findings is not None:
             flagged = [f for f in findings if f.flagged and f.week == label]
         else:
             fnd = pev.evaluate_page(page_obj, material, provider, model, week=label,
                                     project_root=proot, reads=reads, progress=progress)
+            # the version it read, before any fix: "of an earlier version" once a fix changes it
+            records.add_evaluation(pj.parent, critic="facticity", model=model,
+                                   judged={pj.name: records.hash_bytes(data)}, **result(fnd))
             flagged = [f for f in fnd if f.flagged]
         if not flagged:
             continue
+        edited = records.is_edited(pj.parent)        # seen before the first fix overwrites the evidence
         session = tools.PageTools(pageir.PageDraft.adopt(page_obj, pj.parent))   # put_block autosaves it
         critic = _critic_body(pev.PAGE_CATEGORY, proot)
         for f in flagged:
@@ -114,6 +121,8 @@ def fix_course_pages(path, *, weeks=None, provider, model, reads: int = pev.DEFA
                 progress(f"  → {_outcome_word(o)}")
             outcomes.append(o)
         _rerender(page_obj, pj.parent, proot, wk)
+        from coursekit.generate.page import record
+        record.write_fix(pj.parent, model, edited=edited)
     return outcomes
 
 

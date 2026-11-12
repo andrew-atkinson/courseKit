@@ -96,6 +96,7 @@ def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None
     Returns (per-page results, out_path_or_None) — for reviewing already-generated pages."""
     from pathlib import Path
 
+    from coursekit import records
     from coursekit.discover import find_units
     from coursekit.generate.page.concept_map import concept_map_path, load_concept_map
     from coursekit.generate.page.page import Page
@@ -105,12 +106,13 @@ def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None
     if weeks:
         units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
 
-    results = []
+    results, judged = [], []
     for u in units:
         pj = Path(u.output_dir) / "page.json"
         if not pj.exists():
             continue
-        page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
+        data = pj.read_bytes()
+        page = Page.model_validate_json(data)
         material = Path(u.transcript_path).read_text(encoding="utf-8")
         # Score against the week's concept map when one exists — a fixed list, not a re-derivation.
         names = None
@@ -123,6 +125,9 @@ def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None
                                     concepts=names)
         pc.page_id = u.week_slug         # label by week for the course report
         results.append(pc)
+        if not pc.failed:                # a failed call judged nothing
+            judged.append((pj.parent, {pj.name: records.hash_bytes(data)},
+                           {"average": round(pc.average, 1), "concepts": len(pc.concepts)}))
 
     if not results:
         return [], None
@@ -130,4 +135,7 @@ def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None
         out_path = Path(units[0].output_dir).parent / "page-concepts.md"
     out_path = Path(out_path)
     atomic.write(out_path, "\n".join(render_concepts(r) for r in results))
+    for art, files, result in judged:
+        records.add_evaluation(art, critic="concept_delivery", model=model, judged=files, review=out_path,
+                               **result)
     return results, out_path

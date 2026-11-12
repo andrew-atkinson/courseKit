@@ -132,6 +132,12 @@ A change that doesn't reach the model, like adding another unit to `context.yaml
 Moving the open question makes only the introduction stale, since it describes the order; re-run the intro command.
 A quiz made before records reads **unknown** until it's regenerated.
 
+`evaluate` notes each critic's result in the record too (facticity, groundedness), with a fingerprint of the `bank.json` it read.
+The command lists them under the quiz ("evaluated: facticity 2026-11-09 (reviewed 32, flagged 2, errors 0)"), and marks one "of an earlier version" once the quiz has changed since, by a fix or by hand, so you know to evaluate again.
+Reordering the questions doesn't count as a change: the questions it judged are the same.
+Each critic keeps only its latest result; the full history stays in the course's `evals/` folder.
+A quiz made before records gets no record from an evaluation, so it stays unknown.
+
 **Question types:** multiple choice, true/false, multiple-answer, short answer, numerical, matching.
 
 ## Exporting to Canvas

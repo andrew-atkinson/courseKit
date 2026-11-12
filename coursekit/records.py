@@ -31,20 +31,20 @@ _PACKAGE = Path(__file__).resolve().parent.parent          # where the shipped p
 _reads: ContextVar[dict | None] = ContextVar("coursekit_record_reads", default=None)
 
 
-def _hash_bytes(data: bytes) -> str:
+def hash_bytes(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()[:16]
 
 
 def file_hash(path) -> str:
     try:
-        return _hash_bytes(Path(path).read_bytes())
+        return hash_bytes(Path(path).read_bytes())
     except (FileNotFoundError, NotADirectoryError):
         return ABSENT
 
 
 def digest(messages) -> str:
     """The fingerprint of a brief: the messages, exactly as sent."""
-    return _hash_bytes(json.dumps(messages, sort_keys=True, ensure_ascii=False).encode("utf-8"))
+    return hash_bytes(json.dumps(messages, sort_keys=True, ensure_ascii=False).encode("utf-8"))
 
 
 @contextlib.contextmanager
@@ -163,6 +163,24 @@ def write_steps(art_dir, steps: list[dict], *, kind: str, unit: str | None, outp
     atomic.write(art_dir / name, json.dumps(rec, indent=2))
 
 
+def add_evaluation(art_dir, *, critic: str, model: str, judged: dict, review=None, name: str = RECORD,
+                   **result) -> None:
+    """Note on the artifact's record that a critic judged it: the model, the hash of each file it read
+    (`judged`, {name: hash} — of the very bytes it judged), the review it wrote, and its `result` (counts,
+    a score). One entry per critic: a later evaluation replaces the earlier one (`evals/` keeps the
+    history). An artifact with no record gets none, so it stays unknown, as with any later step."""
+    art_dir = Path(art_dir)
+    rec = load(art_dir, name)
+    if rec is None:
+        return
+    entry = {"critic": critic, "at": datetime.now().isoformat(timespec="seconds"), "model": model,
+             "coursekit": _commit(), "judged": judged, "result": result}
+    if review:
+        entry["review"] = _key(str(Path(review).resolve()), _root(art_dir))
+    rec["evaluations"] = [e for e in rec.get("evaluations", []) if e["critic"] != critic] + [entry]
+    atomic.write(art_dir / name, json.dumps(rec, indent=2))
+
+
 def unit_for(text_key: str, art_dir):
     """The unit whose text is `text_key` (a record's `options["text"]`), found as a run finds it, and the
     text — noted, since every brief built from it reads it."""
@@ -190,6 +208,7 @@ class Status:
     edited: bool = False
     reasons: list[str] = field(default_factory=list)
     by_step: tuple = field(default=(), compare=False, repr=False)   # ((steps, reason), …) behind `stale`
+    evaluations: list[dict] = field(default_factory=list)  # each with `current`: it judged today's files
 
 
 def _made_by(path: Path, art: tuple) -> tuple | None:
@@ -249,7 +268,10 @@ def status(art_dir, name: str = RECORD, *, _seen: frozenset = frozenset()) -> St
             stale.append((set(steps), f"{', '.join(steps)}: built from {k}, which is itself stale ({'; '.join(why)})"))
     edited = _outputs(art_dir, rec["output"]) != rec["output"]
     reasons = [r for _, r in stale] + outdated + (["edited by hand since coursekit last wrote it"] if edited else [])
-    return Status("stale" if stale else "outdated" if outdated else "current", edited, reasons, tuple(stale))
+    evals = [{**e, "current": all(file_hash(art_dir / f) == h for f, h in e["judged"].items())}
+             for e in rec.get("evaluations", [])]
+    return Status("stale" if stale else "outdated" if outdated else "current", edited, reasons, tuple(stale),
+                  evals)
 
 
 def main() -> int:
@@ -267,6 +289,10 @@ def main() -> int:
         print(f"{made.relative_to(root).as_posix():48} {st.state}{' + edited' if st.edited else ''}")
         for r in st.reasons:
             print(f"    {r}")
+        for e in st.evaluations:
+            result = ", ".join(f"{k} {v}" for k, v in e["result"].items())
+            print(f"    evaluated: {e['critic']} {e['at'][:10]} ({result})"
+                  + ("" if e["current"] else " — of an earlier version"))
     return 0
 
 

@@ -124,6 +124,8 @@ uv run python -m coursekit.records "/path/to/course"
 When what a page was built from is itself out of date, the page says so: re-transcribing a lecture makes its concept map **stale**, and the page and quiz built from that map **stale** too ("built from `.vtconfig/concepts/week-7.yaml`, which is itself stale"), even though their own inputs haven't changed.
 Re-run `analyze` first, then regenerate what was built from the map.
 
+Each page's evaluations are listed under it too (facticity, groundedness, pedagogy, concept delivery), marked "of an earlier version" once the page has changed since ([quizzes.md](quizzes.md#is-a-quiz-still-up-to-date)).
+
 ## What makes a good page
 
 The model is prompted to build a **teaching outline**, not a transcript recap.

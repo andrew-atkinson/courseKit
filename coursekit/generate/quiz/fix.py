@@ -113,18 +113,23 @@ def fix_course(path, *, weeks=None, provider, model, reads: int = ev.DEFAULT_REA
     re-audit, so "generate flagged 1 → fix it" is near-instant. Otherwise cold-read every week to find
     the flags first. `progress(msg)` gives a live heartbeat. The QTI/`.imscc` package is NOT re-emitted
     here — bank.json + GIFT are; re-run `emit qti`/`emit course` to refresh the Canvas package."""
+    from coursekit import records
     from coursekit.generate.quiz.bank import Bank
 
     # Shared discovery with evaluate — whole-week AND targeted quizzes (see ev._iter_quiz_banks).
     outcomes: list[FixOutcome] = []
     for slug, bj, tpath, proot in ev._iter_quiz_banks(path, weeks):
-        bank_obj = Bank.model_validate_json(bj.read_text(encoding="utf-8"))
+        data = bj.read_bytes()
+        bank_obj = Bank.model_validate_json(data)
         transcript = tpath.read_text(encoding="utf-8")
         if findings is not None:
             flagged = [f for f in findings if f.flagged and f.week == slug]
         else:
             fnd = ev.evaluate_bank(bank_obj, transcript, provider, model, week=slug,
                                    project_root=proot, reads=reads, progress=progress)
+            # the version it read, before any fix: "of an earlier version" once a fix changes it
+            records.add_evaluation(bj.parent, critic="facticity", model=model,
+                                   judged={bj.name: records.hash_bytes(data)}, **ev.result(fnd))
             flagged = [f for f in fnd if f.flagged]
         if not flagged:
             continue

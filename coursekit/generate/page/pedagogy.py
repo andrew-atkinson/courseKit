@@ -101,6 +101,7 @@ def evaluate_course_pedagogy(path, *, weeks=None, provider, model, out_path=None
     (rubrics, out_path_or_None) — for reviewing already-generated pages without regenerating."""
     from pathlib import Path
 
+    from coursekit import records
     from coursekit.discover import find_units
     from coursekit.generate.page.page import Page
     from coursekit.pipeline import _week_matches
@@ -109,16 +110,20 @@ def evaluate_course_pedagogy(path, *, weeks=None, provider, model, out_path=None
     if weeks:
         units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
 
-    rubrics = []
+    rubrics, judged = [], []
     for u in units:
         pj = Path(u.output_dir) / "page.json"
         if not pj.exists():
             continue
-        page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
+        data = pj.read_bytes()
+        page = Page.model_validate_json(data)
         material = Path(u.transcript_path).read_text(encoding="utf-8")
         rub = evaluate_page_pedagogy(page, material, provider, model, project_root=u.course_root)
         rub.page_id = u.week_slug        # label by week for a course-level report
         rubrics.append(rub)
+        if not rub.failed:               # a failed call judged nothing
+            judged.append((pj.parent, {pj.name: records.hash_bytes(data)},
+                           {"total": rub.total, "out_of": 3 * len(CRITERIA)}))
 
     if not rubrics:
         return [], None
@@ -126,4 +131,6 @@ def evaluate_course_pedagogy(path, *, weeks=None, provider, model, out_path=None
         out_path = Path(units[0].output_dir).parent / "page-pedagogy.md"
     out_path = Path(out_path)
     atomic.write(out_path, "\n".join(render_rubric(r) for r in rubrics))
+    for art, files, result in judged:
+        records.add_evaluation(art, critic="pedagogy", model=model, judged=files, review=out_path, **result)
     return rubrics, out_path

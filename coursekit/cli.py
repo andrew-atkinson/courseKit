@@ -424,6 +424,7 @@ def _cmd_analyze(args) -> int:
 def _review_targeted_quiz(res, provider) -> None:
     """Opt-in cold read of a single targeted quiz (report-only, best-effort — never sinks the generate).
     Precise: reviews just THIS quiz's bank against its own source.md, not the whole week."""
+    from coursekit import records
     from coursekit.generate.quiz import evaluate as ev
     from coursekit.generate.quiz.bank import Bank
     model, reads = _critic_model_and_reads(str(res.output_dir))
@@ -432,7 +433,8 @@ def _review_targeted_quiz(res, provider) -> None:
         return
     print("\nReviewing the quiz (cold read)…")
     try:
-        bank = Bank.model_validate_json((res.output_dir / "bank.json").read_text(encoding="utf-8"))
+        data = (res.output_dir / "bank.json").read_bytes()
+        bank = Bank.model_validate_json(data)
         transcript = (res.output_dir / "source.md").read_text(encoding="utf-8")
         findings = ev.evaluate_bank(bank, transcript, provider, model, week=res.output_dir.name,
                                     project_root=courseconfig.find_root(res.output_dir), reads=reads,
@@ -444,10 +446,13 @@ def _review_targeted_quiz(res, provider) -> None:
     print(f"Quiz review: {len(flagged)} of {len(findings)} question(s) flagged.")
     for f in flagged:
         print(f"  [{f.verdict}] {f.group_id}/{f.label}: {f.concern}")
+    review = None
     if flagged:
         review = res.output_dir / "quiz-review.md"
         atomic.write(review, ev.render_review(findings))
         print(f"-> {review}")
+    records.add_evaluation(res.output_dir, critic="facticity", model=model, review=review,
+                           judged={"bank.json": records.hash_bytes(data)}, **ev.result(findings))
 
 
 def _cmd_generate_targeted(args) -> int:

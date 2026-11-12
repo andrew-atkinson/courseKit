@@ -99,8 +99,8 @@ def _course(tmp_path):
     return root
 
 
-def _unit(root, n="7"):
-    (unit,) = find_units(root / "output" / f"week {n}" / f"week-{n}.md")
+def _unit(root, n="7", subdir="quizzes"):
+    (unit,) = find_units(root / "output" / f"week {n}" / f"week-{n}.md", subdir=subdir)
     return unit
 
 
@@ -122,7 +122,8 @@ def _map_status(root, n="7"):
 
 
 def _page(root, function="teaching", generator="auto"):
-    return _quiet(pagebuild.build_page_unit, _unit(root), Model(), "m", function=function, generator=generator)
+    return _quiet(pagebuild.build_page_unit, _unit(root, subdir="pages"), Model(), "m", function=function,
+                  generator=generator)
 
 
 # --------------------------------------------------------------------------- concept maps

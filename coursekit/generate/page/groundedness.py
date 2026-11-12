@@ -155,6 +155,7 @@ def evaluate_course_groundedness(path, *, weeks=None, provider, model, out_path=
     Returns (per-page results, out_path_or_None)."""
     from pathlib import Path
 
+    from coursekit import records
     from coursekit.discover import find_units
     from coursekit.generate.page.page import Page
     from coursekit.pipeline import _week_matches
@@ -163,12 +164,13 @@ def evaluate_course_groundedness(path, *, weeks=None, provider, model, out_path=
     if weeks:
         units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
 
-    results = []
+    results, judged = [], []
     for u in units:
         pj = Path(u.output_dir) / "page.json"
         if not pj.exists():
             continue
-        page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
+        data = pj.read_bytes()
+        page = Page.model_validate_json(data)
         material = Path(u.transcript_path).read_text(encoding="utf-8")
         n = sum(1 for b in page.blocks.values() if b.kind not in _SKIP_KINDS)
         if progress:
@@ -177,6 +179,9 @@ def evaluate_course_groundedness(path, *, weeks=None, provider, model, out_path=
                                         project_root=u.course_root, progress=progress)
         pg.page_id = u.week_slug             # label by week for the course report
         results.append(pg)
+        judged.append((pj.parent, {pj.name: records.hash_bytes(data)},
+                       {"coverage": round(pg.coverage, 2), "in_tension": len(pg.tensions),
+                        "model_supplied": len(pg.model_supplied), "unchecked": len(pg.unchecked)}))
 
     if not results:
         return [], None
@@ -184,4 +189,6 @@ def evaluate_course_groundedness(path, *, weeks=None, provider, model, out_path=
         out_path = Path(units[0].output_dir).parent / "page-groundedness.md"
     out_path = Path(out_path)
     atomic.write(out_path, "\n".join(render_groundedness(r) for r in results))
+    for art, files, result in judged:
+        records.add_evaluation(art, critic="groundedness", model=model, judged=files, review=out_path, **result)
     return results, out_path

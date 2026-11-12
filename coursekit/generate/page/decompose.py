@@ -396,6 +396,9 @@ def main() -> int:
                                    project_root=unit.course_root)
             print(f"  {f.group_id} ({f.label}): {_outcome_word(o)}")
         _render(pg, unit, out_dir, unit.course_root)
+        if pg.finalized:                                  # an unfinished page's fixes stay staged
+            from coursekit.generate.page import record
+            record.write_fix(out_dir, model)
     return 0
 
 
