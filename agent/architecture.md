@@ -232,8 +232,9 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
 13. ✅ **The CORE-1 spine** — `outcomes` (one error type with a stable code, warnings as notices, no prints in library code), `schemas` + `coursekit check`, `settings` + `coursekit config`, and required inputs (a switched-on feature produces its artifact or records why not).
 14. ✅ **The course model** (CORE-2) — see [above](#the-course-model--one-loader-one-index).
 15. ✅ **Generator state in instances** (CORE-3) — assignments, pages, quizzes, and the renderer, with a guard and a threaded proof. See [above](#who-owns-the-artifact-being-built).
-16. **Migrate the transcriber onto the spine** — providers first, taking the union of capabilities.
-17. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class.
+16. ✅ **Artifact records** (CORE-4) — a record beside every artifact, every write atomic, evaluations tied to the version they judged, and the status shown by the census and `emit`; `generate` won't overwrite a hand edit. See [core-4-design.md](core-4-design.md).
+17. **Migrate the transcriber onto the spine** — providers first, taking the union of capabilities.
+18. **Canvas API emitter stays gated** on the local Canvas. File emitters remain first-class.
 
 ## Not yet closed
 
@@ -244,4 +245,6 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
   Evaluate and fix take every quiz and page from the index (`course.review_items`), glossary and overview siblings included, but the pedagogy, concept-delivery, and page-groundedness critics (`evaluate --all`) still read one `page.json` per unit at its layout path.
   Moving them onto `review_items` would review the siblings too — more model calls and a visible change in their reports, so it is its own decision, not a cleanup.
 - **The code still says `week`** (`week_slug`, `week_num`, `discover.Unit`) where the model says *unit*; CORE-5 renames it once its readers have moved.
+- **Two writers still overwrite a hand edit:** `analyze` (a concept map) and the overview script (`python -m coursekit.generate.overview`); parked as `CORE-4.6`.
+  And the decompose prototype's `--review` isn't recorded as an evaluation.
 - **The census does not count overview pages yet**, though the model indexes them — a visible output change, kept out of the byte-identical CORE-2 steps.

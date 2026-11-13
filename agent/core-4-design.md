@@ -1,7 +1,7 @@
 # CORE-4 design — artifact records (2026-11-07)
 
 The fourth step of [structure-review.md](structure-review.md): beside each generated artifact, a small record of what it was made from and how, so coursekit can tell when an artifact no longer matches its course.
-Steps 1 to 4 are built (2026-11-07, 2026-11-08, 2026-11-09, 2026-11-11). The user settled decisions 1, 4, and 5 on 2026-11-07 and added the atomic writes to step 2; the others stand as recommended.
+All five steps are built (2026-11-07 to 2026-11-12); `CORE-4.6` (`analyze` overwriting a hand-edited concept map) is parked. The user settled decisions 1, 4, and 5 on 2026-11-07 and added the atomic writes to step 2; the others stand as recommended.
 Facts below were read from `main` at `2a0b346` and from both real courses (read only); counts are snapshots.
 
 ## 1. What exists today
@@ -169,11 +169,12 @@ Every step keeps these **goldens** identical to `main`, captured once before ste
    `emit` warns from `course.ir_files`, the one place every emitter gets its files, so each command warns once per stale artifact and packages it anyway.
    `generate` checks every target before the model is reached (`records.refuse_edited`, from `run_course`, a document quiz, and assignments) and names every edited one at once; `--force` overrides. A deleted file isn't an edit, since there's nothing to lose, and an artifact with no record regenerates as before.
    A page's folder depends on its function (`page_dir`, which `build_page_unit` now shares), so a glossary or overview page is checked where it's written.
-   Not covered: `analyze` re-running over a hand-edited concept map, and the course overviews' prototype; neither is `generate`. Parked as `CORE-4.6` (2026-11-12).
+   Not covered: `analyze` re-running over a hand-edited concept map, and the overview script (`python -m coursekit.generate.overview`); neither is `generate`. Parked as `CORE-4.6` (2026-11-12).
    A gap from step 2, found here: the course index read an overview's `<slug>.record.json` as another overview; it's skipped now.
    On copies of both real courses: CC101's 40 artifacts all read unknown. PH101's 4 older quizzes read unknown, and its one quiz made since records reads stale, because the PDF it was made from (`…-ocr.pdf`) is no longer in the course. `emit` warns about that one quiz only. Every member of the 16 export packages is byte-identical to `main`'s.
    21 mutations, all caught.
 5. **Docs** — `docs/architecture.md` (what each command reads and writes), `agent/architecture.md`, `docs/architecture-diagram.html` (a new output beside each artifact), `CLAUDE.md`'s rules, and the roadmap's Shipped line.
+   **Done 2026-11-12.** `CLAUDE.md` has two new rules (every write through `atomic.py`; whatever writes an artifact writes its record, with one brief builder shared by the run and the check, status never stored, no emitter reading it), and "the faculty decides" now covers a hand edit; `docs/architecture.md` adds the record to "what each command runs" and a paragraph on who writes and reads it; the diagram page gives `record.json` its own node.
 
 ## 6. Decisions
 

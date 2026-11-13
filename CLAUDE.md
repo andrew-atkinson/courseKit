@@ -27,6 +27,13 @@ One exception to re-emitting: GIFT has no `emit` command — `BankDraft.finalize
 - **A run owns its state; nothing under `coursekit/generate/` keeps any in a module.**
   The artifact being built lives in a draft (`BankDraft`, `PageDraft`, `AssignmentDraft`) and the run's tools in a tool session (`dispatch.ToolSession`); a function that needs either takes it as an argument, so two jobs in one process never touch each other's artifact.
   [tests/test_isolation.py](tests/test_isolation.py) enforces it (no `global`, no shared module-level containers, no class attributes set at run time) and proves it with two jobs taking turns on threads.
+- **Every file write under `coursekit/` goes through `coursekit/atomic.py`** (`atomic.write`, or `atomic.replacing` for a writer that needs a path), so a crash leaves the old file or the new one, never half; appending a log line is the one exception.
+  [tests/test_atomic.py](tests/test_atomic.py) enforces it.
+- **Whatever writes an artifact writes its record, right after it** (`records.write_steps`; `agent/core-4-design.md`).
+  A record holds what the model was shown (a fingerprint of the brief), the files it read, and what was written; status (current, stale, outdated, edited, unknown) is worked out when asked, never stored.
+  Each step's brief comes from one builder the run and the check both call, so they can't drift ([tests/test_records_everywhere.py](tests/test_records_everywhere.py) checks each against the messages actually sent).
+  A later step on an artifact with no record writes none: an artifact made before records stays unknown, never current.
+  No emitter reads a record.
 - **coursekit writes its own `.vtconfig` settings only through `coursekit/settings.py`** — validated against `coursekit/schemas.py`, atomic, never `context.yaml`.
   New code that changes a setting calls the settings API; it never dumps YAML into `.vtconfig/` itself.
 - Default branch for PRs is `main`.
@@ -66,6 +73,7 @@ One exception to re-emitting: GIFT has no `emit` command — `BankDraft.finalize
 - **Proposers draft; the faculty decides.**
   `propose` (structure, `--grading`, `--expectations`) writes a commented draft the faculty owns by editing, and refuses to clobber it without `--force`.
   A pedagogic choice the faculty hasn't made (a cadence, whether/how EUs are assessed) is a flagged DECISION NEEDED, never a pre-filled rule.
+  The same goes for a hand edit: `generate` refuses to overwrite an artifact edited since coursekit made it, unless `--force`.
 - **The census is presence, not quality.**
   It answers "is there an artifact for X?" offline; "is X any good?" needs the model and belongs to the evaluators.
 - **Content boundary: instructor-authored material only, never student submissions.**

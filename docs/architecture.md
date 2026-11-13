@@ -219,6 +219,11 @@ flowchart TB
     end
     bank & page & asg --> cen -.-> cenout[("census.json · census.md")]
 
+    rec[("record.json · beside each artifact<br/>what it was made from · its evaluations")]
+    bank & page & asg & cmap -.- rec
+    ev -. "each critic's result" .-> rec
+    rec --> cen
+
     crs -- "import · the whole course" --> canvas(["<b>Canvas</b>"])
     zip & imscc & aimscc -- "import · one type" --> canvas
 
@@ -237,4 +242,8 @@ Adding a platform costs one emitter, not one converter per input, and re-emittin
 It reuses the standalone emitters rather than formatting anything itself: a quiz's questions are `qti.emit_assessment`'s XML (only the packaging differs), a page is `cc.render_page`'s HTML (byte-identical to the pages-only `.imscc`), and an assignment's body goes through the same `render_body`.
 `emit assignments` is the same assembler with only the assignment source.
 So the course `.imscc` is the whole course in one import, and the QTI `.zip`, the pages `.imscc`, and the assignments `.imscc` are the alternative of importing one type at a time.
+**Records.** Every command that writes an artifact writes its record right after it: `generate` and `analyze` start a fresh one, and `fix`, a reorder, and the quiz's later passes add a step.
+Each critic's result is added wherever it runs: `evaluate`, `generate`'s review, and the check `fix` makes before it fixes.
+Three things read them, none of them an emitter: `python -m coursekit.records PATH` and the census report each artifact's status, `emit` warns about a stale one (and packages it anyway), and `generate` refuses to overwrite one edited by hand unless `--force`.
+
 A Canvas **API** emitter is the gated third delivery path — it will read the same IRs, so it is one more emitter, not a new pipeline.

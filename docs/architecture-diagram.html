@@ -164,7 +164,8 @@
         <div class="node built"><div class="n-name">context.yaml <span style="color:var(--vt);font-weight:600">+</span> structure.coursekit.yaml</div><div class="n-meta">the declared structure — units and their order, sources, titles, grading groups, expectations.</div></div>
         <div class="node built"><div class="n-name">week-N.md</div><div class="n-meta">the unit's consolidated text.</div></div>
         <div class="node built"><div class="n-name">concept map</div><div class="n-meta">the unit's concepts — grounds generation + evaluation.</div></div>
-        <div class="node built"><div class="n-name">bank.json · page.json · assignment.json</div><div class="n-meta">the canonical quiz, page, and assignment — the one form every emitter reads. Generation writes these, and beside each one (and each concept map and overview) a record of what it was made from, so coursekit can tell when it no longer matches the course.</div></div>
+        <div class="node built"><div class="n-name">bank.json · page.json · assignment.json</div><div class="n-meta">the canonical quiz, page, and assignment — the one form every emitter reads.</div></div>
+        <div class="node built"><div class="n-name">record.json</div><div class="n-meta">beside each artifact (and each concept map and overview): what it was made from, and what the critics found, so coursekit can tell when it no longer matches the course. <code>generate</code> won&rsquo;t overwrite a hand edit without <code>--force</code>.</div></div>
       </div>
     </section>
 
