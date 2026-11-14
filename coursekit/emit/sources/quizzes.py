@@ -13,7 +13,6 @@ hang off a `learning-application-resource` dependency. The *questions* come from
 """
 
 from coursekit import outcomes
-from coursekit.courseconfig import week_key
 from coursekit.emit import cc, qti
 from coursekit.emit.cartridge import CartridgeItem
 
@@ -71,6 +70,8 @@ class QuizzesSource:
             outcomes.warn("emit.quiz_skipped", f"  ⚠ skipped quiz {bj.parent.name}: {reason}",
                           quiz=bj.parent.name, reason=reason)
         scheme = CourseStructure.load(course_path).grading()   # declared grading groups (STRC-2)
+        from coursekit.course import artifact_units
+        units = artifact_units(course_path)
         items = []
         for bank, quiz, bj in entries:
             qid = qti.quiz_ident(bank.run_id)
@@ -79,7 +80,7 @@ class QuizzesSource:
             group = scheme.group_for("quiz", slug=bj.parent.name)   # declared group, else default (None)
             gref = group_ident(group) if group else None
             items.append(CartridgeItem(
-                week_key=week_key(bj.parent.name),
+                unit=units.get(bj),
                 content_type="Quizzes::Quiz",
                 title=title,
                 resource_id=qid,
@@ -90,7 +91,7 @@ class QuizzesSource:
                     f"{qid}/assessment_meta.xml": qti.emit_assessment_meta(bank, quiz, assignment_group_id=gref),
                     f"non_cc_assessments/{qid}.xml.qti": qti.emit_assessment(bank, quiz),
                 },
-                rank=1,   # quizzes after pages in a week's module
+                rank=1,   # quizzes after pages in a unit's module
                 source=bj,
             ))
         return items

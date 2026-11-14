@@ -238,7 +238,7 @@ GIFT is the exception: `BankDraft.finalize` writes `bank.gift` and `quiz_<seed>.
 The standalone `.html` is likewise first written at generation, beside `page.json`, and `emit html` re-renders it.
 Emitters find those files through the course model's index (`course.ir_files`), and evaluate and fix do too (`course.review_items`), never by walking the folder.
 Adding a platform costs one emitter, not one converter per input, and re-emitting needs no model: `emit qti`, `emit html`, `emit cc`, `emit assignments`, and `emit course` rebuild from the committed JSON.
-`emit course` (`emit/cartridge.py`) sits one level up — it assembles all three IRs into one Common Cartridge of week modules, via a `CartridgeSource` per content type (pages, quizzes, assignments; discussions next), so a new content type is one source, not a new assembler.
+`emit course` (`emit/cartridge.py`) sits one level up — it assembles all three IRs into one Common Cartridge of a module per unit, in the course's order, via a `CartridgeSource` per content type (pages, quizzes, assignments; discussions next), so a new content type is one source, not a new assembler.
 It reuses the standalone emitters rather than formatting anything itself: a quiz's questions are `qti.emit_assessment`'s XML (only the packaging differs), a page is `cc.render_page`'s HTML (byte-identical to the pages-only `.imscc`), and an assignment's body goes through the same `render_body`.
 `emit assignments` is the same assembler with only the assignment source.
 So the course `.imscc` is the whole course in one import, and the QTI `.zip`, the pages `.imscc`, and the assignments `.imscc` are the alternative of importing one type at a time.

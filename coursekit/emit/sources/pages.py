@@ -4,8 +4,8 @@ Reuses the page emitter (`cc.render_page` / `cc.page_resource`) verbatim, so a p
 cartridge is byte-identical to one in a pages-only `.imscc`.
 """
 
-from coursekit.course import ir_files
-from coursekit.courseconfig import find_root, week_key
+from coursekit.course import artifact_units, ir_files
+from coursekit.courseconfig import find_root
 from coursekit.emit import cc
 from coursekit.emit.cartridge import CartridgeItem
 
@@ -19,23 +19,21 @@ class PagesSource:
         from coursekit.generate.page.style import load_style
 
         items = []
+        units = artifact_units(course_path)
         for pj in ir_files(course_path, "page"):
             page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
             root = find_root(pj)
             supp = load_supplements(root, page.unit_ref or page.slug)
             style = load_style(root)
-            wk = week_key(page.unit_ref) if page.unit_ref else None
-            if wk is None:
-                wk = week_key(pj.parent.name)
             items.append(CartridgeItem(
-                week_key=wk,
+                unit=units.get(pj),
                 content_type="WikiPage",
                 title=page.title,
                 resource_id=cc.page_ident(page),
                 item_id=cc.item_ident(page),
                 resource_xml=cc.page_resource(page),
                 files={f"wiki_content/{page.slug}.html": cc.render_page(page, supp, style)},
-                rank=0,   # pages come before quizzes in a week's module
+                rank=0,   # pages come before quizzes in a unit's module
                 source=pj,
             ))
         return items

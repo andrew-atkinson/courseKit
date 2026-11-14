@@ -3,13 +3,12 @@ course-level `rubrics.xml` / `assignment_groups.xml` a source contributes via `c
 
 The per-resource XML (settings, html, rubric) lives in `emit/assignment.py`, grounded from the real
 CC101 course export; this wires it into the shared cartridge assembler so an assignment lands in a
-week module exactly like a page or quiz (and imports the same way).
+unit's module exactly like a page or quiz (and imports the same way).
 """
 
 from pathlib import Path
 
-from coursekit.course import ir_files
-from coursekit.courseconfig import week_key
+from coursekit.course import artifact_units, ir_files
 from coursekit.emit import assignment as ae
 from coursekit.emit import cc
 from coursekit.emit.cartridge import CartridgeItem
@@ -47,12 +46,13 @@ class AssignmentSource:
         root = find_root(Path(course_path))
         style = load_style(root)                            # the course theme, so assignments match pages
         scheme = CourseStructure.load(course_path).grading()   # declared grading groups (STRC-2)
+        units = artifact_units(course_path)
         items = []
         for a, f in self._loaded:
             aid = ae.assignment_ident(a)
             group = scheme.group_for("assignment", slug=a.slug) or a.group_title   # declared → default
             items.append(CartridgeItem(
-                week_key=week_key(a.unit_ref) if a.unit_ref else None,
+                unit=units.get(f),
                 content_type="Assignment",
                 title=a.title,
                 resource_id=aid,
@@ -60,7 +60,7 @@ class AssignmentSource:
                 resource_xml=_resource(a),
                 files={f"{aid}/{a.slug}.html": ae.assignment_html(a, style=style),
                        f"{aid}/assignment_settings.xml": ae.assignment_settings_xml(a, group_title=group)},
-                rank=2,   # assignments after pages(0) / quizzes(1) in a week's module
+                rank=2,   # assignments after pages(0) / quizzes(1) in a unit's module
                 source=f,
             ))
         return items

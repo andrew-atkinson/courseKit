@@ -269,3 +269,54 @@ def test_a_model_free_page_is_titled_by_its_units_label_once(sessions, monkeypat
     weekly_analyze(root)
     out = _quiet(pagebuild.build_page_unit, weekly_unit(root, subdir="pages"), Model(), "m", function="overview").output_dir
     assert json.loads((out / "page.json").read_text())["title"] == "Week 7: Objects"     # not "Week 7: Week 7: …"
+
+
+# ------------------------------------------------------------------ CORE-5.4: a cartridge module per unit
+
+def _modules(imscc):
+    """[(module title, [item titles])] from a cartridge's module_meta.xml, in order."""
+    import re
+    import zipfile
+    mm = zipfile.ZipFile(imscc).read("course_settings/module_meta.xml").decode()
+    return [(re.search(r"<title>(.*?)</title>", m).group(1), re.findall(r"<item [^>]*>\s*<content_type>[^<]*</content_type>"
+                                                                      r"\s*<workflow_state>[^<]*</workflow_state>\s*<title>(.*?)</title>", m))
+            for m in re.findall(r"<module [^>]*>.*?</module>", mm, re.S)]
+
+
+@pytest.fixture
+def built(sessions, monkeypatch):
+    """The session course with a quiz and an overview page per session, and units declared loops-first."""
+    _analyze(sessions, monkeypatch)
+    for s in ("intro", "loops"):
+        _quiet(run_unit, _unit(sessions, s), OpenAICompatProvider(client=_Endpoint(), name="f"), "m", QuizGenerator())
+        _quiet(pagebuild.build_page_unit, _unit(sessions, s, "pages"), Model(), "m", function="overview")
+    overlay = sessions / ".vtconfig" / "structure.coursekit.yaml"
+    head, intro, loops = overlay.read_text().splitlines()
+    overlay.write_text("\n".join([head, loops, intro]) + "\n", encoding="utf-8")      # the course's order: loops first
+    return sessions
+
+
+def test_a_course_cartridge_has_a_module_per_unit_titled_and_ordered_by_the_course(built):
+    from coursekit.emit import cartridge
+    mods = _modules(_quiet(cartridge.write_course_imscc, built))
+    assert [title for title, _ in mods] == ["Session 2 — Loops", "Session 1 — Intro"]
+    assert all(len(items) == 2 for _, items in mods)                       # its overview page, then its quiz
+    assert mods[0][1][0].startswith("Session 2 — Loops")
+
+
+def test_the_pages_cartridge_follows_the_courses_order_too(built):
+    import zipfile
+    from coursekit.emit import cc
+    names = [n for n in zipfile.ZipFile(_quiet(cc.write_imscc, built)).namelist() if n.startswith("wiki_content/")]
+    assert names == ["wiki_content/loops-overview.html", "wiki_content/intro-overview.html"]
+
+
+def test_an_artifact_with_no_unit_goes_in_the_courses_own_module(built):
+    from coursekit.emit import cartridge
+    stray = built / "pages" / "welcome"
+    stray.mkdir()
+    page = json.loads((built / "pages" / "intro-overview" / "page.json").read_text())
+    stray.joinpath("page.json").write_text(json.dumps({**page, "unit_ref": None, "slug": "welcome",
+                                                       "page_id": "welcome", "title": "Welcome"}), encoding="utf-8")
+    mods = _modules(_quiet(cartridge.write_course_imscc, built))
+    assert mods[-1] == ("Intensive", ["Welcome"])                           # course scope, after every unit

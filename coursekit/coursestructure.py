@@ -285,6 +285,10 @@ class CourseStructure:
             return title or str(unit_id)
         return f"Week {unit_id}: {title}" if title else f"Week {unit_id}"
 
+    def unit_title(self, unit_id: str) -> str | None:
+        """A unit's declared title alone (`Repetition`, `Session 1 — Intro`), or None."""
+        return self._entry(unit_id).get("title")
+
     def unit_module(self, unit_id: str) -> str | None:
         return self._entry(unit_id).get("module")
 

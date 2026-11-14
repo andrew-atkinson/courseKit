@@ -275,20 +275,9 @@ def package_files(entries: list[tuple], course_title: str) -> dict[str, str]:
     return files
 
 
-def _week_order(page) -> tuple:
-    """Sort key that orders week-2 before week-10 (numeric), not lexically — so the module's page
-    order in Canvas follows the weeks. Non-week pages sort last, by slug. Matches how the course
-    cartridge orders its week modules (`cartridge._week_sort`)."""
-    from coursekit.courseconfig import week_key
-    k = week_key(page.unit_ref) if page.unit_ref else None
-    if k and k.isdigit():
-        return (0, int(k), "")
-    return (1, 0, page.unit_ref or page.slug or "")
-
-
 def _load_pages(path) -> list[tuple]:
     """Every committed `page.json` under `path`, each with its course supplements and theme, in
-    week order.
+    the course's unit order.
 
     Mirrors `emit/html.reemit`: supplements and style are resolved at package time by walking up to
     the `.vtconfig/` root, so the cartridge carries the same styled body a re-render would.
@@ -299,14 +288,18 @@ def _load_pages(path) -> list[tuple]:
     from coursekit.generate.page.renderer import load_supplements
     from coursekit.generate.page.style import load_style
 
+    from coursekit.course import artifact_units
+    from coursekit.emit.cartridge import unit_rank
+    units, rank = artifact_units(path), unit_rank(path)
     entries = []
     for pj in ir_files(path, "page"):
         page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
         root = find_root(pj)
         supp = load_supplements(root, page.unit_ref or page.slug)
-        entries.append((page, supp, load_style(root)))
-    entries.sort(key=lambda e: _week_order(e[0]))   # week-2 before week-10, not lexical
-    return entries
+        entries.append((page, supp, load_style(root), units.get(pj)))
+    # the course's unit order (week 2 before week 10, not lexical), then by slug within a unit
+    entries.sort(key=lambda e: (rank(e[3]), e[0].slug or ""))
+    return [e[:3] for e in entries]
 
 
 def _course_title(path) -> str:

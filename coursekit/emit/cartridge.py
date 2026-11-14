@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from coursekit import atomic, courseconfig
+from coursekit import atomic, courseconfig, outcomes
 from coursekit.emit import cc
 
 
@@ -33,7 +33,7 @@ class CartridgeItem:
 
     `resource_xml` is one or more `<resource>` blocks for the manifest; `files` is its arcname→content
     contributions to the zip; `resource_id` is what the module item points at (`identifierref`)."""
-    week_key: str | None
+    unit: str | None           # the unit it belongs to (`course.artifact_units`); None for course scope
     content_type: str          # "WikiPage" | "Quizzes::Quiz" | "DiscussionTopic" | "Assignment" | …
     title: str
     resource_id: str           # the module item's identifierref → the primary resource
@@ -84,32 +84,37 @@ def _grading_settings(path, items: list[CartridgeItem], course_title: str) -> di
 
 # ------------------------------------------------------------- module grouping
 
-def _week_sort(k: str | None):
-    """Numeric weeks first in order; anything else after, alphabetically. None sorts last."""
-    if k is None:
-        return (2, "")
-    return (0, int(k)) if k.isdigit() else (1, k)
+def unit_rank(path):
+    """A sort key over unit ids in the course's own order: its units first, as the course orders them; a unit
+    only an artifact names after (numbered ones by number, then the rest by name); course scope (None) last."""
+    from coursekit.course import Course
+    from coursekit.coursestructure import _week_sort
+    p = Path(path).expanduser().resolve()
+    with outcomes.capture(sink=lambda n: None):
+        order = {u.id: u.order for u in Course.load(p if p.is_dir() else p.parent).units}
+    return lambda k: (3, (0, 0)) if k is None else (0, (order[k], 0)) if k in order else (1, _week_sort(k))
 
 
-def _module_title(cfg, week_key: str | None, course_title: str) -> str:
-    """A module's title: the course context's week title if known, else 'Week N', else the course."""
-    if week_key is None:
+def _module_title(struct, unit: str | None, course_title: str) -> str:
+    """A module's title: the unit's declared title, else `Week N` for a numbered unit, else its id; the
+    course's own title for course scope."""
+    if unit is None:
         return course_title
-    entry = cfg.week(week_key) if cfg else {}
-    return (entry or {}).get("title") or f"Week {week_key}"
+    return struct.unit_title(unit) or (f"Week {unit}" if unit.isdigit() else unit)
 
 
 def _modules(items: list[CartridgeItem], path, course_title: str):
-    """Group items into ordered week-modules: [(module_id, title, [items])]."""
-    cfg = courseconfig.load(courseconfig.find_root(Path(path)) or Path(path))
+    """Group items into one module per unit, in the course's order: [(module_id, title, [items])]."""
+    from coursekit.coursestructure import CourseStructure
+    struct = CourseStructure.load(courseconfig.find_root(Path(path)) or Path(path))
     groups: dict = {}
     for it in items:
-        groups.setdefault(it.week_key, []).append(it)
+        groups.setdefault(it.unit, []).append(it)
     modules = []
-    for k in sorted(groups, key=_week_sort):
+    for k in sorted(groups, key=unit_rank(path)):
         mid = cc.gid(course_title, str(k), "module")
         its = sorted(groups[k], key=lambda it: (it.rank, it.title))
-        modules.append((mid, _module_title(cfg, k, course_title), its))
+        modules.append((mid, _module_title(struct, k, course_title), its))
     return modules
 
 
@@ -227,7 +232,7 @@ def package_files(items: list[CartridgeItem], course_title: str) -> dict:
 
 def write_course_imscc(path, out_path=None, title=None, sources=None) -> Path | None:
     """Package a course's pages AND quizzes (and any future content types) into ONE `.imscc` whose
-    items land in week modules. Returns the written path, or None when nothing was found.
+    items land in a module per unit, in the course's order. Returns the written path, or None when nothing was found.
 
     Deterministic ids mean re-packaging the same course yields byte-stable output.
     """

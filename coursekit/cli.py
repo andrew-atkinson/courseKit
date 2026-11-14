@@ -690,7 +690,7 @@ def _cmd_emit_course(args) -> int:
     if out is None:
         print(f"No pages or quizzes found under {args.path}")
         return 1
-    print(f"Canvas course cartridge (pages + quizzes, in week modules):\n  [OK]   {out}")
+    print(f"Canvas course cartridge (pages + quizzes, a module per unit):\n  [OK]   {out}")
     return 0
 
 
@@ -1033,7 +1033,7 @@ def build_parser() -> argparse.ArgumentParser:
     ec.set_defaults(func=_cmd_emit_cc)
 
     eco = esub.add_parser("course",
-                          help="ONE Canvas .imscc of the WHOLE course — pages AND quizzes, in week modules")
+                          help="ONE Canvas .imscc of the WHOLE course — pages AND quizzes, a module per unit")
     eco.add_argument("path", help="the course root (its pages/ and quizzes/ trees)")
     eco.set_defaults(func=_cmd_emit_course)
 

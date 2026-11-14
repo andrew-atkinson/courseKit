@@ -143,6 +143,15 @@ def ir_files(path, kind: str) -> list[Path]:
     return found
 
 
+def artifact_units(path) -> dict[Path, str | None]:
+    """Each indexed artifact under the course at `path`, with the unit it belongs to (the one ownership rule,
+    `owner`), so an emitter places it without working the unit out again."""
+    p = Path(path).expanduser().resolve()
+    with outcomes.capture(sink=lambda n: None):
+        course = Course.load(p if p.is_dir() else p.parent)
+    return {a.path: a.unit for a in course.artifacts}
+
+
 def _warn_stale(paths: list[Path]) -> None:
     """An export of an artifact its course has moved on from says so, and packages it anyway; an edited one
     is normal (instructors edit), and one made before records can't be checked, so neither is mentioned."""

@@ -153,7 +153,7 @@ def test_a_new_content_type_is_one_source(course):
     class DiscussionsSource:
         def collect(self, path):
             return [CartridgeItem(
-                week_key="3", content_type="DiscussionTopic", title="Week 3 Discussion",
+                unit="3", content_type="DiscussionTopic", title="Week 3 Discussion",
                 resource_id="gdisc1", item_id="gdiscitem1",
                 resource_xml='    <resource identifier="gdisc1" type="imsdt_xmlv1p1">\n'
                              '      <file href="gdisc1/discussion.xml"/>\n    </resource>',

@@ -6,7 +6,7 @@ holds the instructions HTML + an `assignment_settings.xml` (`<assignment xmlns=â
 rubric lives in `course_settings/rubrics.xml` and is attached via `<rubric_identifierref>`. The emitted
 fields are a valid subset of the export's (Canvas defaults the rest). The MANIFEST/module wiring is NOT here â€” `emit/sources/
 assignments.py` turns these parts into cartridge items so the shared assembler (`cartridge.py`) places
-an assignment in a week module exactly like a page or quiz. `emit_from_path` routes a standalone
+an assignment in its unit's module exactly like a page or quiz. `emit_from_path` routes a standalone
 `emit assignments` through that same assembler.
 """
 

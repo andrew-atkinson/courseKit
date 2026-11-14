@@ -125,6 +125,10 @@ Every step keeps these **goldens** identical to `main`, captured once before ste
    After an upgrade, a model-free page or course overview made before this step reads "outdated" (its brief is the page, now with `unit_ref`), as CORE-4 decision 2 intends; neither real course has one with a record.
 4. **`CORE-5.4-emit-by-unit` — a cartridge module per unit, in the course's order.**
    *Pass:* G0 identical; on G2, two modules titled by the units' labels, in declared order.
+   **Done 2026-11-14.** Each cartridge item takes its unit from the course index (`course.artifact_units`, the one ownership rule), not from a week number parsed out of its folder or `unit_ref`; `CartridgeItem.week_key` is now `unit`.
+   Modules follow the course's unit order (`cartridge.unit_rank`: the course's units as it orders them, then a unit only an artifact names, then course scope), and a module's title is the unit's declared title (`CourseStructure.unit_title`), else `Week N` for a numbered unit, else its id; the pages-only cartridge orders its pages the same way.
+   A title comes from the structure, `context.yaml` and coursekit's overlay composed, where it used to come from `context.yaml` alone: the same for both real courses (PH101's overlay declares no titles).
+   G0: all 904 files and members identical, and both emit logs. G2: the session course's cartridge has a module per session titled "Session 2 — Loops" and "Session 1 — Intro", in the order the overlay declares (reversed on purpose), and an artifact with no unit lands in the course's own module, last. 8 mutations, all caught.
 5. **`CORE-5.5-unit-noun` — what the model is shown.**
    *Pass:* G1's records all still current (every brief byte-identical for a weekly course); on G2 with `unit_noun: session`, the briefs say "session" and never "week".
 6. **Docs** — `docs/architecture.md`, `agent/architecture.md`, the diagram page, the user guides' `--unit`, `CLAUDE.md`'s unit rule (its examples of surviving week names), and the roadmap.
