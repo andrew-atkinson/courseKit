@@ -105,7 +105,7 @@ def _iter_page_jsons(path, weeks=None):
     course's pages/ tree — the per-week teaching page AND its function siblings (`-glossary`,
     `-overview`). `label` is the page dir name (distinguishes the siblings in a review); `unit_slug`
     is the base unit, shared by a unit's pages (for supplements + material). A page belongs to the unit
-    the course model's index says (`course.review_items`), so a page moved by its `week_ref` is read
+    the course model's index says (`course.review_items`), so a page moved by its `unit_ref` is read
     against its new unit. Mirrors the quiz side's `_iter_quiz_banks` so evaluate and fix see the same set."""
     from coursekit.course import review_items
 

@@ -166,7 +166,7 @@ def test_an_unreadable_artifact_is_counted_and_flagged_by_the_census(tmp_path):
     with _captured() as report:
         c = census.build_census(root)
     assert c.unreadable == ["quizzes/week-3/bank.json"]
-    assert next(w for w in c.weeks if w.week == "3").quizzes == 1            # presence still counts
+    assert next(w for w in c.units if w.unit == "3").quizzes == 1            # presence still counts
     assert "Unreadable artifacts" in census.render_report(c)
     assert [w.code for w in report.warnings] == ["census.unreadable_artifact"]
 

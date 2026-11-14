@@ -7,18 +7,18 @@ from coursekit.generate.assignment import build as ab
 from coursekit.generate.assignment.assignment import Assignment
 
 
-def _tools(out_dir=None, *, id="c", slug="a", week_ref="w", points=10):
-    return ab.AssignmentTools(ab.AssignmentDraft(assignment_id=id, slug=slug, week_ref=week_ref,
+def _tools(out_dir=None, *, id="c", slug="a", unit_ref="w", points=10):
+    return ab.AssignmentTools(ab.AssignmentDraft(assignment_id=id, slug=slug, unit_ref=unit_ref,
                                                  default_points=points, out_dir=out_dir))
 
 
 @pytest.fixture
 def s(tmp_path):
-    return _tools(tmp_path, id="c-w3", slug="week-3-assignment", week_ref="week-3")
+    return _tools(tmp_path, id="c-w3", slug="week-3-assignment", unit_ref="week-3")
 
 
 def test_tools_build_a_valid_assignment_with_a_rubric(tmp_path):
-    s = _tools(tmp_path, id="c-w3", slug="week-3-assignment", week_ref="week-3", points=30)
+    s = _tools(tmp_path, id="c-w3", slug="week-3-assignment", unit_ref="week-3", points=30)
     assert s.set_assignment("Apply loops", "Make a grid of shapes using loops and map().",
                              overview="Connects the week to practice.",
                              deliverable="a p5.js sketch").startswith("OK")
@@ -98,7 +98,7 @@ def test_assignment_dispatch_shares_the_quiz_and_page_contract(tmp_path):
     import json
     import types
 
-    s = _tools(tmp_path, id="a", week_ref="week-1")
+    s = _tools(tmp_path, id="a", unit_ref="week-1")
     calls = [types.SimpleNamespace(id="1", name="set_assignment", arguments="[1, 2]"),
              types.SimpleNamespace(id="2", name="set_assignment",
                                    arguments=json.dumps({"title": "T", "task": "Apply the idea."}))]
@@ -107,7 +107,7 @@ def test_assignment_dispatch_shares_the_quiz_and_page_contract(tmp_path):
     assert ok.startswith("OK brief set")
     log = tmp_path / "calls.jsonl"
     assert [json.loads(line)["name"] for line in log.read_text().splitlines()] == ["set_assignment"] * 2
-    assert _tools(id="a", week_ref="week-1").replay(log)[1].startswith("OK brief set")
+    assert _tools(id="a", unit_ref="week-1").replay(log)[1].startswith("OK brief set")
 
 
 def test_two_assignments_built_at_once_do_not_touch_each_other(tmp_path):

@@ -52,7 +52,7 @@ def build_week_overview(course_title: str, num, title: str, module: str, cm, *, 
     slug = f"{ref or slugify(title)}-overview"
     return Page(page_id=f"{slugify(course_title)}-{slug}", page_type="week_overview",
                 title=f"Week {num}: {title}" if num else title,
-                week_ref=ref, slug=slug, blocks=_blocks(pairs), finalized=True)
+                unit_ref=ref, slug=slug, blocks=_blocks(pairs), finalized=True)
 
 
 def build_week_recap(course_title: str, num, title: str, module: str, cm, *, ref: str | None = None) -> Page:
@@ -75,7 +75,7 @@ def build_week_recap(course_title: str, num, title: str, module: str, cm, *, ref
     slug = f"{ref or slugify(title)}-recap"
     return Page(page_id=f"{slugify(course_title)}-{slug}", page_type="week_recap",
                 title=f"Week {num}: {title} — Recap" if num else f"{title} — Recap",
-                week_ref=ref, slug=slug,
+                unit_ref=ref, slug=slug,
                 blocks=_blocks(pairs), finalized=True)
 
 
@@ -94,7 +94,7 @@ def build_module_overview(course_title: str, module: str, weeks, *, framing: str
     mslug = slugify(module)
     slug = (f"{mslug}-overview" if mslug.startswith("module-") else f"module-{mslug}-overview")
     return Page(page_id=f"{slugify(course_title)}-{slug}", page_type="module_overview",
-                title=module, week_ref=None, slug=slug, blocks=_blocks(pairs), finalized=True)
+                title=module, unit_ref=None, slug=slug, blocks=_blocks(pairs), finalized=True)
 
 
 # --------------------------------------------------------------------------- orchestration

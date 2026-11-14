@@ -37,7 +37,7 @@ def propose_expectations(path) -> tuple[dict, list[str]]:
 
     root = courseconfig.find_root(Path(path).expanduser()) or Path(path).expanduser().resolve()
     c = cen.build_census(path)
-    generating = [w for w in c.weeks if w.has_any_artifact()]
+    generating = [w for w in c.units if w.has_any_artifact()]
     n = len(generating)
     defaults, notes = [], []
 
@@ -45,13 +45,13 @@ def propose_expectations(path) -> tuple[dict, list[str]]:
     for art, attr in (("page", "pages"), ("quiz", "quizzes"), ("concept-map", "concept_map")):
         cnt = sum(1 for w in generating if getattr(w, attr))
         if n and cnt * 2 > n:
-            defaults.append({"scope": "week", "artifact": art, "count": 1})
+            defaults.append({"scope": "unit", "artifact": art, "count": 1})
             notes.append(f"{art}: each week — high confidence (modal: {cnt}/{n} weeks have one)")
 
     a_weeks = sum(1 for w in generating if w.assignments)
-    a_total = sum(w.assignments for w in c.weeks)
+    a_total = sum(w.assignments for w in c.units)
     if a_total and a_weeks * 2 > n:                      # assignments are themselves the norm
-        defaults.append({"scope": "week", "artifact": "assignment", "count": 1})
+        defaults.append({"scope": "unit", "artifact": "assignment", "count": 1})
         notes.append(f"assignment: each week — modal ({a_weeks}/{n})")
     elif a_total:                                        # sparse → a flagged decision, NOT a fabricated rule
         notes.append(f"assignment: appears {a_total}x (sparse, not the norm) — DECISION NEEDED: declare a "
@@ -60,17 +60,17 @@ def propose_expectations(path) -> tuple[dict, list[str]]:
     # L1-deterministic — concept-map rules
     overrides_week: dict = {}
     cm_weeks, eu_weeks = [], []
-    for w in c.weeks:
-        cm = _load_cm(root, w.week)
+    for w in c.units:
+        cm = _load_cm(root, w.unit)
         if cm is None:
             continue
-        cm_weeks.append(w.week)
+        cm_weeks.append(w.unit)
         if getattr(cm, "enduring_understanding", ""):
-            eu_weeks.append(w.week)
+            eu_weeks.append(w.unit)
         n_concepts = len(getattr(cm, "concepts", []))
         if n_concepts >= GLOSSARY_THRESHOLD:
-            overrides_week.setdefault(w.week, {})["page:glossary"] = 1
-            notes.append(f"week {w.week}: page:glossary — CLT (dense: {n_concepts} concepts)")
+            overrides_week.setdefault(w.unit, {})["page:glossary"] = 1
+            notes.append(f"week {w.unit}: page:glossary — CLT (dense: {n_concepts} concepts)")
 
     # Whether/how EUs are assessed is the faculty's call (instrument + cadence), so a quiz:eu rule is
     # proposed only on declared intent (`eu_question` in quiz.yaml); undeclared → a flagged decision.
@@ -84,7 +84,7 @@ def propose_expectations(path) -> tuple[dict, list[str]]:
     elif not eu_intent:
         notes.append("enduring understanding: `eu_question: false` in quiz.yaml — no quiz:eu rule proposed")
     elif len(eu_weeks) == len(cm_weeks):                  # universal → promote to a week-default
-        defaults.append({"scope": "week", "artifact": "quiz:eu", "count": 1})
+        defaults.append({"scope": "unit", "artifact": "quiz:eu", "count": 1})
         notes.append("quiz:eu: each week — UbD + declared `eu_question: true` (every concept-mapped week "
                      "marks an enduring understanding)")
     else:
@@ -95,7 +95,7 @@ def propose_expectations(path) -> tuple[dict, list[str]]:
 
     expect: dict = {"defaults": defaults}
     if overrides_week:
-        expect["overrides"] = {"week": overrides_week}
+        expect["overrides"] = {"unit": overrides_week}
     return expect, notes
 
 

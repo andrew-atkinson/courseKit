@@ -22,9 +22,9 @@ class PagesSource:
         for pj in ir_files(course_path, "page"):
             page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
             root = find_root(pj)
-            supp = load_supplements(root, page.week_ref or page.slug)
+            supp = load_supplements(root, page.unit_ref or page.slug)
             style = load_style(root)
-            wk = week_key(page.week_ref) if page.week_ref else None
+            wk = week_key(page.unit_ref) if page.unit_ref else None
             if wk is None:
                 wk = week_key(pj.parent.name)
             items.append(CartridgeItem(

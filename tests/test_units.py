@@ -89,13 +89,13 @@ def test_a_sessions_quiz_and_pages_are_built_from_its_concept_map(sessions, monk
     page = _quiet(pagebuild.build_page_unit, _unit(sessions, "intro", "pages"), Model(), "m", function="overview")
     assert page.output_dir == sessions / "pages" / "intro-overview"
     pj = json.loads((page.output_dir / "page.json").read_text())
-    assert (pj["slug"], pj["week_ref"]) == ("intro-overview", "intro")      # not `week-None-overview`
+    assert (pj["slug"], pj["unit_ref"]) == ("intro-overview", "intro")      # not `week-None-overview`
 
 
 def test_the_census_sees_a_sessions_concept_map(sessions, monkeypatch):
     _analyze(sessions, monkeypatch)
     census = _quiet(build_census, sessions)
-    assert [(w.week, w.concept_map) for w in census.weeks] == [("intro", True), ("loops", True)]
+    assert [(w.unit, w.concept_map) for w in census.units] == [("intro", True), ("loops", True)]
 
 
 def test_a_weekly_unit_keeps_its_week_names(tmp_path):
@@ -176,3 +176,96 @@ def test_a_module_script_takes_a_unit_too(sessions, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["eu", str(sessions), "--unit", "Session 2 — Loops"])
     assert eu.main() == 1                                  # found the unit; it has no concept map yet
     assert "Session 2 — Loops has no enduring understanding" in capsys.readouterr().out
+
+
+# ------------------------------------------------------------------ CORE-5.3: what coursekit writes says unit
+
+def test_the_census_labels_each_unit_by_its_own_title_in_the_courses_order(sessions, monkeypatch):
+    overlay = sessions / ".vtconfig" / "structure.coursekit.yaml"
+    overlay.write_text(overlay.read_text().replace("weeks:", "units:"), encoding="utf-8")
+    lines = overlay.read_text().splitlines()
+    overlay.write_text("\n".join([lines[0], lines[2], lines[1]]) + "\n", encoding="utf-8")   # loops first
+    census = _quiet(build_census, sessions)
+    assert [(w.unit, w.label) for w in census.units] == [("loops", "Session 2 — Loops"), ("intro", "Session 1 — Intro")]
+    report = __import__("coursekit.census", fromlist=["render_report"]).render_report(census)
+    assert "| Unit |" in report and "2 units ·" in report and "Week intro" not in report
+    assert "units" in json.loads(census.model_dump_json()) and "weeks" not in json.loads(census.model_dump_json())
+
+
+@pytest.mark.parametrize("section", ["units", "weeks"])
+def test_the_overlay_declares_units_under_units_or_its_old_name_weeks(sessions, section):
+    overlay = sessions / ".vtconfig" / "structure.coursekit.yaml"
+    overlay.write_text(overlay.read_text().replace("weeks:", f"{section}:"), encoding="utf-8")
+    units = _quiet(Course.load, sessions).units
+    assert [(u.id, u.label, u.module, u.doc.name) for u in units] == [
+        ("intro", "Session 1 — Intro", "Day 1", "intro.md"), ("loops", "Session 2 — Loops", "Day 1", "loops.md")]
+
+
+def test_an_overlay_cant_declare_units_in_both_places(sessions):
+    from coursekit.outcomes import CoursekitError
+    overlay = sessions / ".vtconfig" / "structure.coursekit.yaml"
+    overlay.write_text(overlay.read_text() + "units:\n  outro: {title: Outro}\n", encoding="utf-8")
+    with pytest.raises(CoursekitError, match="both `units:` and `weeks:`"):
+        _quiet(Course.load, sessions)
+
+
+def test_propose_writes_units_and_a_redraft_replaces_the_old_weeks(tmp_path):
+    from coursekit import settings
+    from coursekit.ingest import propose as P
+    from coursekit.outcomes import CoursekitError
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    (root / "week-3").mkdir()
+    (root / "week-3" / "a.pdf").write_bytes(b"%PDF")
+    (root / ".vtconfig" / "structure.coursekit.yaml").write_text("weeks:\n  week 3: {title: Old}\n", encoding="utf-8")
+    with pytest.raises(CoursekitError, match="already declares `weeks:`"):
+        P.write_overlay(P.propose(root))                       # the old name holds the faculty's edits too
+    P.write_overlay(P.propose(root), force=True)
+    data = settings.read(root, "structure")
+    assert "week 3" in data["units"] and "weeks" not in data
+
+
+@pytest.mark.parametrize("old, new", [("week", "unit")])
+def test_an_expectation_scoped_to_week_reads_as_unit(old, new):
+    from coursekit.coursestructure import _parse_expect
+    def scheme(scope):
+        return _parse_expect({"defaults": [{"scope": scope, "artifact": "quiz", "count": 1}],
+                              "overrides": {scope: {"3": {"quiz": 0}}}})
+    assert scheme(old) == scheme(new) and scheme(old).for_unit("3") == {} and scheme(old).for_unit("4") == {"quiz": 1}
+
+
+def test_propose_expectations_writes_unit_scopes(tmp_path):
+    from coursekit.ingest import propose_expectations as pe
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    for n in ("1", "2"):
+        (root / "pages" / f"week-{n}").mkdir(parents=True)
+        (root / "pages" / f"week-{n}" / "page.json").write_text(json.dumps({"unit_ref": f"week-{n}"}), encoding="utf-8")
+    expect, _ = _quiet(pe.propose_expectations, root)
+    assert {r["scope"] for r in expect["defaults"]} == {"unit"}
+
+
+@pytest.mark.parametrize("key", ["unit_ref", "week_ref"])
+def test_an_artifact_names_its_unit_by_unit_ref_or_its_old_name_week_ref(tmp_path, key):
+    from coursekit.generate.assignment.assignment import Assignment
+    from coursekit.generate.page.page import Page
+    assert Page.model_validate({"page_id": "p", key: "week-3"}).unit_ref == "week-3"
+    assert Assignment.model_validate({"assignment_id": "a", "title": "T", "task": "Do it.", key: "week-3"}).unit_ref == "week-3"
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    (root / "pages" / "stray").mkdir(parents=True)
+    (root / "pages" / "stray" / "page.json").write_text(json.dumps({key: "week-3"}), encoding="utf-8")
+    assert [a.unit for a in _quiet(Course.load, root).artifacts] == ["3"]      # moved by its own reference
+    assert "week_ref" not in Page(page_id="p", unit_ref="week-3").model_dump()    # new files say unit_ref
+
+
+def test_a_model_free_page_is_titled_by_its_units_label_once(sessions, monkeypatch, tmp_path):
+    from tests.test_records_everywhere import _analyze as weekly_analyze, _course as weekly_course, _unit as weekly_unit
+    _analyze(sessions, monkeypatch)
+    for function in ("overview", "recap"):
+        out = _quiet(pagebuild.build_page_unit, _unit(sessions, "intro", "pages"), Model(), "m", function=function).output_dir
+        assert json.loads((out / "page.json").read_text())["title"].startswith("Session 1 — Intro")
+    root = weekly_course(tmp_path)
+    weekly_analyze(root)
+    out = _quiet(pagebuild.build_page_unit, weekly_unit(root, subdir="pages"), Model(), "m", function="overview").output_dir
+    assert json.loads((out / "page.json").read_text())["title"] == "Week 7: Objects"     # not "Week 7: Week 7: …"

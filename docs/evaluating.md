@@ -38,7 +38,7 @@ uv run coursekit evaluate "/path/to/course" --all    # + pedagogy (form) + conce
 It writes `quiz-review.md`, `page-review.md`, and (with `--all`) `page-pedagogy.md`, `page-concepts.md`, `page-groundedness.md`, and `quiz-groundedness.md` beside the course.
 Nothing is changed — a human stays in the loop.
 
-**What it reads.** `evaluate` and `fix` take what they review from the course's index of artifacts, so a page belongs to the unit its `week_ref` names, wherever its folder sits, and is read against that unit's text.
+**What it reads.** `evaluate` and `fix` take what they review from the course's index of artifacts, so a page belongs to the unit its `unit_ref` names (`week_ref` in older files), wherever its folder sits, and is read against that unit's text.
 A unit's other pages (glossary, overview, recap) are reviewed along with its teaching page, and a single-document quiz is read against its own `source.md` (one with no `source.md` is skipped).
 The `--all` critics for pedagogy, concept delivery, and page groundedness are narrower for now: they read only each unit's teaching page.
 

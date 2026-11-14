@@ -111,7 +111,7 @@ def _overview(tmp):
 def _assignment(tmp):
     from coursekit.generate.assignment.build import AssignmentDraft
     def draft(title):
-        d = AssignmentDraft(assignment_id="a", slug="week-7-assignment", week_ref="week-7", default_points=10,
+        d = AssignmentDraft(assignment_id="a", slug="week-7-assignment", unit_ref="week-7", default_points=10,
                             out_dir=tmp / "assignments" / "week-7")
         d.set_brief(title, "Make a sketch.", "", "", None, "online_upload")
         d.add_criterion("Works", [{"description": "Yes", "points": 10}, {"description": "No", "points": 0}],

@@ -170,7 +170,16 @@ def _course(root: Path, tag: str, theme: str) -> Path:
 
 
 def _files(d: Path) -> dict:
-    return {str(p.relative_to(d)): p.read_bytes() for p in sorted(d.rglob("*")) if p.is_file()}
+    """Every file under `d`, byte for byte, but a record without its `at` times: two runs a second apart
+    stamp different ones, and comparing them made this test fail whenever the runs straddled a second."""
+    def read(p: Path):
+        if not p.name.endswith("record.json"):
+            return p.read_bytes()
+        rec = json.loads(p.read_text(encoding="utf-8"))
+        for entry in [rec, *rec.get("steps", []), *rec.get("evaluations", [])]:
+            entry.pop("at", None)
+        return rec
+    return {str(p.relative_to(d)): read(p) for p in sorted(d.rglob("*")) if p.is_file()}
 
 
 def _run(kind, tasks, where: Path, together: bool):

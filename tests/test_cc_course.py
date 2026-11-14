@@ -21,7 +21,7 @@ from coursekit.generate.quiz import bank as B
 
 
 def _write_page(root, week, title, slug):
-    d = P.PageDraft.new(f"c-{week}", title=title, slug=slug, week_ref=week)
+    d = P.PageDraft.new(f"c-{week}", title=title, slug=slug, unit_ref=week)
     d.put_block(P.build_block(kind="heading", block_id="h", text="Loops", level=2, role="concept"))
     d.put_block(P.build_block(kind="bullets", block_id="b", items=["for loops repeat"]))
     pdir = root / "pages" / week

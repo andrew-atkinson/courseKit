@@ -176,13 +176,14 @@ class Grading(_File):
 
 
 class ExpectationRule(_File):
-    scope: Literal["week", "module", "course"]
+    scope: Literal["unit", "week", "module", "course"]          # `week` is `unit` under its old name
     artifact: str = Field(min_length=1)
     count: Count = 1
 
 
 class ExpectationOverrides(_File):
-    week: dict[Key, dict[Key, Count]] = {}
+    unit: dict[Key, dict[Key, Count]] = {}
+    week: dict[Key, dict[Key, Count]] = {}                      # `unit` under its old name
     module: dict[Key, dict[Key, Count]] = {}
 
 
@@ -192,9 +193,16 @@ class Expectations(_File):
 
 
 class StructureOverlay(_File):
-    weeks: dict[Key, UnitEntry | None] = {}
+    units: dict[Key, UnitEntry | None] = {}
+    weeks: dict[Key, UnitEntry | None] = {}                     # `units` under its old name
     grading: Grading | None = None
     expect: Expectations | None = None
+
+    @model_validator(mode="after")
+    def _units_in_one_place(self):
+        if self.units and self.weeks:
+            raise ValueError("declares units under both `units:` and `weeks:` — keep one (`weeks:` is the old name)")
+        return self
 
 
 # Which schema governs which `.vtconfig/` file.

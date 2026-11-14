@@ -108,24 +108,25 @@ def _parse_grading(raw) -> GradingScheme:
 @dataclass(frozen=True)
 class ExpectationScheme:
     """Declared EXPECTATIONS (FLOW-9 Phase 1.5, Layer A): what each scope SHOULD contain, as scoped
-    artifact counts. `week`/`module`/`course` are the default rules (artifact -> count); the `*_overrides`
-    refine a specific week number or module name (a count of 0 means "not expected here"). Artifacts are
+    artifact counts. `unit`/`module`/`course` are the default rules (artifact -> count); the `*_overrides`
+    refine a specific unit or module name (a count of 0 means "not expected here"). The overlay may say
+    `week` for `unit`, its old name. Artifacts are
     COARSE (page/quiz/assignment/concept-map) with an optional `:subtype` (e.g. `quiz:eu`, `page:glossary`).
     Layer B reads this to infer gaps; empty when nothing is declared."""
 
-    week: dict = field(default_factory=dict)              # artifact -> count, every week
+    unit: dict = field(default_factory=dict)              # artifact -> count, every unit
     module: dict = field(default_factory=dict)            # artifact -> count, every module
     course: dict = field(default_factory=dict)            # artifact -> count, the whole course
-    week_overrides: dict = field(default_factory=dict)    # week_num -> {artifact -> count}
+    unit_overrides: dict = field(default_factory=dict)    # unit id -> {artifact -> count}
     module_overrides: dict = field(default_factory=dict)  # module name -> {artifact -> count}
 
     def has_scheme(self) -> bool:
-        return bool(self.week or self.module or self.course)
+        return bool(self.unit or self.module or self.course)
 
-    def for_week(self, week_num: str) -> dict:
-        """The week-scoped expected counts for one week: the week defaults, refined by that week's
+    def for_unit(self, unit_id: str) -> dict:
+        """The unit-scoped expected counts for one unit: the unit defaults, refined by that unit's
         overrides (an override count of 0 drops the expectation)."""
-        merged = {**self.week, **self.week_overrides.get(str(week_num), {})}
+        merged = {**self.unit, **self.unit_overrides.get(str(unit_id), {})}
         return {a: c for a, c in merged.items() if c}
 
     def for_module(self, module_name: str) -> dict:
@@ -135,15 +136,18 @@ class ExpectationScheme:
 
 def _parse_expect(raw) -> ExpectationScheme:
     """Coerce the overlay's `expect:` block into an ExpectationScheme; anything malformed degrades to
-    empty. Shape: `{defaults: [{scope, artifact, count}], overrides: {week:{n:{art:ct}}, module:{…}}}`."""
+    empty. Shape: `{defaults: [{scope, artifact, count}], overrides: {unit:{id:{art:ct}}, module:{…}}}`, where
+    `week` is read as `unit`, its old name."""
     if not isinstance(raw, dict):
         return ExpectationScheme()
-    buckets = {"week": {}, "module": {}, "course": {}}
+    buckets = {"unit": {}, "module": {}, "course": {}}
     for rule in raw.get("defaults") or []:
-        if not (isinstance(rule, dict) and rule.get("scope") in buckets and rule.get("artifact")):
+        scope = rule.get("scope") if isinstance(rule, dict) else None
+        scope = "unit" if scope == "week" else scope
+        if not (scope in buckets and rule.get("artifact")):
             continue
         try:
-            buckets[rule["scope"]][str(rule["artifact"])] = int(rule.get("count", 1))
+            buckets[scope][str(rule["artifact"])] = int(rule.get("count", 1))
         except (TypeError, ValueError):
             continue
     ov = raw.get("overrides") or {}
@@ -156,8 +160,8 @@ def _parse_expect(raw) -> ExpectationScheme:
                                  if isinstance(c, int) or (isinstance(c, str) and c.isdigit())}
         return out
 
-    return ExpectationScheme(week=buckets["week"], module=buckets["module"], course=buckets["course"],
-                             week_overrides=_ovmap("week"), module_overrides=_ovmap("module"))
+    return ExpectationScheme(unit=buckets["unit"], module=buckets["module"], course=buckets["course"],
+                             unit_overrides={**_ovmap("week"), **_ovmap("unit")}, module_overrides=_ovmap("module"))
 
 
 def _as_source(raw, *, default_kind: str | None = None, default_role: str = "content") -> Source | None:
@@ -184,10 +188,11 @@ def _read_overlay(cfg: courseconfig.CourseConfig) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def _read_overlay_weeks(cfg: courseconfig.CourseConfig) -> dict:
-    """Just the overlay's `weeks` mapping, or {}."""
-    weeks = _read_overlay(cfg).get("weeks")
-    return weeks if isinstance(weeks, dict) else {}
+def _read_overlay_units(cfg: courseconfig.CourseConfig) -> dict:
+    """Just the overlay's units — under `units:`, or `weeks:`, its old name (the schema allows one) — or {}."""
+    data = _read_overlay(cfg)
+    units = data.get("units") or data.get("weeks")
+    return units if isinstance(units, dict) else {}
 
 
 def _compose(base: dict, overlay: dict) -> dict:
@@ -217,7 +222,7 @@ class CourseStructure:
         self._cfg = cfg
         base = (cfg.context or {}).get("weeks")
         base = base if isinstance(base, dict) else {}
-        self._weeks = _compose(base, _read_overlay_weeks(cfg))
+        self._weeks = _compose(base, _read_overlay_units(cfg))
 
     @classmethod
     def load(cls, start, *, config_name: str = "quiz.yaml") -> "CourseStructure":
@@ -232,8 +237,10 @@ class CourseStructure:
     def course_title(self) -> str | None:
         return self._cfg.course_title
 
-    def _entry(self, week_num: str) -> dict:
-        entry = self._weeks.get(f"week {week_num}")
+    def _entry(self, unit_id: str) -> dict:
+        """A unit's declared entry: a numbered unit's is keyed `week 3` (the transcriber's form), another's by
+        its id (`intro`)."""
+        entry = self._weeks.get(f"week {unit_id}") or self._weeks.get(str(unit_id))
         return entry if isinstance(entry, dict) else {}
 
     def iter_weeks(self) -> list[tuple[str, dict]]:
@@ -253,7 +260,7 @@ class CourseStructure:
     def declares_order(self) -> bool:
         """True once coursekit's own overlay declares units — the file the settings API (and a GUI)
         writes, so its order was chosen. `context.yaml`'s listing alone is a scan order, not a choice."""
-        return bool(_read_overlay_weeks(self._cfg))
+        return bool(_read_overlay_units(self._cfg))
 
     def grading(self) -> GradingScheme:
         """The declared grading scheme (STRC-2) from the overlay's `grading:` block, or an empty scheme
@@ -268,32 +275,35 @@ class CourseStructure:
         """True when at least one week declares coursekit's own `doc` or `sources` — the signal to
         drive discovery from the manifest. Decoration-only weeks (title/module) and the transcriber's
         `videos:` do NOT trigger it, so existing courses keep the filename-glob path unchanged."""
-        return any(entry.get("doc") or entry.get("sources") for _, entry in self.iter_weeks())
+        return any(entry.get("doc") or entry.get("sources") for _, entry in self.iter_declared())
 
-    def week_label(self, week_num: str) -> str:
-        """`Week 3: Exposure` / `Week 3` from the declared title, matching discover's label format."""
-        title = self._entry(week_num).get("title")
-        return f"Week {week_num}: {title}" if title else f"Week {week_num}"
+    def unit_label(self, unit_id: str) -> str:
+        """A unit's label: a numbered unit's is `Week 3: Exposure` (or `Week 3`), from its declared title;
+        any other's is its declared title, or its id (`Session 1 — Intro`, `intro`), never `Week intro`."""
+        title = self._entry(unit_id).get("title")
+        if not str(unit_id).isdigit():
+            return title or str(unit_id)
+        return f"Week {unit_id}: {title}" if title else f"Week {unit_id}"
 
-    def week_module(self, week_num: str) -> str | None:
-        return self._entry(week_num).get("module")
+    def unit_module(self, unit_id: str) -> str | None:
+        return self._entry(unit_id).get("module")
 
-    def week_doc(self, week_num: str) -> Path | None:
-        """The consolidated week doc discovery should read: the declared `doc:` (resolved against the
-        root) when present, else the default `output/week-<n>.md` when a root is known, else None."""
-        doc = self._entry(week_num).get("doc")
+    def unit_doc(self, unit_id: str) -> Path | None:
+        """The consolidated text discovery should read: the declared `doc:` (resolved against the root) when
+        present, else for a numbered unit the default `output/week-<n>.md` when a root is known, else None."""
+        doc = self._entry(unit_id).get("doc")
         if doc:
             p = Path(str(doc)).expanduser()
             return p if p.is_absolute() or self.root is None else self.root / p
-        if self.root is not None:
-            return self.root / "output" / f"week-{week_num}.md"
+        if self.root is not None and str(unit_id).isdigit():
+            return self.root / "output" / f"week-{unit_id}.md"
         return None
 
-    def sources_for(self, week_num: str) -> list[Source]:
-        """The typed sources for a week: the declared `sources:` list, or — when absent — the
+    def sources_for(self, unit_id: str) -> list[Source]:
+        """The typed sources for a unit: the declared `sources:` list, or — when absent — the
         transcriber's `videos:` normalized to kind `video` (their filenames are relative to the week
         `folder`, so join it). Empty when neither is present."""
-        entry = self._entry(week_num)
+        entry = self._entry(unit_id)
         raw = entry.get("sources")
         if isinstance(raw, list):
             return [s for s in (_as_source(r) for r in raw) if s is not None]

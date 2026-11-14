@@ -62,6 +62,6 @@ def reemit(path) -> list[tuple[Path, Path]]:
     for pj in ir_files(path, "page"):
         page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
         root = find_root(pj)
-        supplements = load_supplements(root, page.week_ref or page.slug)
+        supplements = load_supplements(root, page.unit_ref or page.slug)
         out.append((pj, write_html(page, pj.parent, supplements, load_style(root))))
     return out

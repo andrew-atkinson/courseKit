@@ -45,9 +45,9 @@ def _shortfalls(actual: dict, expected: dict) -> dict:
             for a, n in expected.items() if actual.get(a, 0) < n}
 
 
-class WeekCensus(BaseModel):
+class UnitCensus(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    week: str                                   # the bare week number, e.g. "3"
+    unit: str                                   # the unit's id: "3" for week 3, "intro" for a session
     label: str
     materials: list[Material] = Field(default_factory=list)
     pages: int = 0
@@ -94,11 +94,11 @@ class ArtifactStatus(BaseModel):
 class Census(BaseModel):
     model_config = ConfigDict(extra="forbid")
     course_title: str | None = None
-    weeks: list[WeekCensus] = Field(default_factory=list)
+    units: list[UnitCensus] = Field(default_factory=list)       # in the course's order
     # where each week's `expected` came from: a DECLARED `expect:` block, or the course's own MODAL pattern
     expectation_basis: Literal["declared", "modal"] = "modal"
     modal_norm: dict[str, int] = Field(default_factory=dict)  # modal basis: artifact -> generating weeks with it
-    generating_weeks: int = 0                                  # modal basis: the norm's denominator
+    generating_units: int = 0                                  # modal basis: the norm's denominator
     modules: list[ScopeCensus] = Field(default_factory=list)  # declared module rules, one entry per module
     course: ScopeCensus | None = None                          # declared course rules
     grading_groups: list[str] = Field(default_factory=list)          # declared group names (STRC-2)
@@ -111,24 +111,24 @@ class Census(BaseModel):
         """Every unmet expectation, plus each modal-basis week that has material but produced nothing
         and carries no per-type shortfall (an empty norm can't name what's missing)."""
         weeks = sum(len(w.gaps) or (1 if self.expectation_basis == "modal" and w.nothing_generated else 0)
-                    for w in self.weeks)
+                    for w in self.units)
         scopes = sum(len(m.gaps) for m in self.modules) + (len(self.course.gaps) if self.course else 0)
         return weeks + scopes + len(self.unused_grading_groups)
 
     @property
     def totals(self) -> dict:
-        return {"weeks": sum(1 for w in self.weeks if w.is_real()),
-                "pages": sum(w.pages for w in self.weeks),
-                "quizzes": sum(w.quizzes for w in self.weeks),
-                "assignments": sum(w.assignments for w in self.weeks)}
+        return {"units": sum(1 for w in self.units if w.is_real()),
+                "pages": sum(w.pages for w in self.units),
+                "quizzes": sum(w.quizzes for w in self.units),
+                "assignments": sum(w.assignments for w in self.units)}
 
     @property
     def coverage(self) -> dict:
-        """How many of the REAL weeks carry each artifact type — the distribution, over which 'gaps'
+        """How many of the REAL units carry each artifact type — the distribution, over which 'gaps'
         stays silent. Surfaces a sparse type (assignments 1/8) that is neither declared-missing nor off
-        the modal norm, so 'no gaps' is never mistaken for 'complete'. `weeks` is the denominator."""
-        real = [w for w in self.weeks if w.is_real()]
-        return {"weeks": len(real),
+        the modal norm, so 'no gaps' is never mistaken for 'complete'. `units` is the denominator."""
+        real = [w for w in self.units if w.is_real()]
+        return {"units": len(real),
                 "pages": sum(1 for w in real if w.pages),
                 "quizzes": sum(1 for w in real if w.quizzes),
                 "assignments": sum(1 for w in real if w.assignments),
@@ -147,7 +147,7 @@ def _load_json(p: Path, unreadable: list[str]) -> dict:
         return {}
 
 
-def _bump(w: "WeekCensus", artifact: str) -> None:
+def _bump(w: "UnitCensus", artifact: str) -> None:
     w.actual[artifact] = w.actual.get(artifact, 0) + 1
 
 
@@ -161,14 +161,16 @@ def build_census(course_path) -> Census:
     struct = coursestructure.CourseStructure.load(course_path)     # labels + grading/expectations
     root = course.root
 
-    weeks: dict[str, WeekCensus] = {}
+    units: dict[str, UnitCensus] = {}
     placed: list[tuple[str, str]] = []   # (kind, slug) per graded item — for grading-group resolution
     unreadable: list[str] = []
+    labels = {u.id: u.label for u in course.units}
+    order = {u.id: u.order for u in course.units}
 
-    def wk(uid: str) -> WeekCensus:
-        if uid not in weeks:
-            weeks[uid] = WeekCensus(week=uid, label=struct.week_label(uid))
-        return weeks[uid]
+    def wk(uid: str) -> UnitCensus:
+        if uid not in units:
+            units[uid] = UnitCensus(unit=uid, label=labels.get(uid) or struct.unit_label(uid))
+        return units[uid]
 
     # inputs: each unit's declared sources, its doc first — the SOURCE text generation reads
     for u in course.units:
@@ -209,7 +211,8 @@ def build_census(course_path) -> Census:
             w = wk(a.unit); w.concept_map = True; _bump(w, "concept-map")
 
     census = Census(course_title=course.title or root.name,   # fall back to the folder name
-                    weeks=sorted((w for w in weeks.values()), key=lambda w: _wsort(w.week)),
+                    units=sorted(units.values(), key=lambda w: (0, order[w.unit]) if w.unit in order
+                                 else (1, _wsort(w.unit))),          # the course's order; a unit it lacks, after
                     unreadable=[str(Path(u).relative_to(root)) if Path(u).is_relative_to(root) else u
                                 for u in unreadable])
     for a in course.artifacts:
@@ -243,11 +246,11 @@ def _modal_gaps(census: Census) -> None:
     course's own MODAL types — those a strict majority of GENERATING weeks have (the denominator excludes
     nothing-generated weeks so a 2-of-3 norm reads correctly). The norm is stored as data."""
     census.expectation_basis = "modal"
-    real = [w for w in census.weeks if w.is_real()]
+    real = [w for w in census.units if w.is_real()]
     generating = [w for w in real if w.has_any_artifact()]
     n = len(generating)
     counts = {a: sum(1 for w in generating if w.actual.get(a)) for a in _COARSE}
-    census.generating_weeks = n
+    census.generating_units = n
     census.modal_norm = {a: c for a, c in counts.items() if c * 2 > n}
     for w in real:
         w.expected = {a: 1 for a in census.modal_norm}
@@ -259,14 +262,14 @@ def _expectation_gaps(census: Census, struct, exp) -> None:
     declared-but-empty one — the denominator widens, so it becomes a real gap); MODULE rules are met by
     matching artifacts in ANY week of the module; COURSE rules over the whole course."""
     census.expectation_basis = "declared"
-    for w in census.weeks:
-        w.expected = exp.for_week(w.week)
+    for w in census.units:
+        w.expected = exp.for_unit(w.unit)
         w.gaps = _shortfalls(w.actual, w.expected)
 
     if exp.module or exp.module_overrides:
         mods: dict = {}
-        for w in census.weeks:
-            m = struct.week_module(w.week)
+        for w in census.units:
+            m = struct.unit_module(w.unit)
             if m:
                 mods.setdefault(m, []).append(w)
         for mod, members in mods.items():
@@ -276,7 +279,7 @@ def _expectation_gaps(census: Census, struct, exp) -> None:
                                               gaps=_shortfalls(actual, expected)))
 
     if exp.course:
-        actual = _sum_actual(census.weeks)
+        actual = _sum_actual(census.units)
         census.course = ScopeCensus(name="course", actual=actual, expected=dict(exp.course),
                                     gaps=_shortfalls(actual, exp.course))
 
@@ -306,18 +309,18 @@ def _cell(n: int) -> str:
 
 
 def render_report(census: Census) -> str:
-    """A human-readable Markdown report over the Census IR: a per-week grid + a gaps list."""
+    """A human-readable Markdown report over the Census IR: a per-unit grid + a gaps list."""
     t = census.totals
     cov = census.coverage
-    n = cov["weeks"]
+    n = cov["units"]
     lines = [f"# Course census — {census.course_title or 'course'}", "",
-             f"{t['weeks']} weeks · {t['pages']} pages · {t['quizzes']} quizzes · "
+             f"{t['units']} units · {t['pages']} pages · {t['quizzes']} quizzes · "
              f"{t['assignments']} assignments", "",
-             f"Coverage (weeks with each type): pages {cov['pages']}/{n} · quizzes {cov['quizzes']}/{n} · "
+             f"Coverage (units with each type): pages {cov['pages']}/{n} · quizzes {cov['quizzes']}/{n} · "
              f"assignments {cov['assignments']}/{n} · concept maps {cov['concept maps']}/{n}", "",
-             "| Week | Materials | Pages | Quizzes | Assignments | Concept map |",
+             "| Unit | Materials | Pages | Quizzes | Assignments | Concept map |",
              "|------|-----------|-------|---------|-------------|-------------|"]
-    for w in census.weeks:
+    for w in census.units:
         if not w.is_real():
             continue
         cm = "✓" if w.concept_map else "—"
@@ -341,14 +344,14 @@ def _gap_lines(census: Census) -> list[str]:
     """The human-readable gap list, rendered from the structured gap data (never stored as prose)."""
     out = []
     modal = census.expectation_basis == "modal"
-    for w in census.weeks:
+    for w in census.units:
         if modal and w.nothing_generated:
             out.append(f"- **{w.label}** — has material but nothing generated yet")
             continue
         for art, s in w.gaps.items():
             if modal:
                 out.append(f"- **{w.label}** — no {_LABEL.get(art, art)} (but {census.modal_norm[art]}/"
-                           f"{census.generating_weeks} weeks have one)")
+                           f"{census.generating_units} units have one)")
             else:
                 out.append(f"- **{w.label}** — {_LABEL.get(art, art)}: has {s.has}, expects {s.expects}")
     for m in census.modules:

@@ -366,7 +366,7 @@ def render_body(page, supplements: dict | None = None, style: dict | None = None
     return body
 
 
-def load_supplements(course_root, week_ref) -> dict:
+def load_supplements(course_root, unit_ref) -> dict:
     """A course's instructor-authored supplements for one page, or {} when absent. A file that is
     present but unreadable or invalid raises a CoursekitError (see coursekit.schemas).
 
@@ -382,14 +382,14 @@ def load_supplements(course_root, week_ref) -> dict:
         return {}
 
     from coursekit.courseconfig import week_key
-    target = week_key(week_ref)
+    target = week_key(unit_ref)
     match = None
     for f in sorted(list(d.glob("*.yaml")) + list(d.glob("*.yml"))):
         if target is not None and week_key(f.stem) == target:
             match = f
             break
     if match is None:                                   # non-week pages: fall back to exact stem
-        exact = d / f"{week_ref}.yaml"
+        exact = d / f"{unit_ref}.yaml"
         match = exact if exact.is_file() else None
     if match is None:
         return {}

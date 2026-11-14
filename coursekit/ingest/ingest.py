@@ -110,7 +110,7 @@ def _plan_from_structure(struct, out_dir) -> list[tuple[Path, list[Path]]]:
         srcs = [p for p in srcs if p.is_file() and is_supported(p)]
         if not srcs:
             continue
-        dest = (base / f"week-{week_num}.md") if base else struct.week_doc(week_num)
+        dest = (base / f"week-{week_num}.md") if base else struct.unit_doc(week_num)
         plan.append((dest, srcs))
     return plan
 

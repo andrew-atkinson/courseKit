@@ -190,7 +190,7 @@ def _write_page_course(tmp_path):
     (course / "output" / "week-3.md").write_text("loops and iteration", encoding="utf-8")
     pd = course / "pages" / "week-3"
     pd.mkdir(parents=True)
-    d = pagemod.PageDraft.new("p1", None, title="Week 3", week_ref="week-3", slug="week-3")
+    d = pagemod.PageDraft.new("p1", None, title="Week 3", unit_ref="week-3", slug="week-3")
     d.put_block(pagemod.build_block("heading", block_id="h1", text="Loops", level=2))
     d.put_block(pagemod.build_block(
         "paragraph", block_id="b2", text="Recursion OUTOFSCOPE is the tool this week."))

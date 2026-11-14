@@ -21,7 +21,7 @@ import re
 from pathlib import Path
 from typing import Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from coursekit import atomic
 
@@ -215,7 +215,7 @@ class Page(BaseModel):
     page_id: str
     page_type: str = "week_intro"
     title: str = "Untitled page"
-    week_ref: str | None = None
+    unit_ref: str | None = Field(None, validation_alias=AliasChoices("unit_ref", "week_ref"))  # read `week_ref`, its old name
     slug: str = "page"
     blocks: dict[str, Block] = Field(default_factory=dict)
     finalized: bool = False
@@ -247,8 +247,8 @@ class PageDraft:
 
     @classmethod
     def new(cls, page_id: str, out_dir: Path | None = None, *, title: str = "Untitled page",
-            page_type: str = "week_intro", week_ref: str | None = None, slug: str = "page") -> "PageDraft":
-        return cls(Page(page_id=page_id, title=title, page_type=page_type, week_ref=week_ref, slug=slug),
+            page_type: str = "week_intro", unit_ref: str | None = None, slug: str = "page") -> "PageDraft":
+        return cls(Page(page_id=page_id, title=title, page_type=page_type, unit_ref=unit_ref, slug=slug),
                    out_dir, staged=True)
 
     @classmethod

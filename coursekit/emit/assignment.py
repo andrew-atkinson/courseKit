@@ -47,7 +47,7 @@ def _assignment_page(a: Assignment):
         pairs.append(("assess", "bullets", {"items": a.rubric_criteria}))
     blocks = {bid: build_block(k, block_id=bid, **f) for bid, k, f in pairs}
     return Page(page_id=a.assignment_id, title=a.title, page_type="assignment",
-                week_ref=a.week_ref, slug=a.slug, blocks=blocks, finalized=True)
+                unit_ref=a.unit_ref, slug=a.slug, blocks=blocks, finalized=True)
 
 
 def assignment_html(a: Assignment, style=None) -> str:

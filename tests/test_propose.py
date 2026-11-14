@@ -74,7 +74,7 @@ def test_write_overlay_refuses_overwrite_without_force(tmp_path):
     root = _course(tmp_path)
     _touch(root / "week-3" / "a.pdf")
     P.write_overlay(P.propose(root))
-    with pytest.raises(CoursekitError, match="already declares `weeks:`") as e:
+    with pytest.raises(CoursekitError, match="already declares `units:`") as e:
         P.write_overlay(P.propose(root))
     assert e.value.code == "overlay.section_exists"                # a second run must not clobber edits
     P.write_overlay(P.propose(root), force=True)        # ...unless forced
@@ -102,4 +102,4 @@ def test_force_redrafts_the_weeks_but_keeps_grading_and_expectations(tmp_path):
     data = settings.read(root, "structure")
     assert data["grading"]["groups"] == [{"name": "Projects", "weight": 60.0}]
     assert data["expect"]["defaults"] == [{"scope": "week", "artifact": "page"}]
-    assert data["weeks"]
+    assert data["units"] and "weeks" not in data

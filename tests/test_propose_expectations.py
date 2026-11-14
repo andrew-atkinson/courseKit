@@ -43,7 +43,7 @@ def _course(tmp_path, *, eu_all=True, dense_week=None, assignment=True, eu_quest
 
 def test_L0_proposes_week_rules_for_modal_types(tmp_path):
     expect, notes = pe.propose_expectations(_course(tmp_path))
-    week_rules = {r["artifact"] for r in expect["defaults"] if r["scope"] == "week"}
+    week_rules = {r["artifact"] for r in expect["defaults"] if r["scope"] == "unit"}
     assert {"page", "quiz", "concept-map"} <= week_rules          # all present in 3/3 weeks → week rules
     assert all(r["count"] == 1 for r in expect["defaults"])
 
@@ -56,19 +56,19 @@ def test_L0_flags_a_sparse_type_instead_of_fabricating_a_rule(tmp_path):
 
 def test_L1_eu_universal_becomes_a_week_default(tmp_path):
     expect, notes = pe.propose_expectations(_course(tmp_path, eu_all=True, eu_question=True))
-    assert any(r["artifact"] == "quiz:eu" and r["scope"] == "week" for r in expect["defaults"])
+    assert any(r["artifact"] == "quiz:eu" and r["scope"] == "unit" for r in expect["defaults"])
     assert any("quiz:eu" in note and "UbD" in note for note in notes)
 
 
 def test_L1_eu_partial_becomes_per_week_overrides(tmp_path):
     expect, notes = pe.propose_expectations(_course(tmp_path, eu_all=False, eu_question=True))  # only wk 1 has an EU
     assert not any(r["artifact"] == "quiz:eu" for r in expect["defaults"])      # not universal → no default
-    assert expect["overrides"]["week"]["1"]["quiz:eu"] == 1
+    assert expect["overrides"]["unit"]["1"]["quiz:eu"] == 1
 
 
 def _eu_rules(expect):
     return ([r for r in expect["defaults"] if r["artifact"] == "quiz:eu"]
-            + [w for w in expect.get("overrides", {}).get("week", {}).values() if "quiz:eu" in w])
+            + [w for w in expect.get("overrides", {}).get("unit", {}).values() if "quiz:eu" in w])
 
 
 def test_L1_eu_undeclared_is_a_flagged_decision_not_a_rule(tmp_path):
@@ -85,7 +85,7 @@ def test_L1_eu_declared_false_proposes_nothing(tmp_path):
 
 def test_L1_dense_week_gets_a_glossary_override(tmp_path):
     expect, notes = pe.propose_expectations(_course(tmp_path, dense_week="2"))
-    assert expect["overrides"]["week"]["2"]["page:glossary"] == 1
+    assert expect["overrides"]["unit"]["2"]["page:glossary"] == 1
     assert any("glossary" in note and "CLT" in note for note in notes)
 
 

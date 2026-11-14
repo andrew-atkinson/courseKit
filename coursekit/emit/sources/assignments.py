@@ -52,7 +52,7 @@ class AssignmentSource:
             aid = ae.assignment_ident(a)
             group = scheme.group_for("assignment", slug=a.slug) or a.group_title   # declared → default
             items.append(CartridgeItem(
-                week_key=week_key(a.week_ref) if a.week_ref else None,
+                week_key=week_key(a.unit_ref) if a.unit_ref else None,
                 content_type="Assignment",
                 title=a.title,
                 resource_id=aid,

@@ -46,14 +46,14 @@ def test_inventory_counts(tmp_path):
     c = cen.build_census(_course(tmp_path))
     assert c.course_title == "Creative Coding"
     t = c.totals
-    assert t == {"weeks": 4, "pages": 3, "quizzes": 2, "assignments": 0}
-    wk1 = next(w for w in c.weeks if w.week == "1")
+    assert t == {"units": 4, "pages": 3, "quizzes": 2, "assignments": 0}
+    wk1 = next(w for w in c.units if w.unit == "1")
     assert wk1.pages == 1 and wk1.quizzes == 1 and len(wk1.materials) == 1
 
 
 def test_sense1_declared_but_nothing_generated(tmp_path):
     c = cen.build_census(_course(tmp_path))
-    wk4 = next(w for w in c.weeks if w.week == "4")
+    wk4 = next(w for w in c.units if w.unit == "4")
     assert wk4.nothing_generated                          # material, no artifacts
     # the report states it once, rather than also spamming per-type modal lines for that week
     md = cen.render_report(c)
@@ -64,8 +64,8 @@ def test_sense1_declared_but_nothing_generated(tmp_path):
 def test_sense3_modal_outlier(tmp_path):
     c = cen.build_census(_course(tmp_path))
     assert c.expectation_basis == "modal"
-    assert c.modal_norm == {"page": 3, "quiz": 2} and c.generating_weeks == 3   # the norm, as data
-    wk3 = next(w for w in c.weeks if w.week == "3")
+    assert c.modal_norm == {"page": 3, "quiz": 2} and c.generating_units == 3   # the norm, as data
+    wk3 = next(w for w in c.units if w.unit == "3")
     assert wk3.gaps == {"quiz": cen.Shortfall(has=0, expects=1)}   # quiz missing; page present → no page gap
 
 
@@ -86,7 +86,7 @@ def test_coverage_line_surfaces_a_sparse_type_even_when_no_gaps(tmp_path):
             d = root / kind / wk; d.mkdir(parents=True)
             (d / fn).write_text(body, encoding="utf-8")
     c = cen.build_census(root)
-    assert c.coverage == {"weeks": 3, "pages": 3, "quizzes": 3, "assignments": 0, "concept maps": 0}
+    assert c.coverage == {"units": 3, "pages": 3, "quizzes": 3, "assignments": 0, "concept maps": 0}
     md = cen.render_report(c)
     assert "pages 3/3" in md and "assignments 0/3" in md
     assert "No gaps found." in md                          # still no gaps — coverage is the honest signal
@@ -96,7 +96,7 @@ def test_report_renders_grid_and_gaps(tmp_path):
     c = cen.build_census(_course(tmp_path))
     md = cen.render_report(c)
     assert "# Course census — Creative Coding" in md
-    assert "| Week | Materials | Pages | Quizzes | Assignments | Concept map |" in md
+    assert "| Unit | Materials | Pages | Quizzes | Assignments | Concept map |" in md
     assert "Week 3: Functions" in md and "## Gaps" in md
     assert "no quiz" in md and "nothing generated" in md
 
@@ -115,7 +115,7 @@ def test_no_declared_structure_degrades_to_artifacts(tmp_path):
     (root / "quizzes" / "week-2").mkdir(parents=True)
     (root / "quizzes" / "week-2" / "bank.json").write_text("{}", encoding="utf-8")
     c = cen.build_census(root)
-    assert [w.week for w in c.weeks] == ["2"] and c.weeks[0].quizzes == 1
+    assert [w.unit for w in c.units] == ["2"] and c.units[0].quizzes == 1
 
 
 # ============================================================ hardening (edge cases + robustness)
@@ -126,7 +126,7 @@ def test_targeted_and_whole_week_quizzes_both_count_under_the_week(tmp_path):
     for slug in ("week-3", "week-3-barrett"):               # whole-week + a targeted quiz
         d = root / "quizzes" / slug; d.mkdir(parents=True)
         (d / "bank.json").write_text("{}", encoding="utf-8")
-    wk3 = next(w for w in cen.build_census(root).weeks if w.week == "3")
+    wk3 = next(w for w in cen.build_census(root).units if w.unit == "3")
     assert wk3.quizzes == 2
 
 
@@ -136,7 +136,7 @@ def test_sibling_pages_count_under_the_same_week(tmp_path):
     for slug in ("week-3", "week-3-glossary", "week-3-recap"):
         d = root / "pages" / slug; d.mkdir(parents=True)
         (d / "page.json").write_text(json.dumps({"week_ref": "week-3"}), encoding="utf-8")
-    assert next(w for w in cen.build_census(root).weeks if w.week == "3").pages == 3
+    assert next(w for w in cen.build_census(root).units if w.unit == "3").pages == 3
 
 
 def test_malformed_artifact_json_is_skipped_not_fatal(tmp_path):
@@ -145,13 +145,13 @@ def test_malformed_artifact_json_is_skipped_not_fatal(tmp_path):
     d = root / "pages" / "week-3"; d.mkdir(parents=True)
     (d / "page.json").write_text("{ not valid json", encoding="utf-8")   # garbage → _load_json → {}
     c = cen.build_census(root)                                            # must not raise
-    assert next(w for w in c.weeks if w.week == "3").pages == 1           # keyed off the dir name
+    assert next(w for w in c.units if w.unit == "3").pages == 1           # keyed off the dir name
 
 
 def test_empty_course_yields_empty_census(tmp_path):
     root = tmp_path / "c"; (root / ".vtconfig").mkdir(parents=True)
     c = cen.build_census(root)
-    assert c.weeks == [] and c.totals["weeks"] == 0
+    assert c.units == [] and c.totals["units"] == 0
     assert "No gaps found." in cen.render_report(c)
 
 
@@ -160,7 +160,7 @@ def test_week_doc_folder_per_week_layout_with_space(tmp_path):
     root = tmp_path / "c"; (root / ".vtconfig").mkdir(parents=True)
     d = root / "output" / "week 3"; d.mkdir(parents=True)
     (d / "week-3.md").write_text("material", encoding="utf-8")
-    wk3 = next(w for w in cen.build_census(root).weeks if w.week == "3")
+    wk3 = next(w for w in cen.build_census(root).units if w.unit == "3")
     assert any(m.kind == "week doc" for m in wk3.materials)
 
 
@@ -170,7 +170,7 @@ def test_week_doc_counted_once_across_locations(tmp_path):
     (root / "output" / "week-3.md").write_text("x", encoding="utf-8")     # flat
     d = root / "output" / "week 3"; d.mkdir()
     (d / "week-3.md").write_text("x", encoding="utf-8")                   # + a folder-per-week copy
-    wk3 = next(w for w in cen.build_census(root).weeks if w.week == "3")
+    wk3 = next(w for w in cen.build_census(root).units if w.unit == "3")
     assert sum(1 for m in wk3.materials if m.kind == "week doc") == 1     # deduped
 
 
@@ -183,14 +183,14 @@ def test_modal_exactly_half_is_not_a_majority(tmp_path):
     for wk in ("week-1", "week-2"):
         d = root / "quizzes" / wk; d.mkdir(parents=True); (d / "bank.json").write_text("{}", encoding="utf-8")
     c = cen.build_census(root)
-    assert not any("no quiz" in g for w in c.weeks for g in w.gaps)
+    assert not any("no quiz" in g for w in c.units for g in w.gaps)
 
 
 def test_single_generating_week_has_no_modal_noise(tmp_path):
     root = tmp_path / "c"; (root / ".vtconfig").mkdir(parents=True)
     d = root / "pages" / "week-1"; d.mkdir(parents=True)
     (d / "page.json").write_text(json.dumps({"week_ref": "week-1"}), encoding="utf-8")
-    assert cen.build_census(root).weeks[0].gaps == {}
+    assert cen.build_census(root).units[0].gaps == {}
 
 
 def test_grading_slug_override_marks_group_used(tmp_path):
@@ -212,7 +212,7 @@ def test_declared_but_empty_week_is_excluded_from_the_grid(tmp_path):
     (root / ".vtconfig" / "context.yaml").write_text(
         'course_title: C\nweeks:\n  "week 1": {title: Intro}\n', encoding="utf-8")
     c = cen.build_census(root)
-    assert all(w.week != "1" for w in c.weeks if w.is_real())
+    assert all(w.unit != "1" for w in c.units if w.is_real())
     assert "Week 1" not in cen.render_report(c)
 
 
@@ -262,7 +262,7 @@ def test_layerB_week_eu_expectation_gap_and_met(tmp_path):
     _quiz(root, "week-2", eu=True)       # an EU quiz — met
     c = cen.build_census(root)
     assert c.expectation_basis == "declared"
-    wk1, wk2 = (next(w for w in c.weeks if w.week == n) for n in ("1", "2"))
+    wk1, wk2 = (next(w for w in c.units if w.unit == n) for n in ("1", "2"))
     assert wk1.expected == {"quiz": 1, "quiz:eu": 1}
     assert wk1.gaps == {"quiz:eu": cen.Shortfall(has=0, expects=1)}
     assert wk2.gaps == {}                                # week 2 satisfies it
@@ -275,7 +275,7 @@ def test_layerB_subtype_glossary_detected(tmp_path):
     _page(root, "week-1", ptype="glossary")
     _page(root, "week-2", ptype="week_intro")            # a teaching page, not a glossary
     c = cen.build_census(root)
-    wk1, wk2 = (next(w for w in c.weeks if w.week == n) for n in ("1", "2"))
+    wk1, wk2 = (next(w for w in c.units if w.unit == n) for n in ("1", "2"))
     assert wk1.gaps == {}
     assert wk2.gaps == {"page:glossary": cen.Shortfall(has=0, expects=1)}
 
@@ -285,7 +285,7 @@ def test_layerB_denominator_widens_to_declared_empty_weeks(tmp_path):
     _ctx(root, 'course_title: C\nweeks:\n  "week 1": {title: Intro}\n')   # declared, no artifacts
     _overlay(root, "expect:\n  defaults:\n    - {scope: week, artifact: page, count: 1}\n")
     c = cen.build_census(root)
-    wk1 = next(w for w in c.weeks if w.week == "1")
+    wk1 = next(w for w in c.units if w.unit == "1")
     assert not wk1.is_real()                              # empty declared week — hidden from the grid…
     assert wk1.gaps == {"page": cen.Shortfall(has=0, expects=1)}   # …but it IS a gap now (widened)
 
@@ -318,7 +318,7 @@ def test_layerB_scheme_present_suppresses_modal_gaps(tmp_path):
     _overlay(root, "expect:\n  defaults:\n    - {scope: week, artifact: page, count: 1}\n")
     _page(root, "week-1"); _page(root, "week-2"); _quiz(root, "week-3")   # wk3 has no page
     c = cen.build_census(root)
-    wk3 = next(w for w in c.weeks if w.week == "3")
+    wk3 = next(w for w in c.units if w.unit == "3")
     assert wk3.gaps == {"page": cen.Shortfall(has=0, expects=1)}     # flagged by the declared expectation…
     assert c.expectation_basis == "declared" and c.modal_norm == {}   # …and the modal norm never ran
 
@@ -329,8 +329,8 @@ def test_gaps_round_trip_as_data_in_census_json(tmp_path):
     _quiz(root, "week-1")
     c = cen.build_census(root)
     raw = json.loads(c.model_dump_json())
-    assert raw["weeks"][0]["gaps"] == {"quiz:eu": {"has": 0, "expects": 1}}   # data, not prose
-    assert raw["weeks"][0]["expected"] == {"quiz:eu": 1}
+    assert raw["units"][0]["gaps"] == {"quiz:eu": {"has": 0, "expects": 1}}   # data, not prose
+    assert raw["units"][0]["expected"] == {"quiz:eu": 1}
     assert cen.Census.model_validate_json(c.model_dump_json()) == c          # the IR round-trips
 
 
@@ -356,6 +356,6 @@ def test_report_says_concept_map_while_the_data_key_stays_hyphenated(tmp_path):
     for wk in ("week-1", "week-2"):                                  # concept maps on 2 of 3 weeks
         (root / ".vtconfig" / "concepts" / f"{wk}.yaml").write_text("week: x\n", encoding="utf-8")
     c = cen.build_census(root)
-    wk3 = next(w for w in c.weeks if w.week == "3")
+    wk3 = next(w for w in c.units if w.unit == "3")
     assert "concept-map" in wk3.gaps                                 # data key unchanged
-    assert "no concept map (but 2/3 weeks have one)" in cen.render_report(c)   # report wording
+    assert "no concept map (but 2/3 units have one)" in cen.render_report(c)   # report wording

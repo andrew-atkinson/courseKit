@@ -280,10 +280,10 @@ def _week_order(page) -> tuple:
     order in Canvas follows the weeks. Non-week pages sort last, by slug. Matches how the course
     cartridge orders its week modules (`cartridge._week_sort`)."""
     from coursekit.courseconfig import week_key
-    k = week_key(page.week_ref) if page.week_ref else None
+    k = week_key(page.unit_ref) if page.unit_ref else None
     if k and k.isdigit():
         return (0, int(k), "")
-    return (1, 0, page.week_ref or page.slug or "")
+    return (1, 0, page.unit_ref or page.slug or "")
 
 
 def _load_pages(path) -> list[tuple]:
@@ -303,7 +303,7 @@ def _load_pages(path) -> list[tuple]:
     for pj in ir_files(path, "page"):
         page = Page.model_validate_json(pj.read_text(encoding="utf-8"))
         root = find_root(pj)
-        supp = load_supplements(root, page.week_ref or page.slug)
+        supp = load_supplements(root, page.unit_ref or page.slug)
         entries.append((page, supp, load_style(root)))
     entries.sort(key=lambda e: _week_order(e[0]))   # week-2 before week-10, not lexical
     return entries

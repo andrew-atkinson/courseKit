@@ -129,7 +129,7 @@ def test_a_doc_for_an_undeclared_unit_is_reported_and_reaches_the_census(root):
     (root / "output" / "week-9.md").write_text("unit 9", encoding="utf-8")   # nobody declared unit 9
     c = Course.load(root)
     assert [u.id for u in c.units] == ["1"] and c.undeclared_units == ["9"]
-    w9 = next(w for w in census.build_census(root).weeks if w.week == "9")
+    w9 = next(w for w in census.build_census(root).units if w.unit == "9")
     assert [m.kind for m in w9.materials] == ["week doc"]                # material, nothing generated: a gap
 
 

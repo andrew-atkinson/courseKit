@@ -35,7 +35,7 @@ def _write_page(page, out_dir: Path, project_root) -> None:
     from coursekit.generate.page.renderer import load_supplements
     from coursekit.generate.page.style import load_style
     atomic.write(out_dir / "page.json", page.model_dump_json(indent=2))
-    supp = load_supplements(project_root, page.week_ref or page.slug)
+    supp = load_supplements(project_root, page.unit_ref or page.slug)
     html_emit.write_html(page, out_dir, supp, load_style(project_root))
 
 

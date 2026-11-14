@@ -83,7 +83,7 @@ One exception to re-emitting: GIFT has no `emit` command — `BankDraft.finalize
   Any API path defaults to dry-run.
 - **The unit is the course's teaching block; a week is only one cadence.**
   Courses meet twice a week, in blocks, by quarter, or self-paced, so new code and docs say *unit* and give it its own identity (id, order, label, optional module, optional calendar slot).
-  "Week" survives only as a label, a legacy alias (`--week`, `week_ref`, `weeks:` in `context.yaml`), or an existing on-disk name — never as something to parse meaning from.
+  "Week" survives only as a label, a legacy alias read but not written (`--week`, `week_ref`, `weeks:` and `scope: week` in an older overlay; `weeks:` in `context.yaml`, the transcriber's), or an existing on-disk name — never as something to parse meaning from.
   See [agent/structure-review.md](agent/structure-review.md).
 - **Real institution and course names stay out of tracked files and commit messages.**
   Use stand-ins (`CC101` for the creative-coding course, `PH101` for the photography course).

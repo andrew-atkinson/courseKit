@@ -60,9 +60,8 @@ def deterministic(unit, function: str):
     from coursekit.generate.overview import build_week_overview, build_week_recap
     from coursekit.generate.page.concept_map import load_for_unit
     builder = build_week_overview if function == "overview" else build_week_recap
-    from coursekit.courseconfig import week_key
-    # ponytail: `num` only prefixes the title ("Week 7: …"), doubling a label that already says it; CORE-5.3's labels replace it
-    return builder(unit.course_title or "Course", week_key(unit.id), unit.label or unit.slug,
+    # The unit's label is the title ("Week 7: Objects"); a week number would prefix it a second time.
+    return builder(unit.course_title or "Course", None, unit.label or unit.slug,
                    unit.module or "", load_for_unit(unit), ref=unit.slug)
 
 

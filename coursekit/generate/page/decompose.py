@@ -258,7 +258,7 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
     slug = slugify(unit.label) if unit.label else unit.slug
     draft = pageir.PageDraft.new(f"{unit.course_slug}-{unit.slug}", out_dir,
                                  title=unit.label or unit.slug, page_type="week_intro",
-                                 week_ref=unit.slug, slug=slug)
+                                 unit_ref=unit.slug, slug=slug)
     session = tools.PageTools(draft, call_log=out_dir / "calls.jsonl")
     stats: dict = {}                                   # tallies pass errors (candidate timeouts) across the run
     empties: list[str] = []

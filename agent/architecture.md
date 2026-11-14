@@ -77,7 +77,7 @@ flowchart LR
   Once coursekit's overlay declares units, their order is the overlay's (the file a GUI will reorder); until then units sort by number.
   `context.yaml`'s listing is the transcriber's scan order, not a choice.
 - **One ownership rule.**
-  An artifact belongs to the unit its own `week_ref` names, else its folder's leading unit (`week-3-essay` → `"3"`), else course scope — so moving an artifact is one field, not a rename.
+  An artifact belongs to the unit its own `unit_ref` names (`week_ref` in older files), else its folder's leading unit (`week-3-essay` → `"3"`), else course scope — so moving an artifact is one field, not a rename.
 - **One layout.**
   Artifacts live at `<kind>/<slug>/<ir>.json`; an IR file anywhere else is a stray — warned about, never packaged.
 - **Read-only.**

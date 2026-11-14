@@ -27,8 +27,8 @@ from coursekit.generate.page import page as P
 
 
 def _page(page_id="c-week-3", title="Week 3: Repetition", slug="week-3-repetition",
-          week_ref="week-3", blocks=None):
-    d = P.PageDraft.new(page_id, title=title, slug=slug, week_ref=week_ref)
+          unit_ref="week-3", blocks=None):
+    d = P.PageDraft.new(page_id, title=title, slug=slug, unit_ref=unit_ref)
     for b in blocks or (dict(kind="heading", block_id="h", text="REVIEW", level=4),):
         d.put_block(P.build_block(**b))
     return d.page
@@ -49,7 +49,7 @@ def test_page_html_has_the_canvas_meta_header():
 
 def test_page_html_parses_and_brackets_the_body():
     doc = cc.render_page(_page(
-        page_id="c", title="X", slug="x", week_ref=None,
+        page_id="c", title="X", slug="x", unit_ref=None,
         blocks=[dict(kind="heading", block_id="h", text="A", level=4),
                 dict(kind="bullets", block_id="b", items=["one", "two"])]))
     assert _parses_as_html(doc)
@@ -57,7 +57,7 @@ def test_page_html_parses_and_brackets_the_body():
 
 def test_page_body_carries_the_rendered_blocks_not_the_title_as_h1():
     doc = cc.render_page(_page(
-        page_id="c", title="My Title", slug="s", week_ref=None,
+        page_id="c", title="My Title", slug="s", unit_ref=None,
         blocks=[dict(kind="heading", block_id="h", text="REVIEW", level=4)]))
     import re
     assert re.search(r"<h4[^>]*>.*REVIEW.*</h4>", doc, re.S)
@@ -67,7 +67,7 @@ def test_page_body_carries_the_rendered_blocks_not_the_title_as_h1():
 
 def test_hostile_text_survives_into_the_page():
     doc = cc.render_page(_page(
-        page_id="c", title="A < B & C", slug="s", week_ref=None,
+        page_id="c", title="A < B & C", slug="s", unit_ref=None,
         blocks=[dict(kind="heading", block_id="h", text="x < y & z", level=4)]))
     assert _parses_as_html(doc)              # still structurally sound HTML
     assert "A &lt; B &amp; C" in doc         # title escaped
@@ -86,8 +86,8 @@ def test_manifest_namespaces_match_the_export():
 
 
 def test_manifest_has_a_webcontent_resource_per_page():
-    p1 = _page(page_id="c-w1", title="W1", slug="week-1", week_ref="week-1")
-    p2 = _page(page_id="c-w2", title="W2", slug="week-2", week_ref="week-2")
+    p1 = _page(page_id="c-w1", title="W1", slug="week-1", unit_ref="week-1")
+    p2 = _page(page_id="c-w2", title="W2", slug="week-2", unit_ref="week-2")
     body = cc.emit_manifest([p1, p2], "A Course")
     root = ET.fromstring(body)
     ns = {"cp": "http://www.imsglobal.org/xsd/imsccv1p1/imscp_v1p1"}
@@ -106,8 +106,8 @@ def test_manifest_course_title_is_escaped():
 # --------------------------------------------- reference integrity + packaging
 
 def test_every_resource_href_is_a_packaged_file():
-    entries = [(_page(page_id="c-w1", title="W1", slug="week-1", week_ref="week-1"), {}, None),
-               (_page(page_id="c-w2", title="W2", slug="week-2", week_ref="week-2"), {}, None)]
+    entries = [(_page(page_id="c-w1", title="W1", slug="week-1", unit_ref="week-1"), {}, None),
+               (_page(page_id="c-w2", title="W2", slug="week-2", unit_ref="week-2"), {}, None)]
     files = cc.package_files(entries, "A Course")
 
     manifest = ET.fromstring(files["imsmanifest.xml"])
@@ -131,8 +131,8 @@ def test_package_ships_the_canvas_export_marker():
 
 
 def test_module_meta_lists_each_page_as_a_wikipage():
-    p1 = _page(page_id="c-w1", title="Week 1", slug="week-1", week_ref="week-1")
-    p2 = _page(page_id="c-w2", title="Week 2", slug="week-2", week_ref="week-2")
+    p1 = _page(page_id="c-w1", title="Week 1", slug="week-1", unit_ref="week-1")
+    p2 = _page(page_id="c-w2", title="Week 2", slug="week-2", unit_ref="week-2")
     body = cc.emit_module_meta([p1, p2], "A Course")
     root = ET.fromstring(body)
     ns = {"c": "http://canvas.instructure.com/xsd/cccv1p0"}
@@ -145,8 +145,8 @@ def test_module_meta_lists_each_page_as_a_wikipage():
 
 
 def test_organizations_reference_every_page_resource():
-    p1 = _page(page_id="c-w1", title="W1", slug="week-1", week_ref="week-1")
-    p2 = _page(page_id="c-w2", title="W2", slug="week-2", week_ref="week-2")
+    p1 = _page(page_id="c-w1", title="W1", slug="week-1", unit_ref="week-1")
+    p2 = _page(page_id="c-w2", title="W2", slug="week-2", unit_ref="week-2")
     manifest = ET.fromstring(cc.emit_manifest([p1, p2], "A Course"))
     ns = {"cp": "http://www.imsglobal.org/xsd/imsccv1p1/imscp_v1p1"}
     refs = {i.get("identifierref") for i in manifest.findall(".//cp:organizations//cp:item", ns)
@@ -161,7 +161,7 @@ def test_no_course_settings_xml_is_shipped():
 
 
 def test_resource_identifier_matches_the_page_meta():
-    page = _page(page_id="c-w1", title="W1", slug="week-1", week_ref="week-1")
+    page = _page(page_id="c-w1", title="W1", slug="week-1", unit_ref="week-1")
     files = cc.package_files([(page, {}, None)], "A Course")
     manifest = ET.fromstring(files["imsmanifest.xml"])
     ns = {"cp": "http://www.imsglobal.org/xsd/imsccv1p1/imscp_v1p1"}
@@ -173,8 +173,8 @@ def test_resource_identifier_matches_the_page_meta():
 
 
 def test_a_slug_collision_is_rejected_not_silently_dropped():
-    same = [(_page(page_id="c-a", title="A", slug="dup", week_ref="week-1"), {}, None),
-            (_page(page_id="c-b", title="B", slug="dup", week_ref="week-2"), {}, None)]
+    same = [(_page(page_id="c-a", title="A", slug="dup", unit_ref="week-1"), {}, None),
+            (_page(page_id="c-b", title="B", slug="dup", unit_ref="week-2"), {}, None)]
     with pytest.raises(ValueError, match="same file"):
         cc.package_files(same, "A Course")
 
@@ -191,7 +191,7 @@ def _course_tree(tmp_path):
         pdir = course / "pages" / wk
         pdir.mkdir(parents=True)
         d = P.PageDraft.new("test")
-        d = P.PageDraft.adopt(P.Page(page_id=f"c-{wk}", title=f"{wk.title()}", slug=slug, week_ref=wk), pdir)
+        d = P.PageDraft.adopt(P.Page(page_id=f"c-{wk}", title=f"{wk.title()}", slug=slug, unit_ref=wk), pdir)
         d.put_block(P.build_block(kind="heading", block_id="h", text="REVIEW", level=4))
     d = P.PageDraft.new("test")
     return course
@@ -237,7 +237,7 @@ def test_pages_order_by_week_number_not_lexically(tmp_path):
                             ("week-2", "week-2-loops", "Week 2: Loops")):
         d = tmp_path / "pages" / wk
         d.mkdir(parents=True)
-        pg = _page(page_id=f"c-{wk}", title=title, slug=slug, week_ref=wk)
+        pg = _page(page_id=f"c-{wk}", title=title, slug=slug, unit_ref=wk)
         (d / "page.json").write_text(pg.model_dump_json(), encoding="utf-8")
     out = cc.write_imscc(tmp_path)
     mm = zipfile.ZipFile(out).read("course_settings/module_meta.xml").decode("utf-8")

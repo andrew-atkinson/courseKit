@@ -7,7 +7,7 @@ That is what lets a GUI manage the files later on exactly the code the CLI uses 
 agent/core-2-design.md §4a), so nothing a GUI would change is inferred here:
 
 - a unit's `order` is its position in the declared structure, never computed from its id;
-- an artifact's unit is its own `week_ref` when it has one, so moving it is one field, not a rename.
+- an artifact's unit is its own `unit_ref` (`week_ref` in older files) when it has one, so moving it is one field, not a rename.
 
 A unit is the course's teaching block — a week is only one cadence. `id` is stable ("3" for a
 week-numbered unit, the declared key otherwise); `label` is for display and never parsed.
@@ -227,21 +227,12 @@ def _units(root: Path, struct) -> tuple[list[Unit], dict[str, Path], dict[str, l
     join the declared ones. ORDER is stored data once coursekit's overlay declares units (the file a
     GUI reorders); until then nothing chose an order, so units sort by number, as they always have."""
     units: list[Unit] = []
-    for key, entry in struct.iter_declared():
-        num = courseconfig.week_key(key)
-        uid = num or key
-        if num:
-            label, module = struct.week_label(num), struct.week_module(num)
-            doc, sources = struct.week_doc(num), struct.sources_for(num)
-        else:                                              # a unit with no number: its key is its id
-            label, module = entry.get("title") or key, entry.get("module")
-            doc = Path(str(entry["doc"])) if entry.get("doc") else None
-            doc = (root / doc) if doc is not None and not doc.is_absolute() else doc
-            sources = tuple(s for s in (coursestructure._as_source(r) for r in entry.get("sources") or [])
-                            if s is not None)
-        units.append(Unit(id=uid, order=len(units), label=label, module=module,
+    for key, _entry in struct.iter_declared():
+        uid = courseconfig.week_key(key) or key            # `week 3` is unit 3; a unit with no number is its key
+        doc = struct.unit_doc(uid)
+        units.append(Unit(id=uid, order=len(units), label=struct.unit_label(uid), module=struct.unit_module(uid),
                           doc=doc.resolve() if doc is not None and doc.is_file() else None,
-                          sources=tuple(sources)))
+                          sources=tuple(struct.sources_for(uid))))
     # The one scan for unit docs: `output/week-N.md` (ingest) and `output/<folder>/week-N.md` (transcriber).
     base = root / "output" if (root / "output").is_dir() else root
     found: dict[str, Path] = {}
@@ -259,9 +250,8 @@ def _units(root: Path, struct) -> tuple[list[Unit], dict[str, Path], dict[str, l
         return (units if struct.declares_order() else _numbered(units)), undeclared, dupes
     extra = sorted((uid for uid in found if uid not in known), key=coursestructure._week_sort)
     for uid in extra:
-        num = courseconfig.week_key(uid)
-        units.append(Unit(id=uid, order=len(units), label=struct.week_label(num) if num else uid,
-                          module=struct.week_module(num) if num else None, doc=found[uid]))
+        units.append(Unit(id=uid, order=len(units), label=struct.unit_label(uid), module=struct.unit_module(uid),
+                          doc=found[uid]))
     return (units if struct.declares_order() else _numbered(units)), {}, dupes
 
 
@@ -273,7 +263,7 @@ def _numbered(units: list[Unit]) -> list[Unit]:
 
 # --------------------------------------------------------------- artifacts
 def owner(ref, slug: str, ids: set[str]) -> str | None:
-    """THE rule for which unit an artifact belongs to: its own reference (`week_ref`) first, then its
+    """THE rule for which unit an artifact belongs to: its own reference (`unit_ref`) first, then its
     folder name's leading unit (`week-3-essay` → "3"); a declared non-numeric unit id matches itself.
     None means course or module scope."""
     for candidate in (ref, slug):
@@ -290,7 +280,8 @@ def owner(ref, slug: str, ids: set[str]) -> str | None:
 
 def _ref(path: Path, unreadable: list[Path]):
     try:
-        return json.loads(path.read_text(encoding="utf-8")).get("week_ref")
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data.get("unit_ref") or data.get("week_ref")      # `week_ref`: its old name
     except (OSError, ValueError, AttributeError):
         unreadable.append(path)
         return None

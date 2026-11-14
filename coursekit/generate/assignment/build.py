@@ -22,8 +22,8 @@ from coursekit.generate.assignment.assignment import (Assignment, Rubric, Rubric
 class AssignmentDraft:
     """An assignment being built, and where it saves."""
 
-    def __init__(self, *, assignment_id: str, slug: str, week_ref, default_points: float, out_dir=None):
-        self.assignment_id, self.slug, self.week_ref = assignment_id, slug, week_ref
+    def __init__(self, *, assignment_id: str, slug: str, unit_ref, default_points: float, out_dir=None):
+        self.assignment_id, self.slug, self.unit_ref = assignment_id, slug, unit_ref
         self.default_points = default_points
         self.out_dir = Path(out_dir) if out_dir else None
         self.brief: dict | None = None
@@ -46,7 +46,7 @@ class AssignmentDraft:
                          criteria=criteria) if criteria else None)
         try:
             return Assignment(assignment_id=self.assignment_id, title=b["title"], slug=self.slug,
-                              week_ref=self.week_ref, submission_type=b["submission_type"],
+                              unit_ref=self.unit_ref, submission_type=b["submission_type"],
                               points=self.default_points, overview=b.get("overview", ""),
                               task=b["task"], steps=b.get("steps", []),
                               deliverable=b.get("deliverable", ""), rubric=rubric)
@@ -210,7 +210,7 @@ def build_assignment(unit, provider, model, out_dir, *, material: str | None = N
     points = float(cfg.value("assignment_points") or 10)
     base = (unit.slug or "assignment")
     draft = AssignmentDraft(assignment_id=f"{unit.course_slug}-{base}", slug=f"{base}-assignment",
-                            week_ref=unit.slug, default_points=points, out_dir=out_dir)
+                            unit_ref=unit.slug, default_points=points, out_dir=out_dir)
     loop(messages, provider, model, _AssignmentGenerator(AssignmentTools(draft)), max_iters=12)
 
     a = draft.assignment

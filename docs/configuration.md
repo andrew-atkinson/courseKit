@@ -54,6 +54,8 @@ coursekit writes only its own files there (below); `context.yaml` stays the tran
 | `pages/<week>.yaml` | pages   | a page's [supplements](pages.md) — references, examples, embeds        |
 
 **Unit order.** Once `structure.coursekit.yaml` lists units, that listing is the order every command follows; until then units sort by number, so unit 3 runs before unit 10.
+The overlay lists them under `units:`; an older one says `weeks:`, which reads the same (one or the other, not both), and `propose` writes `units:` when it redrafts.
+Likewise an expectation's `scope: week` is read as `scope: unit`.
 
 ### Generator settings — `quiz.yaml` / `page.yaml`
 
@@ -90,7 +92,7 @@ uv run coursekit config show "/path/to/course"            # everything set so fa
 uv run coursekit config unset "/path/to/course" grading.groups.Projects
 ```
 
-A setting's first part names the file (`quiz`, `page`, `evaluate`, `ingest`, `assignment`, `style`; `pages.<name>` for a page's supplements); `grading`, `expect`, and `weeks` live in the structure overlay.
+A setting's first part names the file (`quiz`, `page`, `evaluate`, `ingest`, `assignment`, `style`; `pages.<name>` for a page's supplements); `grading`, `expect`, and `units` (or `weeks` in an older overlay) live in the structure overlay.
 Grading groups are addressed by name.
 `context.yaml` belongs to the transcriber and is never changed by coursekit.
 Rewriting a file drops any comments you added by hand, so keep notes somewhere else.

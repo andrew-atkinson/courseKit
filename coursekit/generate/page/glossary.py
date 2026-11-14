@@ -78,7 +78,7 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
     base = slugify(unit.label) if unit.label else unit.slug
     draft = pageir.PageDraft.new(f"{unit.course_slug}-{unit.slug}-glossary", out_dir,
                                  title=f"{unit.label or unit.slug} — Key Terms", page_type="glossary",
-                                 week_ref=unit.slug, slug=f"{base}-glossary")
+                                 unit_ref=unit.slug, slug=f"{base}-glossary")
     session = tools.PageTools(draft, call_log=out_dir / "calls.jsonl")
 
     # No heading block: the glossary block is self-labeling (a framed "Key Terms" box), so a separate

@@ -17,7 +17,7 @@ class _FakeCritic:
 
 
 def _page():
-    d = pagemod.PageDraft.new("p1", None, title="Week 3", week_ref="week-3", slug="week-3")
+    d = pagemod.PageDraft.new("p1", None, title="Week 3", unit_ref="week-3", slug="week-3")
     d.put_block(pagemod.build_block("heading", block_id="h1", text="Loops", level=2))
     d.put_block(pagemod.build_block(
         "paragraph", block_id="b1", text="A for loop repeats a block a set number of times."))

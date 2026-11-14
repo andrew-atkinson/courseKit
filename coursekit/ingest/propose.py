@@ -114,10 +114,12 @@ def overlay_path(root: Path) -> Path:
 
 
 def write_overlay(proposal: Proposal, *, force: bool = False) -> Path:
-    """Write the proposed `weeks:` into coursekit's own overlay file, keeping any `grading:`/`expect:`.
-    Refuses to replace declared weeks without `force`, so a re-run never silently discards manual edits."""
+    """Write the proposed units into coursekit's own overlay file (`units:`), keeping any `grading:`/`expect:`.
+    Refuses to replace declared units (under `units:`, or `weeks:`, its old name) without `force`, so a re-run
+    never silently discards manual edits."""
     if proposal.root is None:
         raise CoursekitError("no .vtconfig course root found — the overlay lives in .vtconfig/. "
                              "Create a .vtconfig/ folder in the course root first.", code="course.no_root")
     from coursekit import settings
-    return settings.propose_section(proposal.root, "weeks", proposal.weeks, force=force, header=_OVERLAY_HEADER)
+    return settings.propose_section(proposal.root, "units", proposal.weeks, force=force, header=_OVERLAY_HEADER,
+                                     replaces=("weeks",))

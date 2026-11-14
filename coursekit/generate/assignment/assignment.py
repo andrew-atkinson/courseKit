@@ -13,7 +13,7 @@ rubric attached).
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 # The submission types coursekit emits; matches Canvas's `submission_types` values. `online_text_entry`
 # is the default (and what the grounding export uses) — a written response, gradable by hand.
@@ -93,7 +93,7 @@ class Assignment(BaseModel):
 
     assignment_id: str = Field(min_length=1)
     title: str = Field(min_length=1)
-    week_ref: str | None = None
+    unit_ref: str | None = Field(None, validation_alias=AliasChoices("unit_ref", "week_ref"))  # read `week_ref`, its old name
     slug: str = "assignment"
     submission_type: SubmissionType = "online_text_entry"
     points: float = Field(default=10.0, ge=0)          # used only when no structured rubric is attached

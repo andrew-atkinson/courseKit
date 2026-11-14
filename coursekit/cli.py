@@ -308,7 +308,7 @@ def _cmd_census(args) -> int:
     from coursekit import census as cen
     c, jp, mp = cen.write_census(args.path)
     t = c.totals
-    print(f"Census: {t['weeks']} weeks · {t['pages']} pages · {t['quizzes']} quizzes · "
+    print(f"Census: {t['units']} units · {t['pages']} pages · {t['quizzes']} quizzes · "
           f"{t['assignments']} assignments")
     n_gaps = c.gap_count
     print(f"{n_gaps} gap(s) found." if n_gaps else "No gaps found.")

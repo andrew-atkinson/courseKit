@@ -36,7 +36,7 @@ DOCS = {
     "style": "style.yaml",
     "structure": "structure.coursekit.yaml",
 }
-_OVERLAY_SECTIONS = ("weeks", "grading", "expect")      # top-level keys of the structure overlay
+_OVERLAY_SECTIONS = ("units", "weeks", "grading", "expect")      # top-level keys of the structure overlay
 
 
 def _list_fields(model, seen=None) -> frozenset:
@@ -178,16 +178,21 @@ def unset(root, key: str) -> dict:
     return write(root, doc, data)
 
 
-def propose_section(root, section: str, value, *, force: bool = False, header: str = "") -> Path:
-    """Write one structure-overlay section a proposer drafted (`weeks`, `grading`, `expect`), keeping the
+def propose_section(root, section: str, value, *, force: bool = False, header: str = "",
+                     replaces: tuple[str, ...] = ()) -> Path:
+    """Write one structure-overlay section a proposer drafted (`units`, `grading`, `expect`), keeping the
     other sections. A section that is already declared may hold the faculty's edits, so it is replaced
-    only with `force`. Validated and saved like any other write. Returns the overlay's path."""
+    only with `force`; so is one it `replaces` (its old name, `weeks`), which the redraft then removes.
+    Validated and saved like any other write. Returns the overlay's path."""
     path, _ = _doc(root, "structure")
     data = read(root, "structure")
-    if data.get(section) and not force:
-        raise CoursekitError(f"{path} already declares `{section}:` — pass --force to redraft it (discards your "
+    held = next((s for s in (section, *replaces) if data.get(s)), None)
+    if held and not force:
+        raise CoursekitError(f"{path} already declares `{held}:` — pass --force to redraft it (discards your "
                              f"edits to that section; the others are kept).", code="overlay.section_exists",
-                             details={"path": str(path), "section": section})
+                             details={"path": str(path), "section": held})
+    for old in replaces:
+        data.pop(old, None)
     data[section] = value
     write(root, "structure", data, header=header)
     return path

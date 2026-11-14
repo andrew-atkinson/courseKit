@@ -29,7 +29,7 @@ class PageGenerator:
         slug = slugify(unit.label) if unit.label else unit.slug
         self.draft = page.PageDraft.new(f"{unit.course_slug}-{unit.slug}", out_dir,
                                         title=unit.label or unit.slug, page_type="week_intro",
-                                        week_ref=unit.slug, slug=slug)
+                                        unit_ref=unit.slug, slug=slug)
         self.tools = tools.PageTools(self.draft, call_log=out_dir / "calls.jsonl")
 
     def tool_specs(self) -> list:

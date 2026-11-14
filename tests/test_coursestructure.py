@@ -41,12 +41,12 @@ def test_has_declared_structure_only_fires_on_doc_or_sources():
 def test_week_doc_declared_default_and_rootless(tmp_path):
     # declared doc, resolved against the root
     s = _struct({"weeks": {"week 3": {"doc": "docs/w3.md"}}}, root=tmp_path)
-    assert s.week_doc("3") == tmp_path / "docs" / "w3.md"
+    assert s.unit_doc("3") == tmp_path / "docs" / "w3.md"
     # no declared doc but a known root -> the default consolidated path
     s2 = _struct({"weeks": {"week 4": {"title": "x"}}}, root=tmp_path)
-    assert s2.week_doc("4") == tmp_path / "output" / "week-4.md"
+    assert s2.unit_doc("4") == tmp_path / "output" / "week-4.md"
     # no root -> None (caller must anchor it elsewhere)
-    assert _struct({"weeks": {"week 4": {}}}, root=None).week_doc("4") is None
+    assert _struct({"weeks": {"week 4": {}}}, root=None).unit_doc("4") is None
 
 
 def test_typed_sources_are_parsed_with_kind_inference_and_role(tmp_path):
@@ -98,7 +98,7 @@ def test_load_reads_a_real_vtconfig(tmp_path):
     s = CourseStructure.load(root)
     assert s.course_title == "Digital Photography"
     assert s.has_declared_structure()
-    assert s.week_label("3") == "Week 3: Exposure"
+    assert s.unit_label("3") == "Week 3: Exposure"
     assert [x.kind for x in s.sources_for("3")] == ["reading"]
 
 
@@ -131,8 +131,8 @@ def test_overlay_composes_with_context_yaml(tmp_path):
         """))
     s = CourseStructure.load(root)
     assert s.has_declared_structure()                     # the overlay's sources trigger it
-    assert s.week_label("3") == "Week 3: Exposure"        # identity from context.yaml
-    assert s.week_module("3") == "Unit 2"
+    assert s.unit_label("3") == "Week 3: Exposure"        # identity from context.yaml
+    assert s.unit_module("3") == "Unit 2"
     assert [x.kind for x in s.sources_for("3")] == ["reading"]   # sources from the overlay
 
 
@@ -147,7 +147,7 @@ def test_overlay_never_overrides_context_identity(tmp_path):
         """))
     # context.yaml owns identity — the overlay's title is ignored, its sources are kept
     s = CourseStructure.load(root)
-    assert s.week_label("3") == "Week 3: Canonical"
+    assert s.unit_label("3") == "Week 3: Canonical"
     assert [x.path for x in s.sources_for("3")] == ["r.pdf"]
 
 
@@ -207,17 +207,17 @@ def test_parse_expect_buckets_defaults_by_scope():
         {"scope": "week", "artifact": "quiz", "count": 1},
         {"scope": "module", "artifact": "assignment", "count": 1}]})
     assert e.has_scheme()
-    assert e.week == {"page": 1, "quiz": 1}
+    assert e.unit == {"page": 1, "quiz": 1}                  # `scope: week` is read as `unit`
     assert e.module == {"assignment": 1}
-    assert e.for_week("3") == {"page": 1, "quiz": 1}
+    assert e.for_unit("3") == {"page": 1, "quiz": 1}
 
 
 def test_for_week_override_precedence_and_zero_drops():
     e = _parse_expect({"defaults": [{"scope": "week", "artifact": "quiz", "count": 1},
                                     {"scope": "week", "artifact": "page", "count": 1}],
                        "overrides": {"week": {"11": {"quiz": 0}}}})      # studio week, no quiz expected
-    assert e.for_week("11") == {"page": 1}                               # quiz dropped by the 0 override
-    assert e.for_week("3") == {"page": 1, "quiz": 1}                     # other weeks unaffected
+    assert e.for_unit("11") == {"page": 1}                               # quiz dropped by the 0 override
+    assert e.for_unit("3") == {"page": 1, "quiz": 1}                     # other weeks unaffected
 
 
 def test_for_module_merges_overrides():
@@ -230,4 +230,4 @@ def test_parse_expect_degrades_on_malformed():
     assert _parse_expect(None) == ExpectationScheme()
     assert not _parse_expect({"defaults": "nonsense"}).has_scheme()
     # a rule missing scope/artifact is skipped, not fatal
-    assert _parse_expect({"defaults": [{"artifact": "page"}, {"scope": "week"}]}).week == {}
+    assert _parse_expect({"defaults": [{"artifact": "page"}, {"scope": "week"}]}).unit == {}

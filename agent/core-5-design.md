@@ -115,6 +115,14 @@ Every step keeps these **goldens** identical to `main`, captured once before ste
 3. **`CORE-5.3-unit-words` — what coursekit writes says unit.**
    The overlay's `units:`, `scope: unit`, and `unit_ref` are read beside their week names and written by `propose` and the generators; the census becomes `UnitCensus` with the unit's own label.
    *Pass:* G0 identical; G1 identical but for `week_ref` → `unit_ref` in the IR and `weeks` → `units` in `census.json`; every old file still reads the same (a test per alias); on G2, the census shows "Session 1 — Intro".
+   **Done 2026-11-14.** Each old name is read, never written: the overlay's `units:` or `weeks:` (one or the other; both is an error), an expectation's `scope: unit` or `scope: week` (and `overrides: unit:`/`week:`), and an artifact's `unit_ref` or `week_ref`.
+   `propose` writes `units:` and a redraft with `--force` replaces an old `weeks:`, which also holds the faculty's edits and so is refused without it; `propose --expectations` writes `scope: unit`.
+   The structure's lookups take a unit id (`unit_label`, `unit_module`, `unit_doc`): a numbered unit's label stays `Week 3: …`, and any other's is its declared title, never `Week intro`; `has_declared_structure` now counts a unit declared with no number. The course model builds every unit through them, numbered or not.
+   The census is `UnitCensus` in `census.json` `units`, each with the course model's own label, in the course's order; the report says "Unit" and "units".
+   The doubled title found in step 1 is fixed: a model-free overview or recap page is titled by the unit's label alone ("Week 7: Objects").
+   Found and fixed here: `tests/test_isolation.py`'s two jobs on threads compared every file byte for byte, a record's `at` time included, so it failed whenever the two runs straddled a second (about 1 run in 15, and the unexplained failure during CORE-4.4); records are now compared without their times.
+   G0: all 904 files and members identical. G1: 20 of 52 files differ, every one explained: `week_ref` → `unit_ref` in the IR, the two corrected titles, and each record's fingerprint of what it wrote (a model-free page's brief is the page, so its brief too); every record current, and no brief the model sees changed. Both real courses' `census.md` differ only in the words "units" and "Unit". 17 mutations, all caught.
+   After an upgrade, a model-free page or course overview made before this step reads "outdated" (its brief is the page, now with `unit_ref`), as CORE-4 decision 2 intends; neither real course has one with a record.
 4. **`CORE-5.4-emit-by-unit` — a cartridge module per unit, in the course's order.**
    *Pass:* G0 identical; on G2, two modules titled by the units' labels, in declared order.
 5. **`CORE-5.5-unit-noun` — what the model is shown.**
