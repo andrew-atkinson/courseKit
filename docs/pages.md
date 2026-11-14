@@ -11,7 +11,7 @@ The canonical artifact is `page.json` (typed blocks); the renderer turns it into
 ## Generate
 
 ```bash
-uv run coursekit generate "/path/to/course export" --pages --week 3      # one week
+uv run coursekit generate "/path/to/course export" --pages --unit 3      # one unit
 uv run coursekit generate "/path/to/course export" --pages               # every week
 ```
 
@@ -160,13 +160,13 @@ Without a concept map, `overview` and `recap` stop with a message saying to run 
 
 ```bash
 # the week's teaching page (the default) — uses the model
-uv run coursekit generate "/path/to/course" --pages --week 3
+uv run coursekit generate "/path/to/course" --pages --unit 3
 
 # an after-the-week recap page — model-free, built from the concept map
-uv run coursekit generate "/path/to/course" --pages --function recap --week 3
+uv run coursekit generate "/path/to/course" --pages --function recap --unit 3
 
 # a week "Start Here" overview — also model-free
-uv run coursekit generate "/path/to/course" --pages --function overview --week 3
+uv run coursekit generate "/path/to/course" --pages --function overview --unit 3
 ```
 
 Each renders to `pages/<week>-<function>/<slug>.html` (e.g. `pages/week-3-recap/week-3-recap.html`) alongside its `page.json`; re-render any of them model-free with `emit html` after a theme change.

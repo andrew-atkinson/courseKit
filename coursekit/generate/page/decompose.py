@@ -334,7 +334,9 @@ def _render(pg, unit, out_dir, project_root) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Prototype: per-concept decomposed page generation.")
     ap.add_argument("course")
-    ap.add_argument("--week", required=True, help="week number (e.g. 7) or label")
+    which = ap.add_mutually_exclusive_group(required=True)
+    which.add_argument("--unit", help="the unit, by id or title (e.g. 7)")
+    which.add_argument("--week", help="the unit, by week number (e.g. 7); the same as --unit")
     ap.add_argument("--review", action="store_true",
                     help="also cold-read the result and print the flag count (extra model calls)")
     ap.add_argument("--fix", action="store_true",
@@ -344,10 +346,11 @@ def main() -> int:
                     help="drop the prev/next coherence window (A/B: does the window help?)")
     args = ap.parse_args()
 
+    from coursekit.pipeline import unit_matches
     units = [u for u in find_units(args.course)
-             if u.slug.split("-")[-1] == args.week or u.label == args.week]
+             if unit_matches(args.unit or args.week, u)]
     if not units:
-        print(f"No unit for week {args.week!r} under {args.course}.")
+        print(f"No unit {args.unit or args.week!r} under {args.course}.")
         return 1
     unit = units[0]
 

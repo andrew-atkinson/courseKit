@@ -110,3 +110,69 @@ def test_a_weekly_unit_keeps_its_week_names(tmp_path):
     assert concept_map_path(root, u.id).name == "week-3.yaml"
     assert materials_path(root, u.id).name == "week-3.materials.json"
     assert pagebuild.page_dir(u, "glossary").name == "week-3-glossary"
+
+
+# ------------------------------------------------------------------ CORE-5.2: choosing units by id or title
+
+def _plan(capsys, *args):
+    assert cli.main(["generate", *args, "--quizzes", "--dry-run"]) == 0
+    return [line.strip() for line in capsys.readouterr().out.splitlines() if "[plan]" in line]
+
+
+@pytest.mark.parametrize("flag, ref", [("--unit", "intro"), ("--unit", "Session 1 — Intro"),
+                                       ("--unit", "session 1 — intro"), ("--week", "Session 1 — Intro")])
+def test_a_unit_is_chosen_by_its_id_or_its_title(sessions, capsys, flag, ref):
+    assert _plan(capsys, str(sessions), flag, ref) == ["[plan] Session 1 — Intro"]
+
+
+def test_several_units_are_chosen_in_the_courses_order(sessions, capsys):
+    assert _plan(capsys, str(sessions), "--unit", "loops", "--unit", "intro") == [
+        "[plan] Session 1 — Intro", "[plan] Session 2 — Loops"]
+
+
+def test_a_unit_the_course_doesnt_have_says_which_it_has(sessions, capsys):
+    assert cli.main(["generate", str(sessions), "--unit", "outro", "--dry-run"]) != 0
+    err = capsys.readouterr().err
+    assert "no unit 'outro' in this course" in err
+    assert "intro (Session 1 — Intro), loops (Session 2 — Loops)" in err
+
+
+@pytest.mark.parametrize("verb", ["analyze", "evaluate", "fix"])
+def test_every_verb_that_chooses_units_checks_them(sessions, capsys, verb):
+    assert cli.main([verb, str(sessions), "--unit", "outro"]) != 0
+    assert "no unit 'outro'" in capsys.readouterr().err
+
+
+def test_in_a_weekly_course_unit_and_week_are_the_same(tmp_path, capsys):
+    root = tmp_path / "weekly"
+    (root / ".vtconfig").mkdir(parents=True)
+    (root / ".vtconfig" / "context.yaml").write_text(
+        "course_title: Weekly\nweeks:\n  week 3: {title: Loops}\n  week 4: {title: Noise}\n", encoding="utf-8")
+    (root / "output").mkdir()
+    for n in ("3", "4"):
+        (root / "output" / f"week-{n}.md").write_text("Text.\n", encoding="utf-8")
+    want = ["[plan] Week 4: Noise"]
+    assert _plan(capsys, str(root), "--unit", "4") == _plan(capsys, str(root), "--week", "4") == want
+    assert _plan(capsys, str(root), "--weeks", "4-4") == _plan(capsys, str(root), "--unit", "Week 4: Noise") == want
+    assert cli.main(["generate", str(root), "--week", "9", "--dry-run"]) != 0
+    assert "(units: 3 (Week 3: Loops), 4 (Week 4: Noise))" in capsys.readouterr().err
+
+
+def test_a_document_quizs_unit_can_be_chosen_though_it_has_no_text_of_its_own(tmp_path):
+    from coursekit.course import check_selection
+    from coursekit.outcomes import CoursekitError
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    (root / "quizzes" / "week-2-barrett-reading").mkdir(parents=True)
+    (root / "quizzes" / "week-2-barrett-reading" / "bank.json").write_text("{}", encoding="utf-8")
+    _quiet(check_selection, root, ["2"])                   # unit 2 owns a quiz: it exists
+    with pytest.raises(CoursekitError, match="no unit '9'"):
+        _quiet(check_selection, root, ["9"])
+
+
+def test_a_module_script_takes_a_unit_too(sessions, monkeypatch, capsys):
+    import sys
+    from coursekit.generate.quiz import eu
+    monkeypatch.setattr(sys, "argv", ["eu", str(sessions), "--unit", "Session 2 — Loops"])
+    assert eu.main() == 1                                  # found the unit; it has no concept map yet
+    assert "Session 2 — Loops has no enduring understanding" in capsys.readouterr().out

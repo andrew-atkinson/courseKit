@@ -162,13 +162,13 @@ def review_items(path, kind: str, weeks=None) -> list[tuple]:
     Targeted quizzes of units the path does not select come too (run None): they carry their own
     material, so they need no unit doc. Reviews filter the index; they never walk the folder."""
     from coursekit import discover
-    from coursekit.pipeline import _week_matches
+    from coursekit.pipeline import unit_matches
     p = Path(path).expanduser().resolve()
     with outcomes.capture(sink=lambda n: None):            # strays are the emitters' to warn about
         course = Course.load(p if p.is_dir() else p.parent)
     runs = discover.find_units(p, subdir=_IR[kind][0])
     if weeks:
-        runs = [r for r in runs if any(_week_matches(w, r) for w in weeks)]
+        runs = [r for r in runs if any(unit_matches(w, r) for w in weeks)]
     out, seen = [], set()
     for run in runs:
         for a in sorted(course.artifacts_for(kind=kind, unit=run.id), key=lambda a: (a.slug != run.slug, a.slug)):
@@ -179,12 +179,37 @@ def review_items(path, kind: str, weeks=None) -> list[tuple]:
                 out.append((a.slug, a.path, material, run))
                 seen.add(a.path)
     if kind == "quiz":
-        want = {courseconfig.week_key(w) for w in weeks} if weeks else None
         for a in course.artifacts_for(kind="quiz"):
             source = a.path.parent / "source.md"
-            if a.path not in seen and source.exists() and (want is None or a.unit in want):
+            if a.path not in seen and source.exists() and (not weeks or any(unit_matches(w, _owner(course, a))
+                                                                              for w in weeks)):
                 out.append((a.slug, a.path, source, None))
     return out
+
+
+def _owner(course: "Course", a: Artifact) -> Unit:
+    """The unit an artifact belongs to, as a unit a selection can match: the course's own, or (a document
+    quiz on a unit with no doc of its own) one named only by its id."""
+    return next((u for u in course.units if u.id == a.unit), None) or Unit(id=a.unit or "", order=0, label=a.unit or "")
+
+
+def check_selection(path, refs) -> None:
+    """Raise if a `--unit`/`--week` reference names no unit in the course at `path`, listing the ones it has,
+    so a typo isn't a run over nothing. A unit counts if it has a doc or owns an artifact."""
+    from coursekit.pipeline import unit_matches
+    p = Path(path).expanduser().resolve()
+    if not refs or not p.exists():                         # a missing path is the command's to report
+        return
+    with outcomes.capture(sink=lambda n: None):
+        course = Course.load(p if p.is_dir() else p.parent)
+    known = list(course.units) + [_owner(course, a) for a in course.artifacts
+                                  if a.unit and all(u.id != a.unit for u in course.units)]
+    unknown = [str(r) for r in refs if not any(unit_matches(r, u) for u in known)]
+    if unknown:
+        listed = ", ".join(u.id if u.label in (u.id, f"Week {u.id}") else f"{u.id} ({u.label})"
+                           for u in course.units) or "none"
+        raise CoursekitError(f"no unit {', '.join(map(repr, unknown))} in this course (units: {listed})",
+                             code="unit.unknown", details={"refs": unknown, "units": [u.id for u in course.units]})
 
 
 def unit_slug(unit_id: str) -> str:

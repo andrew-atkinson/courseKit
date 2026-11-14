@@ -129,13 +129,16 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Build a week's glossary companion (the 'terms beside the "
                                              "video' review page).")
     ap.add_argument("course")
-    ap.add_argument("--week", required=True, help="week number (e.g. 7) or label")
+    which = ap.add_mutually_exclusive_group(required=True)
+    which.add_argument("--unit", help="the unit, by id or title (e.g. 7)")
+    which.add_argument("--week", help="the unit, by week number (e.g. 7); the same as --unit")
     args = ap.parse_args()
 
+    from coursekit.pipeline import unit_matches
     units = [u for u in find_units(args.course)
-             if u.slug.split("-")[-1] == args.week or u.label == args.week]
+             if unit_matches(args.unit or args.week, u)]
     if not units:
-        print(f"No unit for week {args.week!r} under {args.course}.")
+        print(f"No unit {args.unit or args.week!r} under {args.course}.")
         return 1
     unit = units[0]
 

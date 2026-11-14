@@ -225,18 +225,20 @@ def run_unit(unit: Unit, provider, model, gen: Generator, *,
     return gen.result(unit, out, reply)
 
 
-def _week_matches(ref, unit: Unit) -> bool:
-    """Does a `--week` reference select this unit?
+def unit_matches(ref, unit) -> bool:
+    """Does a `--unit` (or `--week`) reference select this unit — a run's or the course model's?
 
-    Numeric references ('3', 'week-3', 'week 3', 3) match on the week number via the shared
-    normaliser. A non-numeric reference (a slug like 'intro') has no week number, so it matches
-    the unit's slug literally — never a bare `None == None`, which would select every
-    non-numeric week at once.
+    A numbered reference ('3', 'week-3', 'week 3', 3) matches the unit with that number as its id. Any
+    other reference matches the unit's id, its name on disk ('intro'), or its title ('Session 1 — Intro'),
+    ignoring case; never a bare `None == None`, which would select every non-numeric unit at once.
     """
+    from coursekit.course import unit_slug
     k = courseconfig.week_key(ref)
     if k is not None:
         return unit.id == k                       # a numbered unit's id is its number
-    return slugify(str(ref)) == unit.slug
+    r = str(ref).strip()
+    return (r == unit.id or slugify(r) == getattr(unit, "slug", unit_slug(unit.id))
+            or r.casefold() == (unit.label or "").casefold())
 
 
 def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
@@ -258,7 +260,7 @@ def run_course(path, *, weeks=None, output_root=None, provider=None, model=None,
     subdir = generator.artifacts_subdir
     units = find_units(path, output_root=output_root, subdir=subdir)
     if weeks:
-        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
+        units = [u for u in units if any(unit_matches(w, u) for w in weeks)]
 
     if dry_run:
         return [RunResult(u, finalized=False, output_dir=u.output_dir) for u in units]

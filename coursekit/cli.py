@@ -58,13 +58,18 @@ def _build_provider():
 
 
 def _parse_weeks(args) -> list[str] | None:
-    weeks = list(args.week or [])
+    """Every `--unit`, `--week`, and `--weeks` reference, checked against the course: a unit it doesn't have
+    stops the command, naming the ones it does."""
+    weeks = list(getattr(args, "unit", None) or []) + list(args.week or [])
     if args.weeks:
         try:
             lo, hi = (int(x) for x in args.weeks.split("-"))
         except ValueError:
             raise SystemExit(f"--weeks expects a range like 3-8, got {args.weeks!r}")
         weeks += [str(n) for n in range(lo, hi + 1)]
+    if weeks and args.path:
+        from coursekit.course import check_selection
+        check_selection(args.path, weeks)
     return weeks or None
 
 
@@ -378,7 +383,7 @@ def _cmd_analyze(args) -> int:
     weeks = _parse_weeks(args)
     units = find_units(args.path)
     if weeks:
-        units = [u for u in units if any(pipeline._week_matches(w, u) for w in weeks)]
+        units = [u for u in units if any(pipeline.unit_matches(w, u) for w in weeks)]
     if not units:
         print("No week transcripts found.")
         return 0
@@ -485,12 +490,12 @@ def _run_assignments(args) -> int:
     not the quiz/page seam). Scope defaults to the week; `--scope` names a wider brief."""
     from coursekit.discover import find_units
     from coursekit.generate.assignment import build as ab
-    from coursekit.pipeline import _week_matches
+    from coursekit.pipeline import unit_matches
 
     weeks = _parse_weeks(args)
     units = find_units(args.path, output_root=args.output_root, subdir="assignments")
     if weeks:
-        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
+        units = [u for u in units if any(unit_matches(w, u) for w in weeks)]
     if not units:
         print(f"No weeks found under {args.path}.")
         return 1
@@ -960,6 +965,7 @@ def build_parser() -> argparse.ArgumentParser:
                              "content model generate and evaluate read")
     pa.add_argument("path", nargs="?", default=os.getenv("TRANSCRIPTION"),
                     help="transcript file or directory (default: $TRANSCRIPTION)")
+    pa.add_argument("--unit", action="append", metavar="ID", help="a unit to analyze, by id or title, repeatable")
     pa.add_argument("--week", action="append", metavar="N", help="a week to analyze, repeatable")
     pa.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
     pa.add_argument("--dry-run", action="store_true",
@@ -977,6 +983,7 @@ def build_parser() -> argparse.ArgumentParser:
                        help="draft assignments (brief + rubric) instead of quizzes/pages")
     pg.add_argument("--scope", default="this week",
                     help="assignments only: what the assignment covers (default: 'this week')")
+    pg.add_argument("--unit", action="append", metavar="ID", help="a unit to include, by id or title, repeatable")
     pg.add_argument("--week", action="append", metavar="N",
                     help="a week to include, repeatable, e.g. --week 3 --week 5")
     pg.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
@@ -1044,6 +1051,7 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("--all", action="store_true",
                     help="run every evaluation, not just facticity: the page pedagogy (form) and "
                          "concept-delivery rubrics too -> page-pedagogy.md, page-concepts.md")
+    pv.add_argument("--unit", action="append", metavar="ID", help="a unit to review, by id or title, repeatable")
     pv.add_argument("--week", action="append", metavar="N", help="a week to review, repeatable")
     pv.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
     pv.add_argument("--reads", type=int, metavar="N",
@@ -1057,6 +1065,7 @@ def build_parser() -> argparse.ArgumentParser:
     pfw = pf.add_mutually_exclusive_group()
     pfw.add_argument("--quizzes", action="store_true", help="only quizzes (default: quizzes and pages)")
     pfw.add_argument("--pages", action="store_true", help="only pages (default: quizzes and pages)")
+    pf.add_argument("--unit", action="append", metavar="ID", help="a unit to fix, by id or title, repeatable")
     pf.add_argument("--week", action="append", metavar="N", help="a week to fix, repeatable")
     pf.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
     pf.add_argument("--reaudit", action="store_true",

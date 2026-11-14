@@ -107,6 +107,11 @@ Every step keeps these **goldens** identical to `main`, captured once before ste
 2. **`CORE-5.2-select-units` — choosing units by id or label.**
    `--unit` beside `--week`/`--weeks` on the four verbs and the module scripts, through one `select_units`.
    *Pass:* every existing selection test unchanged; on G2, `--unit intro` and `--unit "Session 1 — Intro"` each select one unit, and an unknown one says which units exist.
+   **Done 2026-11-14.** One matcher, `pipeline.unit_matches` (today's `_week_matches`, which every selection already went through): a numbered reference matches the unit with that number, and any other matches the unit's id, its name on disk, or its title, ignoring case; it takes a run's unit or the model's.
+   `--unit` (repeatable) on `analyze`, `generate`, `evaluate`, and `fix`, and on the four module scripts (`eu`, `intro`, `glossary`, `decompose`, which take `--unit` or `--week`); `--week` goes through the same matcher, so it takes titles too.
+   The check is the CLI's, not the library's: `course.check_selection` stops a command whose reference names no unit, listing the course's units, while `run_course` with an unmatched reference still returns nothing, as a test pins.
+   A unit counts as existing if it has a doc or owns an artifact, so a document quiz's unit with no text of its own (PH101's `week-2-<reading>` kind) can still be chosen; that quiz is now matched through its unit, so it's chosen by title too.
+   The user guides' examples say `--unit`, and the command reference explains it. Every existing test unchanged; G0 and G1 identical; 13 mutations, all caught.
 3. **`CORE-5.3-unit-words` — what coursekit writes says unit.**
    The overlay's `units:`, `scope: unit`, and `unit_ref` are read beside their week names and written by `propose` and the generators; the census becomes `UnitCensus` with the unit's own label.
    *Pass:* G0 identical; G1 identical but for `week_ref` → `unit_ref` in the IR and `weeks` → `units` in `census.json`; every old file still reads the same (a test per alias); on G2, the census shows "Session 1 — Intro".

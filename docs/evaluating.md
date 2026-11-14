@@ -9,7 +9,7 @@ Three commands, in the order you'd use them: **`analyze`** (understand the conte
 
 ```bash
 uv run coursekit analyze "/path/to/course"          # every week
-uv run coursekit analyze "/path/to/course" --week 7 # one week
+uv run coursekit analyze "/path/to/course" --unit 7 # one unit
 uv run coursekit analyze "/path/to/course" --dry-run  # no model; shows what it would read
 ```
 
@@ -55,7 +55,7 @@ A model that won't load stops the run with an error instead.
 ```bash
 uv run coursekit fix "/path/to/course"           # quizzes AND pages
 uv run coursekit fix "/path/to/course" --pages   # only pages (--quizzes for only quizzes)
-uv run coursekit fix "/path/to/course" --week 7  # one week
+uv run coursekit fix "/path/to/course" --unit 7  # one unit
 ```
 
 `fix` closes the loop.

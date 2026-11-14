@@ -104,11 +104,11 @@ def evaluate_course_pedagogy(path, *, weeks=None, provider, model, out_path=None
     from coursekit import records
     from coursekit.discover import find_units
     from coursekit.generate.page.page import Page
-    from coursekit.pipeline import _week_matches
+    from coursekit.pipeline import unit_matches
 
     units = find_units(path, subdir="pages")
     if weeks:
-        units = [u for u in units if any(_week_matches(w, u) for w in weeks)]
+        units = [u for u in units if any(unit_matches(w, u) for w in weeks)]
 
     rubrics, judged = [], []
     for u in units:

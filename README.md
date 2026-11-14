@@ -51,7 +51,7 @@ Create a `.env` in the project root with at least a `MODEL_NAME` and endpoint �
 Then verify:
 
 ```bash
-uv run pytest           # 1142 tests, all offline — no model needed (names each, not just dots)
+uv run pytest           # 1154 tests, all offline — no model needed (names each, not just dots)
 ```
 
 ## Quick start
@@ -62,11 +62,11 @@ The CLI has four phases: **`ingest`** (documents → week text), **`analyze`** (
 # see what it would do — free, no model
 uv run coursekit generate "/path/to/course" --dry-run
 
-# both quizzes AND pages, one week (the default)
-uv run coursekit generate "/path/to/course" --week 3
+# both quizzes AND pages, one unit (the default)
+uv run coursekit generate "/path/to/course" --unit 3
 
 # narrow to one kind
-uv run coursekit generate "/path/to/course" --pages --week 3
+uv run coursekit generate "/path/to/course" --pages --unit 3
 
 # check what you already have for pedagogical soundness
 uv run coursekit evaluate "/path/to/course" --all

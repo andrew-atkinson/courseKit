@@ -47,13 +47,16 @@ It's descriptive: it maps what exists and shows unassigned files rather than dro
 |------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|----------|
 | `coursekit analyze PATH`           | Build each week's concept map (from the transcriber's `knowledge.json`, or the week text when absent) → `.vtconfig/concepts/week-N.yaml`. | ✓        |
 | `coursekit analyze PATH --dry-run` | List the weeks and their knowledge-component counts, no model.                                                                            | x        |
-| `coursekit analyze PATH --week 3`  | One week (`--week` repeatable; `--weeks 3-8` a range).                                                                                    | ✓        |
+| `coursekit analyze PATH --unit 3`  | One unit, by id or title (`--unit` repeatable; `--week 3` the same; `--weeks 3-8` a range).                                               | ✓        |
+
+**Choosing units.** `--unit` takes a unit's id (`3`, `intro`), its folder name, or its title, ignoring case; a unit the course doesn't have stops the command and lists the ones it has.
+`--week` is the same flag under its old name, and `--weeks A-B` picks a range of numbered units.
 
 | Generate Commands                                       | What it does                                                                                                                            | Uses LLM |
 |---------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|----------|
 | `coursekit generate PATH`                               | Both quizzes and pages, every week found.                                                                                               | ✓        |
 | `coursekit generate PATH --dry-run`                     | List the weeks it would process.                                                                                                        | x        |
-| `coursekit generate PATH --week 3`                      | One week. `--week` is repeatable; `--weeks 3-8` a range.                                                                                | ✓        |
+| `coursekit generate PATH --unit 3`                      | One unit, by id or title (`--unit "Week 3: Repetition"`). Repeatable; `--week 3` the same; `--weeks 3-8` a range.                      | ✓        |
 | `coursekit generate --source DOC`                       | **Targeted quiz** from ONE document — à la carte; no `PATH` needed → `quizzes/<week>-<doc>/`. Quizzes only.                             | ✓        |
 | `coursekit generate PATH --pages`                       | Only pages (`--quizzes` for only quizzes).                                                                                              | ✓        |
 | `coursekit generate PATH --pages --function glossary`   | Page function: `teaching` (default) / `glossary` / `overview` / `recap` (after-the-week recall). `overview` and `recap` are assembled from the concept map — model-free, and skip the post-run review. | ✓ / model-free for overview·recap |
@@ -86,14 +89,14 @@ An artifact outside the course layout (`<kind>/<slug>/<file>.json`) is warned ab
 | `coursekit evaluate PATH`          | Cold-read review of already-generated quizzes **and** pages → `quiz-review.md`, `page-review.md`.                       | ✓        |
 | `coursekit evaluate PATH --pages`  | Only the pages (`--quizzes` for only quizzes).                                                                          | ✓        |
 | `coursekit evaluate PATH --all`    | Every evaluation: facticity + page **pedagogy** (form) + **concept-delivery** + **groundedness** (provenance — for pages AND quizzes: how much is source-grounded vs the model's own knowledge, and for pages any contradictions flagged; a low-coverage quiz means the source is too thin to ground it) → `page-pedagogy.md`, `page-concepts.md`, `page-groundedness.md`, `quiz-groundedness.md`. | ✓ |
-| `coursekit evaluate PATH --week 3` | Scope to one week (`--weeks A-B` a range); `--reads N` cold-reads each item N times and unions the flags.               | ✓        |
+| `coursekit evaluate PATH --unit 3` | Scope to one unit (`--week 3` the same; `--weeks A-B` a range); `--reads N` cold-reads each item N times and unions the flags.               | ✓        |
 
 | Fix Command                    | What it does                                                                                                                                                                                                                                        | Uses LLM |
 |--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
 | `coursekit fix PATH`           | **Regenerate each item flagged by the last review in place** (quizzes **and** pages), then verify — no re-audit, so a just-flagged item is fixed at once. Updates `bank.json`/GIFT + `page.json`/HTML; re-run `emit` to refresh the Canvas package. | ✓        |
 | `coursekit fix PATH --reaudit` | Cold-read the whole course afresh instead of acting on the last review.                                                                                                                                                                             | ✓        |
 | `coursekit fix PATH --pages`   | Only the pages (`--quizzes` for only quizzes).                                                                                                                                                                                                      | ✓        |
-| `coursekit fix PATH --week N`  | Only that week (`--weeks A-B` for a range); `--max-turns N` caps model turns per fix; `--reads N` on a `--reaudit` cold-reads each item N times.                                                                                                    | ✓        |
+| `coursekit fix PATH --unit N`  | Only that unit (`--week N` the same; `--weeks A-B` for a range); `--max-turns N` caps model turns per fix; `--reads N` on a `--reaudit` cold-reads each item N times.                                                                                                    | ✓        |
 
 | Test Command           | What it does                                                      | Uses LLM |
 |------------------------|-------------------------------------------------------------------|----------|
