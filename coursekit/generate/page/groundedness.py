@@ -174,10 +174,10 @@ def evaluate_course_groundedness(path, *, weeks=None, provider, model, out_path=
         material = Path(u.transcript_path).read_text(encoding="utf-8")
         n = sum(1 for b in page.blocks.values() if b.kind not in _SKIP_KINDS)
         if progress:
-            progress(f"reading {u.week_slug} — {n} section(s)…")
-        pg = evaluate_page_groundedness(page, material, provider, model, week=u.week_slug,
+            progress(f"reading {u.slug} — {n} section(s)…")
+        pg = evaluate_page_groundedness(page, material, provider, model, week=u.slug,
                                         project_root=u.course_root, progress=progress)
-        pg.page_id = u.week_slug             # label by week for the course report
+        pg.page_id = u.slug             # label by week for the course report
         results.append(pg)
         judged.append((pj.parent, {pj.name: records.hash_bytes(data)},
                        {"coverage": round(pg.coverage, 2), "in_tension": len(pg.tensions),

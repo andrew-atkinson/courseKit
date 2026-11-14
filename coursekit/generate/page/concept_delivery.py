@@ -116,14 +116,14 @@ def evaluate_course_concepts(path, *, weeks=None, provider, model, out_path=None
         material = Path(u.transcript_path).read_text(encoding="utf-8")
         # Score against the week's concept map when one exists — a fixed list, not a re-derivation.
         names = None
-        key = u.week_num if u.course_root else None
+        key = u.id if u.course_root else None
         if key:
             cmap = load_concept_map(concept_map_path(u.course_root, key))   # a broken map raises
             if cmap and cmap.concepts:
                 names = [c.name for c in cmap.concepts]
         pc = evaluate_page_concepts(page, material, provider, model, project_root=u.course_root,
                                     concepts=names)
-        pc.page_id = u.week_slug         # label by week for the course report
+        pc.page_id = u.slug         # label by week for the course report
         results.append(pc)
         if not pc.failed:                # a failed call judged nothing
             judged.append((pj.parent, {pj.name: records.hash_bytes(data)},

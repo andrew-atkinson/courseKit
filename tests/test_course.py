@@ -139,12 +139,12 @@ def test_generation_runs_come_from_the_model_in_unit_order(root):
     from coursekit.discover import find_units
     for n in (10, 3):
         _doc(root, n)
-    assert [u.week_slug for u in find_units(root)] == ["week-3", "week-10"]
+    assert [u.slug for u in find_units(root)] == ["week-3", "week-10"]
     (root / "docs").mkdir()
     (root / "docs" / "exposure.md").write_text("light", encoding="utf-8")
     settings.write(root, "structure", {"weeks": {"week 4": {"doc": "docs/exposure.md", "title": "Exposure"}}})
     (u,) = find_units(root / "docs" / "exposure.md")
-    assert (u.week_slug, u.week_label, u.output_dir) == ("week-4", "Week 4: Exposure", root.resolve() / "quizzes" / "week-4")
+    assert (u.slug, u.label, u.output_dir) == ("week-4", "Week 4: Exposure", root.resolve() / "quizzes" / "week-4")
 
 
 def test_reviews_read_the_index_not_the_folder(root):

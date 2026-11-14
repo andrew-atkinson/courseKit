@@ -21,13 +21,13 @@ def _unit(tmp_path, num="3") -> Unit:
     doc = root / "output" / f"week-{num}.md"
     doc.parent.mkdir(parents=True, exist_ok=True)
     doc.write_text("Loops repeat a block of code.", encoding="utf-8")
-    return Unit(transcript_path=doc, week_slug=f"week-{num}", output_dir=root / "quizzes" / f"week-{num}",
-                course_slug="c", week_label=f"Week {num}", week_num=num, course_root=root)
+    return Unit(transcript_path=doc, id=num, slug=f"week-{num}", output_dir=root / "quizzes" / f"week-{num}",
+                course_slug="c", label=f"Week {num}", course_root=root)
 
 
 def _map(u, *, eu="Loops scale effort."):
-    save_concept_map(ConceptMap(week=u.week_num, enduring_understanding=eu, concepts=[Concept(name="For loops")]),
-                     concept_map_path(u.course_root, u.week_num))
+    save_concept_map(ConceptMap(week=u.id, enduring_understanding=eu, concepts=[Concept(name="For loops")]),
+                     concept_map_path(u.course_root, u.id))
 
 
 def _captured():
@@ -120,7 +120,7 @@ def test_a_targeted_quiz_knows_its_unit_but_keeps_its_own_shape(tmp_path, monkey
     seen = {}
     monkeypatch.setattr(pipeline, "run_unit", lambda unit, p, m, gen, **k: seen.update(unit=unit, gen=gen))
     targeted.generate_targeted_quiz(src, None, "m")
-    assert seen["unit"].week_num == "3" and seen["gen"].concept_shape is False
+    assert seen["unit"].id == "3" and seen["gen"].concept_shape is False
     _map(seen["unit"])
     from coursekit import courseconfig
     seen["gen"].build_messages(seen["unit"], "An essay about loops.",

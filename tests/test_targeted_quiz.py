@@ -46,7 +46,7 @@ def test_generate_targeted_quiz_scopes_to_a_distinct_slug(tmp_path, monkeypatch)
     targeted.generate_targeted_quiz(src, provider=None, model="m")
     u = seen["unit"]
     # a DISTINCT slug — never collides with the plain week-3 quiz or another element's
-    assert u.week_slug == "week-3-the-nature-of-photographs"
+    assert u.slug == "week-3-the-nature-of-photographs"
     assert u.output_dir.name == "week-3-the-nature-of-photographs" and u.output_dir.parent.name == "quizzes"
     # the extracted text is persisted as the unit's material (also a record of what was quizzed)
     assert u.transcript_path == u.output_dir / "source.md"

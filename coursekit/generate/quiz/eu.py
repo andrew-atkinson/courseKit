@@ -88,7 +88,7 @@ def main() -> int:
     args = ap.parse_args()
 
     units = [u for u in find_units(args.course)
-             if u.week_slug.split("-")[-1] == args.week or u.week_label == args.week]
+             if u.slug.split("-")[-1] == args.week or u.label == args.week]
     if not units:
         print(f"No unit for week {args.week!r} under {args.course}.")
         return 1
@@ -107,8 +107,8 @@ def main() -> int:
         draft = bank.BankDraft.adopt(bank.Bank.model_validate_json(bank_path.read_text(encoding="utf-8")), out_dir)
         print(f"Adding the EU question to the existing quiz at {bank_path}")
     else:
-        draft = bank.BankDraft.new(f"{unit.course_slug}-{unit.week_slug}", out_dir,
-                                   title=unit.week_label, source=unit.transcript_path.name)
+        draft = bank.BankDraft.new(f"{unit.course_slug}-{unit.slug}", out_dir,
+                                   title=unit.label, source=unit.transcript_path.name)
         print(f"No existing bank — writing an EU-only bank to {out_dir}")
 
     session = tools.QuizTools(draft, call_log=out_dir / "calls.jsonl")

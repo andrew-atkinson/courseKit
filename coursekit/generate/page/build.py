@@ -54,15 +54,15 @@ def route_teaching(unit, *, verbose: bool = True) -> str:
     choice = "decompose" if reasons else "monolithic"
     if verbose:
         why = "; ".join(reasons) if reasons else "fits a single pass"
-        outcomes.info("page.route", f"  [route] {unit.week_slug}: {choice} ({why})",
-                      unit=unit.week_slug, choice=choice, reasons=reasons)
+        outcomes.info("page.route", f"  [route] {unit.slug}: {choice} ({why})",
+                      unit=unit.slug, choice=choice, reasons=reasons)
     return choice
 
 
 def page_dir(unit, function: str = "teaching") -> Path:
     """Where a unit's page for `function` lives: the unit's folder for teaching, a sibling for the others."""
     out = Path(unit.output_dir)
-    return out if function == "teaching" else out.parent / f"{unit.week_slug}-{function}"
+    return out if function == "teaching" else out.parent / f"{unit.slug}-{function}"
 
 
 def build_page_unit(unit, provider, model, *, function: str = "teaching", generator: str = "auto",
@@ -81,10 +81,10 @@ def build_page_unit(unit, provider, model, *, function: str = "teaching", genera
     if function in DETERMINISTIC_FUNCTIONS:
         cm = load_for_unit(unit)
         if cm is None or not cm.concepts:        # these pages are built FROM the map — refuse, don't ship an intro
-            raise CoursekitError(f"{unit.week_slug}: a {function} page is built from the concept map, and "
+            raise CoursekitError(f"{unit.slug}: a {function} page is built from the concept map, and "
                                  f"{'there is none (run `analyze` first)' if cm is None else 'it lists no concepts'}.",
                                  code="concept_map.missing", category="source",
-                                 details={"unit": unit.week_slug, "function": function})
+                                 details={"unit": unit.slug, "function": function})
         from coursekit import records
         from coursekit.generate.page import record
         with records.reading() as read:

@@ -98,6 +98,12 @@ Every step keeps these **goldens** identical to `main`, captured once before ste
 1. **`CORE-5.1-one-unit` — the run's unit is the model's unit.**
    `discover.Unit` takes `id`, `order`, `label`, `module` from `course.Unit`; `week_slug`, `week_num`, `week_label` go; `unit_slug` names every unit-keyed file; concept maps are found, indexed, and written by unit, and `analyze` stops skipping.
    *Pass:* G0 and G1 identical; on G2, `analyze` writes `concepts/intro.yaml` and `concepts/loops.yaml`, a page and the EU question use them, and the census sees them; no `week_num` left in the package; mutation checks on `unit_slug` and the concept-map lookup.
+   **Done 2026-11-14.** A run's `discover.Unit` now carries the model's `id`, `order`, and `label`, and `slug` (its folder's name: `unit_slug(id)`, or a document quiz's own `week-10-<reading>`); `week_slug`, `week_num`, and `week_label` are gone from every reader.
+   `course.unit_slug` (today's `_run_slug`, made public) names the concept map and its materials too, so `concept_map_path` and `materials_path` take a unit id; the index reads `concepts/*.yaml`; `analyze` no longer skips a unit with no number; and a model-free overview or recap page is named from the unit's slug, not `week-<num>` (a session's was `week-None-overview`).
+   A document quiz keeps its own unit's id ("10") beside its folder name, so it still finds unit 10's concept map, as ASMT-19 layer 1 needs.
+   "No `week_num` left" means no reader of a unit's week number; `week_num` as a parameter name survives in `coursestructure`'s week API and two local loops, which CORE-5.3's words replace.
+   Found here, not fixed (it would change G1): the overview and recap pages that `generate --pages --function overview|recap` writes are titled "Week 7: Week 7: Objects", the unit's label already saying "Week 7"; the course overviews (`overview/`) aren't. Left for CORE-5.3, which builds every label from the unit.
+   G0: all 904 files and package members from copies of both real courses identical to `main`. G1: all 52 files identical (records compared without their time and commit), every record current. 14 mutations, all caught.
 2. **`CORE-5.2-select-units` — choosing units by id or label.**
    `--unit` beside `--week`/`--weeks` on the four verbs and the module scripts, through one `select_units`.
    *Pass:* every existing selection test unchanged; on G2, `--unit intro` and `--unit "Session 1 — Intro"` each select one unit, and an unknown one says which units exist.

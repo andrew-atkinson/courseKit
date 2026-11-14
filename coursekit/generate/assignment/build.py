@@ -208,9 +208,9 @@ def build_assignment(unit, provider, model, out_dir, *, material: str | None = N
 
     cfg = courseconfig.load(unit.transcript_path, config_name="assignment.yaml")
     points = float(cfg.value("assignment_points") or 10)
-    base = (unit.week_slug or "assignment")
+    base = (unit.slug or "assignment")
     draft = AssignmentDraft(assignment_id=f"{unit.course_slug}-{base}", slug=f"{base}-assignment",
-                            week_ref=unit.week_slug, default_points=points, out_dir=out_dir)
+                            week_ref=unit.slug, default_points=points, out_dir=out_dir)
     loop(messages, provider, model, _AssignmentGenerator(AssignmentTools(draft)), max_iters=12)
 
     a = draft.assignment
@@ -218,7 +218,7 @@ def build_assignment(unit, provider, model, out_dir, *, material: str | None = N
     if not problems and material is None:
         opts = {"text": str(Path(unit.transcript_path).resolve()), **({"scope": scope} if scope != "this week" else {})}
         records.write_step(out_dir, step="generate", by="model", brief=fingerprint, read=read, model=model,
-                           options=opts, kind="assignment", unit=unit.week_num or unit.week_slug,
+                           options=opts, kind="assignment", unit=unit.id,
                            outputs=("assignment.json",), fresh=True)
     elif not problems:
         (out_dir / records.RECORD).unlink(missing_ok=True)

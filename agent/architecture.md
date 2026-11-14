@@ -244,7 +244,7 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
 - **Three page critics read only each unit's teaching page.**
   Evaluate and fix take every quiz and page from the index (`course.review_items`), glossary and overview siblings included, but the pedagogy, concept-delivery, and page-groundedness critics (`evaluate --all`) still read one `page.json` per unit at its layout path.
   Moving them onto `review_items` would review the siblings too — more model calls and a visible change in their reports, so it is its own decision, not a cleanup.
-- **The code still says `week`** (`week_slug`, `week_num`, `discover.Unit`) where the model says *unit*; CORE-5 renames it once its readers have moved.
+- **The code still says `week` in places** where the model says *unit*: a run's unit is the model's unit since CORE-5.1 (`id`, `slug`, `label`), but selection, the overlay's and the census's words, the cartridge, and the prompts move in CORE-5.2 to 5.5 ([core-5-design.md](core-5-design.md)).
 - **Two writers still overwrite a hand edit:** `analyze` (a concept map) and the overview script (`python -m coursekit.generate.overview`); parked as `CORE-4.6`.
   And the decompose prototype's `--review` isn't recorded as an evaluation.
 - **The census does not count overview pages yet**, though the model indexes them — a visible output change, kept out of the byte-identical CORE-2 steps.

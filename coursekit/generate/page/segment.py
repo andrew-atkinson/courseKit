@@ -113,8 +113,9 @@ def segment(plan, provider, model) -> dict[str, str]:
     return materials_from_boundaries(chunks, parse_boundaries(reply, len(cm.concepts), len(chunks)), cm)
 
 
-def materials_path(course_root, week_key: str) -> Path:
-    return Path(course_root) / ".vtconfig" / "concepts" / f"week-{week_key}{MATERIALS_SUFFIX}"
+def materials_path(course_root, unit_id: str) -> Path:
+    from coursekit.course import unit_slug
+    return Path(course_root) / ".vtconfig" / "concepts" / f"{unit_slug(unit_id)}{MATERIALS_SUFFIX}"
 
 
 def save_materials(mats: dict, path) -> Path:
@@ -137,5 +138,4 @@ def load_materials_for_unit(unit) -> dict | None:
     """The per-concept materials for a discovered week `unit`, or None. Best-effort, like the map loader."""
     if not getattr(unit, "course_root", None):
         return None
-    key = unit.week_num
-    return load_materials(materials_path(unit.course_root, key)) if key else None
+    return load_materials(materials_path(unit.course_root, unit.id))

@@ -88,7 +88,7 @@ def prepare(source, *, output_root=None):
     with outcomes.capture(sink=lambda n: None):
         course = Course.load(source.parent)
     unit = replace(course.run_target(course.target_unit(wk or slug)), transcript_path=out_dir / "source.md",
-                   week_slug=slug, output_dir=out_dir, week_label=source.stem, week_num=wk, module=None)
+                   slug=slug, output_dir=out_dir, label=source.stem, module=None)
     return unit, text
 
 

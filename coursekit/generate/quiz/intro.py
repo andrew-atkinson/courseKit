@@ -77,7 +77,7 @@ def main() -> int:
     args = ap.parse_args()
 
     units = [u for u in find_units(args.course)
-             if u.week_slug.split("-")[-1] == args.week or u.week_label == args.week]
+             if u.slug.split("-")[-1] == args.week or u.label == args.week]
     if not units:
         print(f"No unit for week {args.week!r} under {args.course}.")
         return 1

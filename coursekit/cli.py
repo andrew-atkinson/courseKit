@@ -75,11 +75,11 @@ def _print_summary(results, *, dry_run: bool) -> None:
     print("DRY RUN — units that would be processed:" if dry_run else "Run complete:")
     for r in results:
         if dry_run:
-            print(f"  [plan] {r.unit.week_label}")
+            print(f"  [plan] {r.unit.label}")
         else:
             status = "OK" if r.finalized else "INCOMPLETE"
             counts = ", ".join(f"{v} {k}" for k, v in r.counts.items()) or "nothing"
-            print(f"  [{status}] {r.unit.week_label}  {counts}")
+            print(f"  [{status}] {r.unit.label}  {counts}")
             for p in r.problems:
                 print(f"           - {p}")
         print(f"         -> {r.output_dir}")
@@ -389,7 +389,7 @@ def _cmd_analyze(args) -> int:
             wk = cmap.read_week_knowledge(u.transcript_path)
             detail = (f"{len(wk.kcs)} knowledge component(s) from {len(wk.sources)} source(s)"
                       if wk.kcs else "no knowledge.json — would extract from the week text")
-            print(f"  [plan] {u.week_label}: {detail}")
+            print(f"  [plan] {u.label}: {detail}")
         return 0
 
     provider = _build_provider()
@@ -400,13 +400,9 @@ def _cmd_analyze(args) -> int:
 
     wrote = 0
     for u in units:
-        label = u.week_label or u.week_slug
+        label = u.label or u.slug
         if not u.course_root:
             print(f"  [skip] {label}: no .vtconfig course root to write the map into")
-            continue
-        key = u.week_num
-        if not key:
-            print(f"  [skip] {label}: could not resolve a week number for the filename")
             continue
         kcs = len(cmap.read_week_knowledge(u.transcript_path).kcs)
         via = f"from {kcs} knowledge components" if kcs else "from the week text (no knowledge.json)"
@@ -501,7 +497,7 @@ def _run_assignments(args) -> int:
     if args.dry_run:
         print("Would draft assignments for:")
         for u in units:
-            print(f"  {u.week_slug} -> {u.output_dir}")
+            print(f"  {u.slug} -> {u.output_dir}")
         return 0
 
     from coursekit import records
@@ -513,7 +509,7 @@ def _run_assignments(args) -> int:
     for u in units:
         a, problems = ab.build_assignment(u, provider, model, u.output_dir, scope=args.scope)
         pts = f", {a.effective_points:.0f} pts" if a else ""
-        print(f"[{'OK' if not problems else 'INCOMPLETE'}] assignment {u.week_slug}{pts} "
+        print(f"[{'OK' if not problems else 'INCOMPLETE'}] assignment {u.slug}{pts} "
               f"-> {u.output_dir}")
         ok = ok and not problems
     return 0 if ok else 1

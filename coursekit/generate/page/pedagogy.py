@@ -119,7 +119,7 @@ def evaluate_course_pedagogy(path, *, weeks=None, provider, model, out_path=None
         page = Page.model_validate_json(data)
         material = Path(u.transcript_path).read_text(encoding="utf-8")
         rub = evaluate_page_pedagogy(page, material, provider, model, project_root=u.course_root)
-        rub.page_id = u.week_slug        # label by week for a course-level report
+        rub.page_id = u.slug        # label by week for a course-level report
         rubrics.append(rub)
         if not rub.failed:               # a failed call judged nothing
             judged.append((pj.parent, {pj.name: records.hash_bytes(data)},

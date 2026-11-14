@@ -26,10 +26,10 @@ class PageGenerator:
     def reset(self, unit: Unit, out_dir: Path) -> None:
         # The page slug comes from the week *title* (Week 3: Repetition -> week-3-repetition), so it
         # matches how the page is named in Canvas, falling back to the bare week slug when untitled.
-        slug = slugify(unit.week_label) if unit.week_label else unit.week_slug
-        self.draft = page.PageDraft.new(f"{unit.course_slug}-{unit.week_slug}", out_dir,
-                                        title=unit.week_label or unit.week_slug, page_type="week_intro",
-                                        week_ref=unit.week_slug, slug=slug)
+        slug = slugify(unit.label) if unit.label else unit.slug
+        self.draft = page.PageDraft.new(f"{unit.course_slug}-{unit.slug}", out_dir,
+                                        title=unit.label or unit.slug, page_type="week_intro",
+                                        week_ref=unit.slug, slug=slug)
         self.tools = tools.PageTools(self.draft, call_log=out_dir / "calls.jsonl")
 
     def tool_specs(self) -> list:
@@ -40,7 +40,7 @@ class PageGenerator:
 
     def build_messages(self, unit: Unit, transcript: str, cfg) -> list[dict]:
         return build_messages(
-            transcript, course_title=unit.course_title, week_label=unit.week_label,
+            transcript, course_title=unit.course_title, week_label=unit.label,
             module=unit.module, project_root=unit.course_root,
             system_prompt=cfg.prompt_name("system_prompt", default="system"),
             task_prompt=cfg.prompt_name("task_prompt", default="task"),
@@ -82,7 +82,7 @@ class PageGenerator:
         from coursekit.generate.page.renderer import load_supplements
         from coursekit.generate.page.style import load_style
         if self.draft.is_finalized():   # an unfinished build must not overwrite the last good HTML either
-            supplements = load_supplements(unit.course_root, unit.week_slug)
+            supplements = load_supplements(unit.course_root, unit.slug)
             html_emit.write_html(pg, out_dir, supplements, load_style(unit.course_root))
 
         return RunResult(

@@ -194,8 +194,8 @@ def plan(unit, *, project_root=None, neighbours=True) -> list[dict]:
     cfg = courseconfig.load(unit.transcript_path, config_name="page.yaml")   # page settings, not quiz.yaml
     cm = load_for_unit(unit)
     if cm is None or not cm.concepts:
-        raise CoursekitError(f"{unit.week_slug}: no concept map (run `analyze` first).",
-                             code="concept_map.missing", category="source", details={"unit": unit.week_slug})
+        raise CoursekitError(f"{unit.slug}: no concept map (run `analyze` first).",
+                             code="concept_map.missing", category="source", details={"unit": unit.slug})
     records.note(unit.transcript_path)
     transcript = Path(unit.transcript_path).read_text(encoding="utf-8", errors="replace")
 
@@ -212,7 +212,7 @@ def plan(unit, *, project_root=None, neighbours=True) -> list[dict]:
     names = ", ".join(c.name for c in cm.concepts)
     eu = cm.enduring_understanding or "(none stated)"
     steps = [{"step": "frame", "concept": None, "passes": [(sysmsg("frame"),
-              f"Topic: {unit.week_label or unit.week_slug}\nEnduring understanding: {eu}\n"
+              f"Topic: {unit.label or unit.slug}\nEnduring understanding: {eu}\n"
               f"Concepts this week: {names}")]}]
 
     # Boundary-correct per-concept material from `analyze` (one contiguous verbatim span per concept, so
@@ -255,10 +255,10 @@ def generate_page_decomposed(unit, provider, model, out_dir, *, project_root=Non
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    slug = slugify(unit.week_label) if unit.week_label else unit.week_slug
-    draft = pageir.PageDraft.new(f"{unit.course_slug}-{unit.week_slug}", out_dir,
-                                 title=unit.week_label or unit.week_slug, page_type="week_intro",
-                                 week_ref=unit.week_slug, slug=slug)
+    slug = slugify(unit.label) if unit.label else unit.slug
+    draft = pageir.PageDraft.new(f"{unit.course_slug}-{unit.slug}", out_dir,
+                                 title=unit.label or unit.slug, page_type="week_intro",
+                                 week_ref=unit.slug, slug=slug)
     session = tools.PageTools(draft, call_log=out_dir / "calls.jsonl")
     stats: dict = {}                                   # tallies pass errors (candidate timeouts) across the run
     empties: list[str] = []
@@ -324,7 +324,7 @@ def _render(pg, unit, out_dir, project_root) -> None:
         from coursekit.emit import html as html_emit
         from coursekit.generate.page.renderer import load_supplements
         from coursekit.generate.page.style import load_style
-        supplements = load_supplements(project_root, unit.week_slug)
+        supplements = load_supplements(project_root, unit.slug)
         html_emit.write_html(pg, Path(out_dir), supplements, load_style(project_root))
     except Exception as e:
         outcomes.warn("page.render_skipped", f"  (render skipped: {type(e).__name__}: {e})",
@@ -345,7 +345,7 @@ def main() -> int:
     args = ap.parse_args()
 
     units = [u for u in find_units(args.course)
-             if u.week_slug.split("-")[-1] == args.week or u.week_label == args.week]
+             if u.slug.split("-")[-1] == args.week or u.label == args.week]
     if not units:
         print(f"No unit for week {args.week!r} under {args.course}.")
         return 1
@@ -359,7 +359,7 @@ def main() -> int:
     # The `teaching` function writes only to the canonical pages/<week>/ tree — no parallel
     # pages-decomposed/ side tree (a second tree collided on emit; length now lives at the function
     # level, so there is nothing to A/B here).
-    out_dir = Path(unit.course_root) / "pages" / unit.week_slug
+    out_dir = Path(unit.course_root) / "pages" / unit.slug
     print(f"Teaching page (decomposed) → {out_dir}")
     pg, problems = generate_page_decomposed(unit, provider, model, out_dir,
                                             neighbours=not args.no_neighbours)
@@ -371,7 +371,7 @@ def main() -> int:
     if args.review or args.fix:
         from coursekit.generate.page import evaluate as pev
         material = Path(unit.transcript_path).read_text(encoding="utf-8", errors="replace")
-        findings = pev.evaluate_page(pg, material, provider, model, week=unit.week_slug,
+        findings = pev.evaluate_page(pg, material, provider, model, week=unit.slug,
                                      project_root=unit.course_root)
         flagged = [f for f in findings if f.flagged]
         print(f"\ncold read: {len(flagged)}/{len(findings)} section(s) flagged")

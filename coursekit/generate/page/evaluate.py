@@ -101,16 +101,16 @@ def evaluate_page(page, material: str, provider, model: str, *, week: str = "",
 
 
 def _iter_page_jsons(path, weeks=None):
-    """Yield (label, page_json, transcript_path, project_root, week_slug) for EVERY page under the
+    """Yield (label, page_json, transcript_path, project_root, unit_slug) for EVERY page under the
     course's pages/ tree — the per-week teaching page AND its function siblings (`-glossary`,
-    `-overview`). `label` is the page dir name (distinguishes the siblings in a review); `week_slug`
-    is the base week, shared by a week's pages (for supplements + material). A page belongs to the unit
+    `-overview`). `label` is the page dir name (distinguishes the siblings in a review); `unit_slug`
+    is the base unit, shared by a unit's pages (for supplements + material). A page belongs to the unit
     the course model's index says (`course.review_items`), so a page moved by its `week_ref` is read
     against its new unit. Mirrors the quiz side's `_iter_quiz_banks` so evaluate and fix see the same set."""
     from coursekit.course import review_items
 
     for label, pj, material, run in review_items(path, "page", weeks):
-        yield label, pj, Path(material), run.course_root, run.week_slug
+        yield label, pj, Path(material), run.course_root, run.slug
 
 
 def evaluate_course_pages(path, *, weeks=None, provider, model, out_path=None,

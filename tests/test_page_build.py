@@ -71,7 +71,7 @@ def _with_map(u):
     from coursekit.generate.page.concept_map import Concept, ConceptMap, concept_map_path, save_concept_map
     save_concept_map(ConceptMap(week="3", enduring_understanding="Loops scale effort.",
                                 concepts=[Concept(name="For loops"), Concept(name="Nested loops")]),
-                     concept_map_path(u.course_root, u.week_num))
+                     concept_map_path(u.course_root, u.id))
     return u
 
 

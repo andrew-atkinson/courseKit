@@ -30,7 +30,7 @@ def write_page(out_dir, unit, steps: list[dict], *, read: dict, options: dict, m
     """A finished page's record: a new one, since every page build makes the whole page again."""
     records.write_steps(out_dir, [{**s, "by": by, "read": read, "model": model, "options": options}
                                   for s in steps],
-                        kind="page", unit=unit.week_num or unit.week_slug, outputs=PAGE_OUTPUTS, fresh=True)
+                        kind="page", unit=unit.id, outputs=PAGE_OUTPUTS, fresh=True)
 
 
 def write_fix(out_dir, model: str, *, edited: bool = False) -> None:
@@ -44,13 +44,14 @@ def write_fix(out_dir, model: str, *, edited: bool = False) -> None:
 def write_map(unit, step: str, messages, read: dict, model: str, *, fresh: bool = False) -> None:
     """A step of `analyze` on a unit's concept map, recorded beside it (`week-7.record.json`)."""
     from coursekit.generate.page.concept_map import concept_map_path
-    path = concept_map_path(unit.course_root, unit.week_num)
-    materials = f"week-{unit.week_num}.materials.json"
+    from coursekit.generate.page.segment import materials_path
+    path = concept_map_path(unit.course_root, unit.id)
+    materials = materials_path(unit.course_root, unit.id).name
     outputs = (path.name,) + ((materials,) if step == "segment" else ())
     records.write_steps(path.parent, [{"step": step, "by": "model", "brief": records.digest(messages), "read": read,
                                        "model": model, "wrote": [materials if step == "segment" else path.name],
                                        "options": {"text": str(Path(unit.transcript_path).resolve())}}],
-                        kind="concept_map", unit=unit.week_num, outputs=outputs, fresh=fresh,
+                        kind="concept_map", unit=unit.id, outputs=outputs, fresh=fresh,
                         name=records.name_for(path))
 
 
@@ -59,8 +60,10 @@ def deterministic(unit, function: str):
     from coursekit.generate.overview import build_week_overview, build_week_recap
     from coursekit.generate.page.concept_map import load_for_unit
     builder = build_week_overview if function == "overview" else build_week_recap
-    return builder(unit.course_title or "Course", unit.week_num, unit.week_label or unit.week_slug,
-                   unit.module or "", load_for_unit(unit))
+    from coursekit.courseconfig import week_key
+    # ponytail: `num` only prefixes the title ("Week 7: …"), doubling a label that already says it; CORE-5.3's labels replace it
+    return builder(unit.course_title or "Course", week_key(unit.id), unit.label or unit.slug,
+                   unit.module or "", load_for_unit(unit), ref=unit.slug)
 
 
 def rebuild(rec: dict, step: dict, art_dir) -> list | dict:

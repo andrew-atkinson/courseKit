@@ -178,10 +178,11 @@ def read_week_knowledge(path, *, week: str = "") -> WeekKnowledge:
 
 # ------------------------------------------------------------- editable-artifact IO
 
-def concept_map_path(course_root, week_key: str) -> Path:
-    """Where a week's concept map lives: `.vtconfig/concepts/week-<key>.yaml`, beside the pages
-    supplements — instructor-editable, the same `.vtconfig/` home as `context.yaml` and `domain.md`."""
-    return Path(course_root) / ".vtconfig" / "concepts" / f"week-{week_key}.yaml"
+def concept_map_path(course_root, unit_id: str) -> Path:
+    """Where a unit's concept map lives: `.vtconfig/concepts/<unit slug>.yaml` (`week-3.yaml` for week 3),
+    beside the pages supplements — instructor-editable, the same `.vtconfig/` home as `context.yaml`."""
+    from coursekit.course import unit_slug
+    return Path(course_root) / ".vtconfig" / "concepts" / f"{unit_slug(unit_id)}.yaml"
 
 
 def load_concept_map(path) -> ConceptMap | None:
@@ -207,10 +208,10 @@ def save_concept_map(cm: ConceptMap, path) -> Path:
 
 
 def load_for_unit(unit) -> ConceptMap | None:
-    """The concept map for a discovered `unit`, or None when there is none — no course root, no unit
-    number, or no map file yet (run `analyze`). A map that exists but is unreadable or invalid raises
+    """The concept map for a discovered `unit`, or None when there is none — no course root
+    or no map file yet (run `analyze`). A map that exists but is unreadable or invalid raises
     (see `load_concept_map`): it is not the same as having no map. Shared by the page and quiz
     generators (the analyze artifact isn't page-specific)."""
-    if not unit.course_root or not unit.week_num:
+    if not unit.course_root:
         return None
-    return load_concept_map(concept_map_path(unit.course_root, unit.week_num))
+    return load_concept_map(concept_map_path(unit.course_root, unit.id))

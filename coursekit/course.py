@@ -86,13 +86,12 @@ class Course:
         """One generation run over `unit` — a `discover.Unit`, built here and only here. Artifacts go to
         `<root>/<subdir>/<slug>` (or `<output_root>/<course>/<slug>`); the slug keeps today's on-disk names."""
         from coursekit import discover
-        num = courseconfig.week_key(unit.id)
-        slug = _run_slug(unit.id)
+        slug = unit_slug(unit.id)
         course_slug = discover.slugify(self.title or self.root.name)
         out = Path(output_root) / course_slug / slug if output_root else self.root / subdir / slug
         has_root = (self.root / courseconfig.VTCONFIG_DIR_NAME).is_dir()
-        return discover.Unit(transcript_path=unit.doc, week_slug=slug, output_dir=out, course_slug=course_slug,
-                             week_label=unit.label, week_num=num, course_title=self.title, module=unit.module,
+        return discover.Unit(transcript_path=unit.doc, id=unit.id, slug=slug, output_dir=out, course_slug=course_slug,
+                             label=unit.label, order=unit.order, course_title=self.title, module=unit.module,
                              course_root=self.root if has_root else None,
                              config=courseconfig.load(unit.doc or self.root, config_name="quiz.yaml"))
 
@@ -170,13 +169,11 @@ def review_items(path, kind: str, weeks=None) -> list[tuple]:
     runs = discover.find_units(p, subdir=_IR[kind][0])
     if weeks:
         runs = [r for r in runs if any(_week_matches(w, r) for w in weeks)]
-    ids = {_run_slug(u.id): u.id for u in course.units}
     out, seen = [], set()
     for run in runs:
-        uid = ids.get(run.week_slug, run.week_num or run.week_slug)
-        for a in sorted(course.artifacts_for(kind=kind, unit=uid), key=lambda a: (a.slug != run.week_slug, a.slug)):
+        for a in sorted(course.artifacts_for(kind=kind, unit=run.id), key=lambda a: (a.slug != run.slug, a.slug)):
             source = a.path.parent / "source.md"
-            material = run.transcript_path if kind == "page" or a.slug == run.week_slug else (
+            material = run.transcript_path if kind == "page" or a.slug == run.slug else (
                 source if source.exists() else None)
             if material is not None:
                 out.append((a.slug, a.path, material, run))
@@ -190,8 +187,9 @@ def review_items(path, kind: str, weeks=None) -> list[tuple]:
     return out
 
 
-def _run_slug(unit_id: str) -> str:
-    """The folder a unit's artifacts live in: `week-3` for a numbered unit, else its slugified id."""
+def unit_slug(unit_id: str) -> str:
+    """A unit's name on disk — its artifact folders, its concept map, its materials: `week-3` for a numbered
+    unit (today's names, kept), else its slugified id. The one place the `week-N` naming rule lives."""
     from coursekit import discover
     num = courseconfig.week_key(unit_id)
     return f"week-{num}" if num else discover.slugify(unit_id)
@@ -280,7 +278,7 @@ def _artifacts(root: Path, ids: set[str]) -> tuple[list[Artifact], list[Path]]:
         for p in sorted(root.glob(f"{folder}/*/{name}")):
             ref = _ref(p, unreadable) if kind != "quiz" else None   # a bank is owned by its folder
             out.append(Artifact(kind=kind, unit=owner(ref, p.parent.name, ids), slug=p.parent.name, path=p))
-    for p in sorted(root.glob(".vtconfig/concepts/week-*.yaml")):
+    for p in sorted(root.glob(".vtconfig/concepts/*.yaml")):
         out.append(Artifact(kind="concept_map", unit=owner(None, p.stem, ids), slug=p.stem, path=p))
     for p in sorted(root.glob("overview/*.json")):
         if p.name.endswith(".record.json"):                 # an overview's record, beside it — not an overview

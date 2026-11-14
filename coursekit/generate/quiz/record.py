@@ -84,7 +84,7 @@ def write(art_dir, unit, step: str, *, opts: dict | None = None, model: str | No
     if brief is None and step in ("eu", "intro"):
         with records.reading() as read:
             brief = records.digest(rebuild({}, {"step": step, "options": opts or {}}, art_dir))
-    records.write_step(art_dir, kind="quiz", unit=(unit.week_num or unit.week_slug) if unit else None,
+    records.write_step(art_dir, kind="quiz", unit=unit.id if unit else None,
                        step=step, by=by, outputs=OUTPUTS, brief=brief, read=read, model=model,
                        options=opts, fresh=fresh, edited=edited)
 

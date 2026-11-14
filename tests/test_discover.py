@@ -26,8 +26,8 @@ def test_single_file_yields_one_unit(tmp_path):
     units = find_units(f)
     assert len(units) == 1
     assert units[0].transcript_path == f.resolve()
-    assert units[0].week_slug == "week-3"
-    assert units[0].week_num == "3"          # carried, so consumers don't re-derive it from the slug
+    assert units[0].slug == "week-3"
+    assert units[0].id == "3"                # the course model's unit id, carried on the run
 
 
 def test_single_file_without_vtconfig_anchors_output_beside_it(tmp_path):
@@ -42,9 +42,9 @@ def test_non_week_filename_still_works(tmp_path):
     f = tmp_path / "lecture-notes.md"
     f.write_text("body", encoding="utf-8")
     unit = find_units(f)[0]
-    assert unit.week_slug == "lecture-notes"
-    assert unit.week_label == "lecture-notes"
-    assert unit.week_num is None             # a non-week unit carries no number
+    assert unit.slug == "lecture-notes"
+    assert unit.label == "lecture-notes"
+    assert unit.id == "lecture-notes"        # a non-week unit's id is its own name
 
 
 # ------------------------------------------------------- directory
@@ -58,7 +58,7 @@ def test_directory_finds_combined_week_docs_only(tmp_path):
     (tmp_path / "week 4" / "week-4.md").write_text("w4", encoding="utf-8")
 
     units = find_units(tmp_path)
-    slugs = sorted(u.week_slug for u in units)
+    slugs = sorted(u.slug for u in units)
     assert slugs == ["week-3", "week-4"]  # the per-video .md is excluded
 
 
@@ -93,7 +93,7 @@ def test_vtconfig_enriches_course_and_week(tmp_path):
     unit = find_units(root / "output" / "week 3" / "week-3.md")[0]
     assert unit.course_root == root.resolve()
     assert unit.course_title == "CC101_01FA00 SPECIAL TOPICS-ART AND DESIGN"
-    assert unit.week_label == "Week 3: Repetition"
+    assert unit.label == "Week 3: Repetition"
     assert unit.module == "Module 2 - Chaos and Control"
 
 
@@ -186,11 +186,11 @@ def test_manifest_declared_weeks_drive_discovery_with_arbitrary_doc_names(tmp_pa
     (root / "docs" / "composition.md").write_text("composition body", encoding="utf-8")
 
     units = find_units(root)
-    assert [u.week_slug for u in units] == ["week-3", "week-4"]
+    assert [u.slug for u in units] == ["week-3", "week-4"]
     u3 = units[0]
-    assert u3.week_num == "3"
+    assert u3.id == "3"
     assert u3.transcript_path == (root / "docs" / "exposure.md").resolve()   # arbitrary name works
-    assert u3.week_label == "Week 3: Exposure" and u3.module == "Unit 2"
+    assert u3.label == "Week 3: Exposure" and u3.module == "Unit 2"
     assert u3.course_root == root.resolve()
     assert u3.output_dir == (root / "quizzes" / "week-3").resolve()
 
@@ -218,7 +218,7 @@ def test_manifest_skips_a_declared_week_whose_doc_is_not_on_disk(tmp_path):
     """))
     (root / "docs").mkdir()
     (root / "docs" / "w3.md").write_text("body", encoding="utf-8")     # w5 intentionally absent
-    assert [u.week_slug for u in find_units(root)] == ["week-3"]
+    assert [u.slug for u in find_units(root)] == ["week-3"]
 
 
 def test_decoration_only_context_still_uses_the_glob(tmp_path):
@@ -232,6 +232,6 @@ def test_decoration_only_context_still_uses_the_glob(tmp_path):
     (root / "output").mkdir()
     (root / "output" / "week-3.md").write_text("body", encoding="utf-8")
     units = find_units(root)
-    assert [u.week_slug for u in units] == ["week-3"]
+    assert [u.slug for u in units] == ["week-3"]
     assert units[0].transcript_path == (root / "output" / "week-3.md").resolve()   # from the glob
-    assert units[0].week_label == "Week 3: T"                                       # still enriched
+    assert units[0].label == "Week 3: T"                                       # still enriched

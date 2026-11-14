@@ -3,8 +3,8 @@
 The primary input is a markdown file or a directory of them, so coursekit works on any file set;
 a `.vtconfig/` root found above it enriches each unit with course/unit titles, but its absence is
 never an error. The units themselves come from the course model (`coursekit/course.py`), and each
-run (`Unit` here — CORE-5 renames it) is built by `Course.run_target`, the one place output paths
-are resolved. Artifacts live with the course (a sibling `quizzes/` tree), never in the app.
+run (`Unit` here: the course model's unit, plus where the run reads and writes) is built by
+`Course.run_target`, the one place output paths are resolved. Artifacts live with the course (a sibling `quizzes/` tree), never in the app.
 """
 
 import re
@@ -16,12 +16,12 @@ from coursekit import courseconfig, outcomes
 @dataclass
 class Unit:
     transcript_path: Path
-    week_slug: str
+    id: str                          # the course model's unit id: "3" for week 3, "intro" for a declared session
+    slug: str                        # the artifact folder's name: `course.unit_slug(id)`, or a document quiz's own
     output_dir: Path
     course_slug: str
-    week_label: str
-    week_num: str | None = None      # the bare week number ("3"), carried so consumers need not
-                                     # re-derive it with week_key(week_slug); None for a non-week unit
+    label: str
+    order: int = 0
     course_title: str | None = None
     module: str | None = None
     course_root: Path | None = None

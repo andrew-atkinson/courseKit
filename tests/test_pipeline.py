@@ -158,7 +158,7 @@ def test_weeks_filter_selects_matching_units(tmp_path):
 
     results = run_course(tmp_path, generator=QuizGenerator(), weeks=["4"], provider=FakeClient(script=[]),
                          model="fake", dry_run=True)
-    assert [r.unit.week_slug for r in results] == ["week-4"]
+    assert [r.unit.slug for r in results] == ["week-4"]
 
 
 @pytest.mark.parametrize("ref", ["3", "week-3", "week 3", 3])
@@ -642,7 +642,7 @@ def test_build_assignment_drafts_a_brief_and_rubric_via_the_loop(tmp_path):
     import types
     from coursekit.generate.assignment import build as ab
     (tmp_path / "week-3.md").write_text("loops and iteration", encoding="utf-8")
-    unit = types.SimpleNamespace(course_slug="c", week_slug="week-3",
+    unit = types.SimpleNamespace(course_slug="c", id="3", slug="week-3",
                                  transcript_path=tmp_path / "week-3.md", course_root=tmp_path)
     provider = FakeClient(script=[
         [("set_assignment", {"title": "Apply loops",

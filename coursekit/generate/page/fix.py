@@ -126,18 +126,18 @@ def fix_course_pages(path, *, weeks=None, provider, model, reads: int = pev.DEFA
     return outcomes
 
 
-def _rerender(page_obj, out_dir, course_root, week_slug) -> None:
+def _rerender(page_obj, out_dir, course_root, unit_slug) -> None:
     """Re-render the page HTML after the fixes, merging supplements + theme (mirrors the generator).
     A render failure must not lose the fixes (already saved to page.json), so it doesn't raise — but the
     HTML is now older than page.json, so it is recorded with how to catch up, never swallowed.
-    Supplements key off the base `week_slug` (shared by a week's teaching + function pages)."""
+    Supplements key off the base `unit_slug` (shared by a unit's teaching + function pages)."""
     try:
         from coursekit.emit import html as html_emit
         from coursekit.generate.page.renderer import load_supplements
         from coursekit.generate.page.style import load_style
-        supplements = load_supplements(course_root, week_slug)
+        supplements = load_supplements(course_root, unit_slug)
         html_emit.write_html(page_obj, Path(out_dir), supplements, load_style(course_root))
     except Exception as e:
-        outcomes.warn("fix.html_stale", f"  {week_slug}: fixes saved to page.json, but the HTML wasn't "
+        outcomes.warn("fix.html_stale", f"  {unit_slug}: fixes saved to page.json, but the HTML wasn't "
                       f"re-rendered ({type(e).__name__}: {e}) — run `coursekit emit html` once that's "
-                      f"resolved.", unit=week_slug, error_type=type(e).__name__)
+                      f"resolved.", unit=unit_slug, error_type=type(e).__name__)

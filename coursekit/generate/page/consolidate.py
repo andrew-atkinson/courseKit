@@ -128,7 +128,7 @@ def analyze_brief(unit) -> list[dict]:
 
     from coursekit import records
     cfg = courseconfig.load(unit.transcript_path, config_name="page.yaml")
-    wk = read_week_knowledge(unit.transcript_path, week=unit.week_label or unit.week_slug)
+    wk = read_week_knowledge(unit.transcript_path, week=unit.label or unit.slug)
     if wk.kcs:
         return _messages("consolidate", _bundle_for_prompt(wk), domain=cfg.domain, project_root=unit.course_root)
     records.note(unit.transcript_path)
@@ -148,18 +148,18 @@ def analyze_unit(unit, provider, model: str):
     with records.reading() as read:
         messages = analyze_brief(unit)
     cm = _parse(provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE),
-                unit.week_label or unit.week_slug)
-    path = cmap.save_concept_map(cm, cmap.concept_map_path(unit.course_root, unit.week_num))
+                unit.label or unit.slug)
+    path = cmap.save_concept_map(cm, cmap.concept_map_path(unit.course_root, unit.id))
     record.write_map(unit, "analyze", messages, read, model, fresh=True)
     try:
         with records.reading() as read:
             plan = seg.brief(unit)
         mats = seg.segment(plan, provider, model) if plan else {}
         if mats:
-            seg.save_materials(mats, seg.materials_path(unit.course_root, unit.week_num))
+            seg.save_materials(mats, seg.materials_path(unit.course_root, unit.id))
             record.write_map(unit, "segment", plan[2], read, model)
     except Exception as e:
         mats = {}
-        outcomes.warn("analyze.segment_skipped", f"  (segmentation skipped for {unit.week_label or unit.week_slug}: "
-                                                 f"{type(e).__name__}: {e})", unit=unit.week_slug)
+        outcomes.warn("analyze.segment_skipped", f"  (segmentation skipped for {unit.label or unit.slug}: "
+                                                 f"{type(e).__name__}: {e})", unit=unit.slug)
     return cm, path, len(mats)

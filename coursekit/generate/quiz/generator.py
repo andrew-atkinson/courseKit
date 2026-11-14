@@ -33,8 +33,8 @@ class QuizGenerator:
     def reset(self, unit: Unit, out_dir: Path) -> None:
         # Fresh per-unit state: run_course reuses one generator, and one week's groups, checklist, and
         # call log must not carry into the next.
-        self.draft = bank.BankDraft.new(f"{unit.course_slug}-{unit.week_slug}", out_dir,
-                                        title=unit.week_label, source=unit.transcript_path.name)
+        self.draft = bank.BankDraft.new(f"{unit.course_slug}-{unit.slug}", out_dir,
+                                        title=unit.label, source=unit.transcript_path.name)
         self.tools = tools.QuizTools(self.draft, call_log=out_dir / "calls.jsonl")
         self._expected_groups = None   # set by build_messages from this unit's brief
         self._overrides = None         # this run's per-run config, set by record_step
@@ -60,7 +60,7 @@ class QuizGenerator:
         concepts = getattr(cm, "concepts", None) if cm is not None else None
         self._expected_groups = int(q) if q else (len(concepts) if concepts else None)
         return build_messages(
-            transcript, course_title=unit.course_title, week_label=unit.week_label,
+            transcript, course_title=unit.course_title, week_label=unit.label,
             module=unit.module, project_root=unit.course_root,
             system_prompt=cfg.prompt_name("system_prompt", default="system"),
             task_prompt=cfg.prompt_name("task_prompt", default="task"),
@@ -109,7 +109,7 @@ class QuizGenerator:
         from coursekit import outcomes
         from coursekit.generate.page.concept_map import load_for_unit
         from coursekit.generate.quiz import eu as eu_pass
-        where = unit.week_slug
+        where = unit.slug
         if not self.draft.is_finalized():
             outcomes.warn("eu.skipped", f"  {where}: no EU question — the quiz itself didn't finish.",
                           unit=where, reason="quiz_not_finalized")

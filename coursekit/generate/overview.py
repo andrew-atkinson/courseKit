@@ -29,9 +29,11 @@ def _blocks(pairs) -> dict:
 
 
 # --------------------------------------------------------------------------- deterministic builders
-def build_week_overview(course_title: str, num, title: str, module: str, cm, *, framing: str = "") -> Page:
+def build_week_overview(course_title: str, num, title: str, module: str, cm, *, framing: str = "",
+                        ref: str | None = None) -> Page:
     """A week 'Start Here': orientation + the big idea + what-you'll-cover + objectives, all from the
-    concept map. `framing` (a model blurb) replaces the default intro when supplied."""
+    concept map. `framing` (a model blurb) replaces the default intro when supplied. `ref` is the unit's name
+    on disk (`week-7`, `intro`), which names the page; it defaults to `week-<num>`."""
     intro = framing or ((f"This week — {title} — is part of {module}. " if module else f"This is {title}. ")
                         + "Here is what it covers and why it matters.")
     pairs = [("intro", "paragraph", {"text": intro})]
@@ -46,13 +48,14 @@ def build_week_overview(course_title: str, num, title: str, module: str, cm, *, 
         if objectives:
             pairs.append(("obj-h", "heading", {"text": "By the end, you'll be able to", "role": "practice"}))
             pairs.append(("obj", "bullets", {"items": objectives}))
-    slug = f"week-{num}-overview"
+    ref = ref or (f"week-{num}" if num else None)
+    slug = f"{ref or slugify(title)}-overview"
     return Page(page_id=f"{slugify(course_title)}-{slug}", page_type="week_overview",
                 title=f"Week {num}: {title}" if num else title,
-                week_ref=f"week-{num}" if num else None, slug=slug, blocks=_blocks(pairs), finalized=True)
+                week_ref=ref, slug=slug, blocks=_blocks(pairs), finalized=True)
 
 
-def build_week_recap(course_title: str, num, title: str, module: str, cm) -> Page:
+def build_week_recap(course_title: str, num, title: str, module: str, cm, *, ref: str | None = None) -> Page:
     """A week RECAP: consolidation AFTER the week — the big idea to carry forward, then a
     predict-then-reveal recall of each concept. Assembled from the concept map (the retrieval
     foldouts are the point); the `review`-role heading + the details render as one Recap box."""
@@ -68,10 +71,11 @@ def build_week_recap(course_title: str, num, title: str, module: str, cm) -> Pag
             answer = c.gist or f"Look back at {c.name} in the week's material."
             pairs.append((f"recall-{i}", "details",
                           {"summary": f"Can you explain {c.name}?", "text": answer}))
-    slug = f"week-{num}-recap"
+    ref = ref or (f"week-{num}" if num else None)
+    slug = f"{ref or slugify(title)}-recap"
     return Page(page_id=f"{slugify(course_title)}-{slug}", page_type="week_recap",
                 title=f"Week {num}: {title} — Recap" if num else f"{title} — Recap",
-                week_ref=f"week-{num}" if num else None, slug=slug,
+                week_ref=ref, slug=slug,
                 blocks=_blocks(pairs), finalized=True)
 
 

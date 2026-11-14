@@ -75,10 +75,10 @@ def build_glossary_page(unit, provider, model, out_dir, *, project_root=None):
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    base = slugify(unit.week_label) if unit.week_label else unit.week_slug
-    draft = pageir.PageDraft.new(f"{unit.course_slug}-{unit.week_slug}-glossary", out_dir,
-                                 title=f"{unit.week_label or unit.week_slug} — Key Terms", page_type="glossary",
-                                 week_ref=unit.week_slug, slug=f"{base}-glossary")
+    base = slugify(unit.label) if unit.label else unit.slug
+    draft = pageir.PageDraft.new(f"{unit.course_slug}-{unit.slug}-glossary", out_dir,
+                                 title=f"{unit.label or unit.slug} — Key Terms", page_type="glossary",
+                                 week_ref=unit.slug, slug=f"{base}-glossary")
     session = tools.PageTools(draft, call_log=out_dir / "calls.jsonl")
 
     # No heading block: the glossary block is self-labeling (a framed "Key Terms" box), so a separate
@@ -133,7 +133,7 @@ def main() -> int:
     args = ap.parse_args()
 
     units = [u for u in find_units(args.course)
-             if u.week_slug.split("-")[-1] == args.week or u.week_label == args.week]
+             if u.slug.split("-")[-1] == args.week or u.label == args.week]
     if not units:
         print(f"No unit for week {args.week!r} under {args.course}.")
         return 1
@@ -144,7 +144,7 @@ def main() -> int:
     cfg = courseconfig.load(args.course, config_name="page.yaml")
     model = os.getenv("MODEL_NAME") or cfg.value("model")
 
-    out_dir = Path(unit.course_root) / "pages" / f"{unit.week_slug}-glossary"
+    out_dir = Path(unit.course_root) / "pages" / f"{unit.slug}-glossary"
     print(f"Glossary companion → {out_dir}")
     pg, problems = build_glossary_page(unit, provider, model, out_dir)
     print(f"\n{len(pg.blocks)} block(s), {'finalized' if not problems else 'NOT finalized'}")

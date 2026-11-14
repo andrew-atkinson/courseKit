@@ -211,7 +211,7 @@ def test_one_generator_reused_for_two_units_keeps_them_separate(tmp_path):
     assert a.finalized and b.finalized and a.counts == b.counts == {"blocks": 2}
     saved_a = json.loads((first.output_dir / "page.json").read_text())
     saved_b = json.loads((second.output_dir / "page.json").read_text())
-    assert list(saved_a["blocks"]) == ["a-h", "a-d"] and saved_a["week_ref"] == first.week_slug
-    assert list(saved_b["blocks"]) == ["b-h", "b-d"] and saved_b["week_ref"] == second.week_slug
+    assert list(saved_a["blocks"]) == ["a-h", "a-d"] and saved_a["week_ref"] == first.slug
+    assert list(saved_b["blocks"]) == ["b-h", "b-d"] and saved_b["week_ref"] == second.slug
     logged = [json.loads(l)["arguments"] for l in (second.output_dir / "calls.jsonl").read_text().splitlines()]
     assert "a-h" not in " ".join(logged) and "b-h" in " ".join(logged)
