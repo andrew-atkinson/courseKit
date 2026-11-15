@@ -21,4 +21,4 @@ Use only code and examples that appear in the material — never invent an examp
 
 When the material shows an idea EVOLVE — a version shown, then changed, corrected, or refined later — use the FINAL, latest form, not an earlier one. A lecture often demonstrates a naive or buggy first attempt before the working conclusion; the page should show the conclusion (use an earlier version only as an explicit, labelled wrong-vs-right contrast).
 
-Stay on THIS concept only — do not open other sections, do not add a heading, do not summarise the week. Give each block a short, stable block_id. No links or URLs.
+Stay on THIS concept only — do not open other sections, do not add a heading, do not summarise the {unit_noun}. Give each block a short, stable block_id. No links or URLs.

@@ -89,7 +89,7 @@ CATALOG: dict[str, Component] = {c.kind: c for c in [
         kind="glossary", name="Glossary",
         summary="Term/definition pairs for review.",
         functions=("reference",),
-        use_when="Collect a section's or a week's key terms for look-up.",
+        use_when="Collect a section's or a {unit_noun}'s key terms for look-up.",
         avoid_when="Not a substitute for teaching a term in context the first time it appears.",
         fields="entries[] (term, definition)"),
     Component(
@@ -111,7 +111,7 @@ CATALOG: dict[str, Component] = {c.kind: c for c in [
         kind="pullquote", name="Pull quote",
         summary="The one key idea, foregrounded.",
         functions=("signalling",),
-        use_when="Once per page — the week's enduring understanding.",
+        use_when="Once per page — the {unit_noun}'s enduring understanding.",
         avoid_when="More than one per page dilutes the signal.",
         fields="text, attribution?"),
     Component(
@@ -168,7 +168,7 @@ def unknown_components(content_type: str, kinds) -> list[str]:
 
 
 # ---- model-facing palette (COMP-3) — injected into the generation prompts as `{palette}` -----------
-def render_palette(content_type: str = "page", only=None) -> str:
+def render_palette(content_type: str = "page", only=None, noun: str = "week") -> str:
     """A terse, imperative component palette for the GENERATION prompt — the model-facing analog of
     `render_markdown`. Each line leads with the TOOL the model calls and the FUNCTION it serves, so
     the model composes BY FUNCTION. This is the single source the page prompts inject via `{palette}`,
@@ -180,7 +180,7 @@ def render_palette(content_type: str = "page", only=None) -> str:
     for c in components_for(content_type):
         if only is not None and c.kind not in only:
             continue
-        line = f"- `add_{c.kind}` ({', '.join(c.functions)}) — {c.use_when}"
+        line = f"- `add_{c.kind}` ({', '.join(c.functions)}) — {c.use_when.replace('{unit_noun}', noun)}"
         if c.variants:
             line += f" [{c.variants}]"
         if c.avoid_when:
@@ -218,7 +218,7 @@ def render_markdown() -> str:
         lines.append(f"### `{c.kind}` — {c.name}")
         lines.append(f"- **Serves:** {', '.join(c.functions)}")
         lines.append(f"- **What:** {c.summary}")
-        lines.append(f"- **Use when:** {c.use_when}")
+        lines.append(f"- **Use when:** {c.use_when.replace('{unit_noun}', 'unit')}")
         lines.append(f"- **Avoid:** {c.avoid_when}")
         if c.fields:
             lines.append(f"- **Fields:** {c.fields}")

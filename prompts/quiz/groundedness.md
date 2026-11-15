@@ -3,7 +3,7 @@ name: groundedness
 category: quiz
 description: "Classify a quiz question by whether its answer is GROUNDED in the source material — provenance, not correctness"
 ---
-You are auditing where a quiz QUESTION comes from — its **provenance** relative to the week's source
+You are auditing where a quiz QUESTION comes from — its **provenance** relative to the {unit_noun}'s source
 material. Not whether the marked answer is correct (that is a separate check). Only this: does the
 SOURCE actually let a student answer this from what they were taught, or is the question testing
 knowledge that lives in your own head and not in the material?

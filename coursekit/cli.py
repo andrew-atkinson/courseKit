@@ -294,7 +294,11 @@ def _cmd_config(args) -> int:
     if args.action == "set":
         if args.value is None:
             raise CoursekitError(f"`config set {args.key}` needs a value", code="settings.bad_key")
-        settings.set(root, args.key, yaml.safe_load(args.value))
+        value = yaml.safe_load(args.value)
+        if value is None:                                   # "", "null", "~": setting nothing would quietly remove it
+            raise CoursekitError(f"`config set {args.key}` needs a value — to remove the setting, use "
+                                 f"`config unset {args.key}`", code="settings.bad_value", details={"key": args.key})
+        settings.set(root, args.key, value)
         print(f"{args.key} = {settings.get(root, args.key)}")
         return 0
     settings.unset(root, args.key)                          # action == "unset"
@@ -486,8 +490,8 @@ def _cmd_generate_targeted(args) -> int:
 
 
 def _run_assignments(args) -> int:
-    """Draft one assignment per selected week → `assignments/<week>/assignment.json` (its own mode,
-    not the quiz/page seam). Scope defaults to the week; `--scope` names a wider brief."""
+    """Draft one assignment per selected unit → `assignments/<unit>/assignment.json` (its own mode,
+    not the quiz/page seam). Scope defaults to the unit; `--scope` names a wider brief."""
     from coursekit.discover import find_units
     from coursekit.generate.assignment import build as ab
     from coursekit.pipeline import unit_matches
@@ -981,8 +985,9 @@ def build_parser() -> argparse.ArgumentParser:
     which.add_argument("--pages", action="store_true", help="only pages (default: both)")
     which.add_argument("--assignments", action="store_true",
                        help="draft assignments (brief + rubric) instead of quizzes/pages")
-    pg.add_argument("--scope", default="this week",
-                    help="assignments only: what the assignment covers (default: 'this week')")
+    pg.add_argument("--scope",
+                    help="assignments only: what the assignment covers (default: 'this week', in the course's "
+                         "word for a unit)")
     pg.add_argument("--unit", action="append", metavar="ID", help="a unit to include, by id or title, repeatable")
     pg.add_argument("--week", action="append", metavar="N",
                     help="a week to include, repeatable, e.g. --week 3 --week 5")

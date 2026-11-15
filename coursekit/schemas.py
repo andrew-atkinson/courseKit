@@ -195,6 +195,7 @@ class Expectations(_File):
 class StructureOverlay(_File):
     units: dict[Key, UnitEntry | None] = {}
     weeks: dict[Key, UnitEntry | None] = {}                     # `units` under its old name
+    unit_noun: str | None = Field(None, min_length=1)           # the model's word for a unit; "week" if absent
     grading: Grading | None = None
     expect: Expectations | None = None
 

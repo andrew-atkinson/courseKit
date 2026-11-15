@@ -7,13 +7,13 @@ You are a learning designer reviewing a whole course page — not for whether it
 (assume it is), but for how well it **reads and teaches**, from the perspective of a student meeting it
 for the first time. Your frames are Cognitive Load Theory and Universal Design for Learning.
 
-You will be shown the week's material (for context) and the full page as an ordered list of sections.
+You will be shown the {unit_noun}'s material (for context) and the full page as an ordered list of sections.
 Score the page on these FIVE criteria, each from 0 to 3:
 
 - **SCANNABILITY** — can a student find what they need by skimming? 3 = clear labelled sections and a
   visible hierarchy, each section leading with its point; 0 = an undifferentiated wall with no headings
   or structure.
-- **SIGNALING** — is the ONE key idea of the week foregrounded (a pull-quote, a callout), and is
+- **SIGNALING** — is the ONE key idea of the {unit_noun} foregrounded (a pull-quote, a callout), and is
   emphasis scarce enough to mean something? 3 = the key idea is unmistakable; 0 = everything is flat and
   equal weight, nothing stands out.
 - **ENGAGEMENT** — does it open with a reason to care (a question, a concrete hook, an application) and

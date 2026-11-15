@@ -87,8 +87,8 @@ def _parse_verdict(reply: str) -> tuple[str, str, str]:
 
 
 def _one_read(critic: str, transcript: str, v, provider, model: str,
-              *, seed: int | None = None) -> tuple[str, str, str]:
-    user = (f"The week's teaching material:\n<material>\n{transcript}\n</material>\n\n"
+              *, seed: int | None = None, noun: str = "week") -> tuple[str, str, str]:
+    user = (f"The {noun}'s teaching material:\n<material>\n{transcript}\n</material>\n\n"
             f"The question to review:\n{_format_question(v)}\n\nEvaluate this question.")
     messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]
     kwargs = {"model": model, "messages": messages, "temperature": READ_TEMPERATURE}
@@ -124,12 +124,12 @@ def _critic_body(category: str, project_root, name: str = "critic") -> str:
     return courseconfig.critic_domain_preface(domain) + body
 
 
-def _reads_for(critic, transcript, v, provider, model, reads, seed_base=None):
+def _reads_for(critic, transcript, v, provider, model, reads, seed_base=None, noun: str = "week"):
     """The per-read outcomes for one variant: `reads` independent cold reads, each seeded distinctly
     when `seed_base` is given. Returns [(verdict, concern, fix), ...]. The single gather that both the
     Finding-producing evaluate_bank and the raw-verdict read_verdicts sit on."""
     return [_one_read(critic, transcript, v, provider, model,
-                      seed=None if seed_base is None else seed_base + i)
+                      seed=None if seed_base is None else seed_base + i, noun=noun)
             for i in range(max(1, reads))]
 
 
@@ -139,11 +139,11 @@ def evaluate_bank(bank, transcript: str, provider, model: str, *, week: str = ""
     flag if any flags. That is what turns a noisy local critic ('a different 3 of 4 each run') into a
     dependable one. `progress(msg)`, when given, is called after each question — a live heartbeat for a
     slow local model."""
-    critic = _critic_body(EVALUATE_CATEGORY, project_root)
+    critic, noun = _critic_body(EVALUATE_CATEGORY, project_root), prompts.unit_noun(project_root)
     findings = []
     for g in bank.groups.values():
         for v in g.variants.values():
-            results = _reads_for(critic, transcript, v, provider, model, reads)
+            results = _reads_for(critic, transcript, v, provider, model, reads, noun=noun)
             verdict, concern, fix, n_flag = _union(results)
             if progress:
                 progress(f"  {'⚑' if verdict == 'FLAG' else '·'} {week} {g.group_id}/{v.label} — {verdict}")
@@ -158,11 +158,11 @@ def read_verdicts(bank, transcript: str, provider, model: str, *, reads: int = D
     harness needs to see what each cold read caught and what the union adds. Returns
     (group_id, label, stem, [verdict per read]). When `seed_base` is set, read i uses seed
     `seed_base + i`, so the reads are distinct samples rather than the same one repeated."""
-    critic = _critic_body(EVALUATE_CATEGORY, project_root)
+    critic, noun = _critic_body(EVALUATE_CATEGORY, project_root), prompts.unit_noun(project_root)
     out = []
     for g in bank.groups.values():
         for v in g.variants.values():
-            reads_out = _reads_for(critic, transcript, v, provider, model, reads, seed_base)
+            reads_out = _reads_for(critic, transcript, v, provider, model, reads, seed_base, noun)
             verdicts = [verdict for verdict, _, _ in reads_out]
             out.append((g.group_id, v.label, v.question_text.strip(), verdicts))
     return out

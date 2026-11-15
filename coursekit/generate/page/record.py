@@ -57,12 +57,13 @@ def write_map(unit, step: str, messages, read: dict, model: str, *, fresh: bool 
 
 def deterministic(unit, function: str):
     """A model-free overview or recap page, assembled from the unit's concept map."""
+    from coursekit import prompts
     from coursekit.generate.overview import build_week_overview, build_week_recap
     from coursekit.generate.page.concept_map import load_for_unit
     builder = build_week_overview if function == "overview" else build_week_recap
     # The unit's label is the title ("Week 7: Objects"); a week number would prefix it a second time.
     return builder(unit.course_title or "Course", None, unit.label or unit.slug,
-                   unit.module or "", load_for_unit(unit), ref=unit.slug)
+                   unit.module or "", load_for_unit(unit), ref=unit.slug, noun=prompts.unit_noun(unit.course_root))
 
 
 def rebuild(rec: dict, step: dict, art_dir) -> list | dict:

@@ -45,7 +45,7 @@ def fix_one_block(session, finding, material: str, provider, model: str, *, crit
     before_dump = b.model_dump()
     tool_name = f"add_{kind}"
     system = _fixer_body(project_root)
-    user = (f"The week's teaching material:\n<material>\n{material}\n</material>\n\n"
+    user = (f"The {prompts.unit_noun(project_root)}'s teaching material:\n<material>\n{material}\n</material>\n\n"
             f"A reviewer flagged this page section:\n{pev._format_block(b)}\n\n"
             f"The reviewer's concern:\n{finding.concern or '(the section is wrong or its code will not run)'}\n\n"
             f"Correct it: call {tool_name} with block_id '{block_id}' (the same id, so it REPLACES "

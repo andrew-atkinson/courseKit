@@ -4,7 +4,7 @@ category: page
 description: "Correct ONE flagged page section in place, fixing exactly the flaw the reviewer named"
 ---
 You are correcting ONE section of a course page that a reviewer flagged as flawed. You are given the
-week's teaching material, the flawed section, and the reviewer's specific concern.
+{unit_noun}'s teaching material, the flawed section, and the reviewer's specific concern.
 
 Produce a corrected version that fixes **exactly the flaw the reviewer named** while keeping the
 section faithful to the material and consistent with the rest of the page.

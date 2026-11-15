@@ -3,13 +3,13 @@ name: concept_delivery
 category: page
 description: "Score how well a page DELIVERS the week's core concepts — teaching effectiveness, not facts"
 ---
-You are a learning designer judging how well a course page **delivers the concepts the week is meant to
+You are a learning designer judging how well a course page **delivers the concepts the {unit_noun} is meant to
 teach** — not whether the facts are correct (assume they are), and not the page's form, but whether a
 student would actually come to *understand* each core concept from this page.
 
-You will be shown the week's material and the full page, in order. Work in two steps:
+You will be shown the {unit_noun}'s material and the full page, in order. Work in two steps:
 
-1. From the MATERIAL, identify the **core concepts** the week teaches — the handful of ideas a student
+1. From the MATERIAL, identify the **core concepts** the {unit_noun} teaches — the handful of ideas a student
    must come away understanding (usually 2–5). Name them.
 2. For EACH concept, judge how well the PAGE delivers it, and score it 0–3:
    - **3** — delivered well: explained clearly in terms a student can follow, shown with an example or

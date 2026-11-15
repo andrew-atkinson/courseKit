@@ -20,7 +20,7 @@ wrong SOURCE (upstream); tension + facticity FAIL ≈ a model error to fix.
 import re
 from dataclasses import dataclass, field
 
-from coursekit import atomic
+from coursekit import atomic, prompts
 from coursekit.generate.critic import ask as ask_critic
 from coursekit.generate.page.evaluate import _SKIP_KINDS, _format_block
 from coursekit.generate.quiz.evaluate import READ_TEMPERATURE, _critic_body
@@ -96,13 +96,14 @@ def evaluate_page_groundedness(page, material: str, provider, model: str, *, wee
     every section is examined. A block whose critic call fails is listed in `unchecked` (and kept out of
     the coverage) rather than silently contributing nothing."""
     critic = _critic_body(GROUNDEDNESS_CATEGORY, project_root, name="groundedness")
+    noun = prompts.unit_noun(project_root)
     claims: list[Claim] = []
     raw_parts: list[str] = []
     unchecked: list[str] = []
     for b in page.blocks.values():
         if b.kind in _SKIP_KINDS:                    # a heading is a label, not a claim to trace
             continue
-        user = (f"The week's source material:\n<material>\n{material}\n</material>\n\n"
+        user = (f"The {noun}'s source material:\n<material>\n{material}\n</material>\n\n"
                 f"The page section to classify:\n{_format_block(b)}\n\n"
                 f"Classify each substantive claim in THIS section by its provenance against the material.")
         messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]

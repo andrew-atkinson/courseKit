@@ -16,7 +16,7 @@ Discovery reuses `_iter_quiz_banks`, so it covers whole-week AND targeted quizze
 import re
 from dataclasses import dataclass, field
 
-from coursekit import atomic
+from coursekit import atomic, prompts
 from coursekit.generate.critic import ask as ask_critic
 from coursekit.generate.quiz.evaluate import (
     READ_TEMPERATURE,
@@ -88,12 +88,13 @@ def evaluate_bank_groundedness(bank, material: str, provider, model: str, *, qui
     """Classify each quiz variant's provenance against the material, question by question. A question
     whose critic call fails is listed in `unchecked` (and kept out of the coverage), not dropped."""
     critic = _critic_body(GROUNDEDNESS_CATEGORY, project_root, name="groundedness")
+    noun = prompts.unit_noun(project_root)
     items: list[GroundItem] = []
     raw_parts: list[str] = []
     unchecked: list[str] = []
     for g in bank.groups.values():
         for v in g.variants.values():
-            user = (f"The week's source material:\n<material>\n{material}\n</material>\n\n"
+            user = (f"The {noun}'s source material:\n<material>\n{material}\n</material>\n\n"
                     f"The quiz question to classify:\n{_format_question(v)}\n\n"
                     f"Classify this question's provenance against the material.")
             messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]

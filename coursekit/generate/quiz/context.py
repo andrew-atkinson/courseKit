@@ -13,7 +13,7 @@ from coursekit import courseconfig, prompts
 QUIZ_CATEGORY = "quiz"
 
 
-def _shape_directive(concept_map, questions=None) -> str:
+def _shape_directive(concept_map, questions=None, noun: str = "week") -> str:
     """How many question groups, and covering what — the quiz analog of the page's concept checklist.
     The number is FLEXIBLE, not a hardcoded five: an explicit `questions` (quiz.yaml) fixes it (the
     user's choice); otherwise the week's concept map suggests it — one group per teaching concept, its
@@ -32,14 +32,14 @@ def _shape_directive(concept_map, questions=None) -> str:
             kcs = ", ".join(c.components) if getattr(c, "components", None) else ""
             out.append(f"  - {c.name}" + (f"  (aspects: {kcs})" if kcs else ""))
         if eu:
-            out.append(f"\nThe week's enduring understanding — the transferable idea the questions "
+            out.append(f"\nThe {noun}'s enduring understanding — the transferable idea the questions "
                        f"should keep pointing at, but NOT its own MC group (multiple choice can't test "
                        f"a transferable understanding): {eu}")
         return out
 
     if questions and concepts:                     # a fixed count, still grounded in the map
         lines = [f"\n\n**How many groups: create EXACTLY {questions} question groups.** Cover the "
-                 f"week's concepts, one group each:"] + _concept_lines()
+                 f"{noun}'s concepts, one group each:"] + _concept_lines()
         lines.append(f"\nIf {questions} is more than the concepts above, add a second group for the "
                      f"richest concepts; if fewer, cover the most important. Four variants per group.")
         d = "\n".join(lines)
@@ -47,8 +47,8 @@ def _shape_directive(concept_map, questions=None) -> str:
         d = (f"\n\n**How many groups.** Create EXACTLY {questions} question groups, one concept "
              f"each — the {questions} most important ideas the lecture teaches.")
     elif concepts:
-        lines = ["\n\n**How many groups — build the quiz to cover the week's concept map, not a fixed "
-                 "number.** The concepts this week teaches, each its own group:"] + _concept_lines()
+        lines = [f"\n\n**How many groups — build the quiz to cover the {noun}'s concept map, not a fixed "
+                 f"number.** The concepts this {noun} teaches, each its own group:"] + _concept_lines()
         lines.append("\nMake ONE group per concept above, its variants testing different aspects of "
                      "it. Where a concept's aspects clearly support more than one distinct question, "
                      "add a second group for it. Do NOT add an MC group for the enduring understanding "
@@ -103,6 +103,6 @@ def build_messages(transcript: str, *, course_title: str | None = None,
     )
     system_message = ("\n" + courseconfig.domain_preface(domain)
                       + courseconfig.quiz_voice_preface(voice) + body + "\n")
-    task_body = task.body + _shape_directive(concept_map, questions)
+    task_body = task.body + _shape_directive(concept_map, questions, prompts.unit_noun(project_root))
     return [{"role": "system", "content": system_message},
             {"role": "user", "content": "\n" + task_body + "\n"}]

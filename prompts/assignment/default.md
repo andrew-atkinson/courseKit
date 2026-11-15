@@ -34,7 +34,7 @@ Markdown (headings, block quotes, tables) — the instructions are rendered from
 
 3. `finalize_assignment` — last, once the brief and criteria are in.
 
-Match the assignment to the SCOPE you are given: a single week is a focused task; a wider scope
-(several weeks, earlier work) is a more integrative or cumulative task.
+Match the assignment to the SCOPE you are given: a single {unit_noun} is a focused task; a wider scope
+(several {unit_nouns}, earlier work) is a more integrative or cumulative task.
 
 Use tool calls only. Do not write prose outside them. Do not invent links or external resources.

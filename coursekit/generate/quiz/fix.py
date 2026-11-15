@@ -66,7 +66,7 @@ def fix_one(session, finding, transcript: str, provider, model: str, *, critic: 
     before_dump = before.model_dump()
     tool_name = _KIND_TO_TOOL[before.kind]
     system = _fixer_body(project_root)
-    user = (f"The week's teaching material:\n<material>\n{transcript}\n</material>\n\n"
+    user = (f"The {prompts.unit_noun(project_root)}'s teaching material:\n<material>\n{transcript}\n</material>\n\n"
             f"A reviewer flagged this question:\n{ev._format_question(before)}\n\n"
             f"The reviewer's concern:\n{finding.concern or '(the marked answer or the question is wrong)'}\n\n"
             f"Correct it: call {tool_name} with group_id '{gid}' and variant_label '{label}' "

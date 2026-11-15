@@ -7,7 +7,7 @@ description: "The brief - one group per concept (count set by the concept map or
 Build a question bank for this lecture.
 
 One question group per concept the lecture teaches. **How many groups** is set at the end of this
-brief — from the week's concept map, or the course's configuration; follow it, and let the content
+brief — from the {unit_noun}'s concept map, or the course's configuration; follow it, and let the content
 decide the number rather than forcing a fixed count. If the course's domain note asks for a particular
 kind of question or a subject emphasis, follow that too.
 

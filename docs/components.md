@@ -64,7 +64,7 @@ The artifacts these components compose into; each component's **Used in** says w
 ### `glossary` — Glossary
 - **Serves:** reference
 - **What:** Term/definition pairs for review.
-- **Use when:** Collect a section's or a week's key terms for look-up.
+- **Use when:** Collect a section's or a unit's key terms for look-up.
 - **Avoid:** Not a substitute for teaching a term in context the first time it appears.
 - **Fields:** entries[] (term, definition)
 - **Used in:** page
@@ -89,7 +89,7 @@ The artifacts these components compose into; each component's **Used in** says w
 ### `pullquote` — Pull quote
 - **Serves:** signalling
 - **What:** The one key idea, foregrounded.
-- **Use when:** Once per page — the week's enduring understanding.
+- **Use when:** Once per page — the unit's enduring understanding.
 - **Avoid:** More than one per page dilutes the signal.
 - **Fields:** text, attribution?
 - **Used in:** page

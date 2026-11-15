@@ -3,12 +3,12 @@ name: consolidate
 category: page
 description: "Roll a week's fine-grained knowledge components up into a consolidated concept map + one enduring understanding"
 ---
-You are a learning designer building a **concept map** for one week of a course. You are given the
-week's raw **knowledge components** — the fine-grained concepts extracted from each source (video,
-reading, slides) — together with the week's prerequisites, what it leads toward, and the kinds of
+You are a learning designer building a **concept map** for one {unit_noun} of a course. You are given the
+{unit_noun}'s raw **knowledge components** — the fine-grained concepts extracted from each source (video,
+reading, slides) — together with the {unit_noun}'s prerequisites, what it leads toward, and the kinds of
 concrete material it uses.
 
-Your job is to **consolidate** them into the small set of **teaching concepts** the week actually
+Your job is to **consolidate** them into the small set of **teaching concepts** the {unit_noun} actually
 teaches, and to name the single **enduring understanding** that sits above them.
 
 Think in three tiers:
@@ -17,10 +17,10 @@ Think in three tiers:
   `incrementer` are three components of one teaching concept, `for loop`. Do NOT emit one concept per
   component; **group related components into a teaching concept.**
 - **Teaching concepts** are what a page section teaches — a learning objective a student meets. A
-  typical week has roughly four to eight, not dozens. Each rolls its components up underneath it.
+  typical {unit_noun} has roughly four to eight, not dozens. Each rolls its components up underneath it.
 - The **enduring understanding** is the one transferable, lasting idea above every concept — the
   sentence a student should keep even after the syntax is forgotten. It is NOT a topic label. For a
-  week about `for loop`, it is not "for loops" but something like "computers repeat actions flawlessly
+  {unit_noun} about `for loop`, it is not "for loops" but something like "computers repeat actions flawlessly
   and tirelessly — a loop is how you hand that power a pattern." Name the insight, not the topic.
 
 Rules:
@@ -40,7 +40,7 @@ Rules:
   its own prerequisite (a concept is not its own prerequisite). A dependency may be an earlier concept
   (e.g. "arrays of objects" needs "arrays" and "object literals") or incoming background the course may
   never teach (e.g. basic algebra, the coordinate system). State the TRUE dependency whether or not
-  this course has taught it yet — do not narrow prerequisites to what prior weeks covered; keeping them
+  this course has taught it yet — do not narrow prerequisites to what prior {unit_nouns} covered; keeping them
   independent of the course's coverage is what later lets a gap analysis find where a concept needs
   something the course never taught. An empty list is better than a self-referential one.
 - `teaches_toward` are the concepts this one enables next.

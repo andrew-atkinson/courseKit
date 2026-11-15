@@ -36,7 +36,7 @@ DOCS = {
     "style": "style.yaml",
     "structure": "structure.coursekit.yaml",
 }
-_OVERLAY_SECTIONS = ("units", "weeks", "grading", "expect")      # top-level keys of the structure overlay
+_OVERLAY_SECTIONS = ("units", "weeks", "unit_noun", "grading", "expect")      # top-level keys of the structure overlay
 
 
 def _list_fields(model, seen=None) -> frozenset:

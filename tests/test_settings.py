@@ -102,5 +102,8 @@ def test_the_config_command(root, capsys):
     assert cli.main(["config", "show", str(root)]) == 0
     out = capsys.readouterr().out
     assert "# quiz\neu_question: true" in out and "# style" not in out              # nothing set there
+    assert cli.main(["config", "set", str(root), "quiz.eu_question", ""]) == 1        # nothing is not a value
+    assert "config unset quiz.eu_question" in capsys.readouterr().err
+    assert settings.get(root, "quiz.eu_question") is True                             # ...and it's still set
     assert cli.main(["config", "unset", str(root), "quiz.eu_question"]) == 0
     assert cli.main(["config", "check", str(root)]) == 0

@@ -4,7 +4,7 @@ category: ingest
 description: "Reshape raw extracted document text into a clean, teaching-ready week document"
 ---
 You are cleaning up the raw text extracted from a course reading, slide deck, or document so it can
-be used as a week's teaching material. The text below was pulled out of a PDF or slides, so it is
+be used as a {unit_noun}'s teaching material. The text below was pulled out of a PDF or slides, so it is
 messy: page numbers and running headers, words split across line breaks, columns run together,
 figure captions stranded mid-sentence.
 

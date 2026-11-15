@@ -82,8 +82,8 @@ def _call(prompt_name: str, user_content: str, provider, model: str, *, week: st
     return _parse(provider.chat(model=model, messages=messages, temperature=READ_TEMPERATURE), week)
 
 
-def _material(text: str) -> str:
-    return f"The week's teaching material:\n<material>\n{text}\n</material>"
+def _material(text: str, project_root) -> str:
+    return f"The {prompts.unit_noun(project_root)}'s teaching material:\n<material>\n{text}\n</material>"
 
 
 def consolidate(wk: WeekKnowledge, provider, model: str, *, week: str = "", domain: str = "",
@@ -103,7 +103,7 @@ def build_concept_map_from_text(text: str, provider, model: str, *, week: str = 
     """The fallback producer for a course with NO transcriber knowledge.json: read the week's teaching
     text directly and build the same `ConceptMap` (identify concepts, roll up components, name the
     enduring understanding). Same schema, same downstream consumers — only the source differs."""
-    return _call("extract", _material(text), provider, model, week=week, domain=domain, project_root=project_root)
+    return _call("extract", _material(text, project_root), provider, model, week=week, domain=domain, project_root=project_root)
 
 
 def build_concept_map(path, provider, model: str, *, week: str = "", domain: str = "",
@@ -133,7 +133,7 @@ def analyze_brief(unit) -> list[dict]:
         return _messages("consolidate", _bundle_for_prompt(wk), domain=cfg.domain, project_root=unit.course_root)
     records.note(unit.transcript_path)
     text = Path(unit.transcript_path).read_text(encoding="utf-8")
-    return _messages("extract", _material(text), domain=cfg.domain, project_root=unit.course_root)
+    return _messages("extract", _material(text, unit.course_root), domain=cfg.domain, project_root=unit.course_root)
 
 
 def analyze_unit(unit, provider, model: str):

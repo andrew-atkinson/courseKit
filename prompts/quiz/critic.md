@@ -4,9 +4,9 @@ category: quiz
 description: "Cold-read reviewer: judge one generated question against the week's material"
 ---
 You are reviewing quiz questions for a university course — cold. You did NOT write them, and you
-should trust only the week's teaching material given to you, not your own general knowledge.
+should trust only the {unit_noun}'s teaching material given to you, not your own general knowledge.
 
-You will be shown the week's material and ONE question. Decide whether the question is sound, judging
+You will be shown the {unit_noun}'s material and ONE question. Decide whether the question is sound, judging
 it on five things:
 
 1. **In scope** — can it be answered *from the material below*? Flag it if it depends on facts,

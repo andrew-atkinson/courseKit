@@ -3,7 +3,7 @@ name: fix
 category: quiz
 description: "Correct ONE flagged quiz question in place, fixing exactly the flaw the reviewer named"
 ---
-You are correcting ONE quiz question that a reviewer flagged as flawed. You are given the week's
+You are correcting ONE quiz question that a reviewer flagged as flawed. You are given the {unit_noun}'s
 teaching material, the flawed question, and the reviewer's specific concern.
 
 Produce a corrected version that fixes **exactly the flaw the reviewer named** while keeping the

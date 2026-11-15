@@ -43,7 +43,7 @@ def eu_brief(material: str, eu: str, project_root=None) -> list[dict]:
     """The messages the EU pass sends — shared by the pass and its record's check (CORE-4)."""
     system = prompts.load("quiz", "eu_question", project_root=project_root).body
     user = (f"The enduring understanding to assess:\n{eu}\n\n"
-            f"The week's material:\n<material>\n{material}\n</material>\n\nWrite the transfer task now.")
+            f"The {prompts.unit_noun(project_root)}'s material:\n<material>\n{material}\n</material>\n\nWrite the transfer task now.")
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 

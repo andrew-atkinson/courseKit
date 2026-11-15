@@ -175,7 +175,7 @@ class _AssignmentGenerator:
 
 
 # --------------------------------------------------------------- driver
-def brief(unit, *, material: str | None = None, scope: str = "this week", project_root=None) -> list[dict]:
+def brief(unit, *, material: str | None = None, scope: str | None = None, project_root=None) -> list[dict]:
     """What drafting `unit`'s assignment shows the model: the scope and the material (by default the
     week's text). The run and a record's check both build it here (CORE-4.2)."""
     from coursekit import courseconfig, records
@@ -186,13 +186,14 @@ def brief(unit, *, material: str | None = None, scope: str = "this week", projec
     cfg = courseconfig.load(unit.transcript_path, config_name="assignment.yaml")
     system = (courseconfig.domain_preface(cfg.domain) + courseconfig.voice_preface(cfg.voice)
               + prompts.load("assignment", "default", project_root=project_root).body)
+    scope = scope or f"this {prompts.unit_noun(project_root)}"
     user = (f"Scope: {scope}.\n\nThe material to base the assignment on:\n<material>\n{material}\n"
             f"</material>\n\nDraft the assignment now.")
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
 def build_assignment(unit, provider, model, out_dir, *, material: str | None = None,
-                     scope: str = "this week", project_root=None):
+                     scope: str | None = None, project_root=None):
     """Draft one assignment for `unit` from `material` (defaults to the week's transcript). `scope`
     names what the assignment covers, woven into the brief. Returns (Assignment|None, problems). A
     finished assignment made from the week's text gets a record; one made from material the caller
@@ -216,7 +217,7 @@ def build_assignment(unit, provider, model, out_dir, *, material: str | None = N
     a = draft.assignment
     problems = [] if (a and draft.is_finalized()) else ["assignment did not finalize"]
     if not problems and material is None:
-        opts = {"text": str(Path(unit.transcript_path).resolve()), **({"scope": scope} if scope != "this week" else {})}
+        opts = {"text": str(Path(unit.transcript_path).resolve()), **({"scope": scope} if scope else {})}
         records.write_step(out_dir, step="generate", by="model", brief=fingerprint, read=read, model=model,
                            options=opts, kind="assignment", unit=unit.id,
                            outputs=("assignment.json",), fresh=True)
@@ -229,4 +230,4 @@ def rebuild(rec: dict, step: dict, art_dir) -> list[dict]:
     """What `step` (the assignment's `generate`) would show the model today."""
     from coursekit import records
     unit, _ = records.unit_for(step["options"]["text"], art_dir)
-    return brief(unit, scope=step["options"].get("scope", "this week"))
+    return brief(unit, scope=step["options"].get("scope"))

@@ -22,6 +22,8 @@ prompt is governed content, versioned next to the course, not a string buried in
 
 Bodies may contain `{placeholders}` filled by the caller — kept explicit rather than templated
 here, because a missing placeholder should be the caller's error, not a silent empty string.
+Two are filled here, for every caller: `{unit_noun}` and `{unit_nouns}`, the course's word for its
+teaching block ("week", "weeks" unless the course's overlay says `unit_noun: session`).
 """
 
 import re
@@ -90,6 +92,32 @@ def _split_frontmatter(text: str) -> tuple[dict, str]:
     return (meta if isinstance(meta, dict) else {}), body.strip()
 
 
+def unit_noun(project_root=None) -> str:
+    """The course's word for its unit, as the model is shown it: the overlay's `unit_noun`, else "week" —
+    so a weekly course's briefs are byte for byte what they were before the noun existed (CORE-5)."""
+    if not project_root:
+        return "week"
+    from coursekit import schemas
+    from coursekit.coursestructure import OVERLAY_NAME
+    data = schemas.load(Path(project_root) / _OVERRIDE_SUBDIR.parent / OVERLAY_NAME, schemas.StructureOverlay)
+    return data.get("unit_noun") or "week"
+
+
+def plural(noun: str) -> str:
+    """English plural of a unit noun: study → studies, class → classes, day → days, else +s."""
+    # ponytail: rules only; an irregular noun (thesis → theses) gets a `unit_nouns` key when a course needs one
+    if noun[-1:] == "y" and noun[-2:-1] not in ("", *"aeiou"):
+        return noun[:-1] + "ies"
+    return noun + ("es" if noun.endswith(("s", "x", "z", "ch", "sh")) else "s")
+
+
+def _with_noun(body: str, project_root) -> str:
+    if "{unit_noun" not in body:
+        return body
+    noun = unit_noun(project_root)
+    return body.replace("{unit_nouns}", plural(noun)).replace("{unit_noun}", noun)
+
+
 def _roots(project_root=None) -> list[Path]:
     roots = []
     if project_root:
@@ -109,7 +137,7 @@ def load(category: str, name: str = "default", *, project_root=None) -> Prompt:
             return Prompt(name=meta.get("name", name),
                           category=meta.get("category", category),
                           description=meta.get("description", ""),
-                          body=body, path=path)
+                          body=_with_noun(body, project_root), path=path)
     tried = ", ".join(str(r / category / f"{name}.md") for r in _roots(project_root))
     raise PromptNotFound(f"no prompt '{category}/{name}'. Looked in: {tried}")
 

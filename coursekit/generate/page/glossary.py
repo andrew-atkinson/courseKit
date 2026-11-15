@@ -55,7 +55,7 @@ def passes(unit, *, project_root=None) -> list[tuple[str, str]]:
         cont = ("" if len(chunks) == 1 else
                 f"\n\n(This is part {k + 1} of {len(chunks)} of the material; add any NEW terms it "
                 f"introduces — do not repeat terms already covered.)")
-        out.append((system, f"The week's material:\n<material>\n{chunk}\n</material>{cont}"))
+        out.append((system, f"The {prompts.unit_noun(project_root)}'s material:\n<material>\n{chunk}\n</material>{cont}"))
     return out
 
 

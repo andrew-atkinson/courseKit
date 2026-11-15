@@ -16,14 +16,14 @@ PAGE_CATEGORY = "page"
 # page's length is grounded by the concept map's one-section-per-concept checklist below.
 
 
-def _concept_directive(concept_map) -> str:
+def _concept_directive(concept_map, noun: str = "week") -> str:
     """Turn a consolidated concept map into an explicit, un-skippable teaching checklist for the
     model — the whole point of the map. It grounds page length in the concept COUNT (one section
     each), names the concrete material each concept must carry, and hands the pullquote its enduring
     understanding. Empty string when there is no map (the page falls back to inline derivation)."""
     if concept_map is None or not concept_map.concepts:
         return ""
-    lines = ["\n\nThe week teaches these concepts — give EACH its own section with a real explanation "
+    lines = [f"\n\nThe {noun} teaches these concepts — give EACH its own section with a real explanation "
              "and, where the material supports it, a worked example. Cover every one; skip none:"]
     for i, c in enumerate(concept_map.concepts, 1):
         gist = f" — {c.gist}" if c.gist else ""
@@ -41,7 +41,7 @@ def _concept_directive(concept_map) -> str:
     return "\n".join(lines)
 
 
-def _context_line(course_title, week_label, module) -> str:
+def _context_line(course_title, week_label, module, noun: str = "week") -> str:
     """A single factual line placing the week, or '' when nothing is known."""
     parts = []
     if week_label:
@@ -52,7 +52,7 @@ def _context_line(course_title, week_label, module) -> str:
         parts.append(f"course: {course_title}")
     if not parts:
         return ""
-    return "\nWeek context — " + "; ".join(parts) + ".\n"
+    return f"\n{noun.capitalize()} context — " + "; ".join(parts) + ".\n"
 
 
 def build_messages(transcript: str, *, course_title: str | None = None,
@@ -68,13 +68,14 @@ def build_messages(transcript: str, *, course_title: str | None = None,
     prompts.require(system, "transcript")   # an override must not silently drop the material
     task = prompts.load(PAGE_CATEGORY, task_prompt, project_root=project_root)
 
+    noun = prompts.unit_noun(project_root)
     body = system.render(
-        context_line=_context_line(course_title, week_label, module),
+        context_line=_context_line(course_title, week_label, module, noun),
         transcript=transcript,
-        palette=catalog.render_palette("page"),
+        palette=catalog.render_palette("page", noun=noun),
     )
     system_message = ("\n" + courseconfig.domain_preface(domain)
                       + courseconfig.voice_preface(voice) + body + "\n")
-    task_body = task.body + _concept_directive(concept_map)
+    task_body = task.body + _concept_directive(concept_map, noun)
     return [{"role": "system", "content": system_message},
             {"role": "user", "content": "\n" + task_body + "\n"}]

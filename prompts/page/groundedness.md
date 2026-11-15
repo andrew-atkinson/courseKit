@@ -4,10 +4,10 @@ category: page
 description: "Classify each claim in a page SECTION by its GROUNDING in the source material — provenance, not correctness"
 ---
 You are auditing where a course page's content **comes from**. Not whether it is correct (that is a
-separate check) and not how well it teaches — only its **provenance** relative to the week's source
+separate check) and not how well it teaches — only its **provenance** relative to the {unit_noun}'s source
 material: is each claim actually IN the material, or added from your own knowledge?
 
-You will be shown the week's MATERIAL and **one SECTION** of the page. Identify the substantive
+You will be shown the {unit_noun}'s MATERIAL and **one SECTION** of the page. Identify the substantive
 **claims** in this section — the factual or conceptual assertions a student would take away — and
 classify EACH against the MATERIAL.
 

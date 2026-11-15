@@ -320,3 +320,100 @@ def test_an_artifact_with_no_unit_goes_in_the_courses_own_module(built):
                                                        "page_id": "welcome", "title": "Welcome"}), encoding="utf-8")
     mods = _modules(_quiet(cartridge.write_course_imscc, built))
     assert mods[-1] == ("Intensive", ["Welcome"])                           # course scope, after every unit
+
+
+# ------------------------------------------------------------------ CORE-5.5: the course's word for a unit
+
+def _rebuilt_briefs(root) -> dict:
+    """Every recorded step's brief, rebuilt from today's files with the run's own builder: {step: messages}."""
+    import importlib
+    out = {}
+    for rp in sorted(root.rglob("*record.json")):
+        rec = records.load(rp.parent, rp.name)
+        rebuild = importlib.import_module(records._REBUILDERS[rec["kind"]]).rebuild
+        out |= {f"{rp.parent.relative_to(root).as_posix()} {s['step']}": rebuild(rec, s, rp.parent) for s in rec["steps"] if "brief" in s}
+    return out
+
+
+def _critiques(root, unit) -> list:
+    """What every critic and fixer shows the model for `unit`'s quiz and page."""
+    from coursekit.generate.page import concept_delivery, consolidate, evaluate as pev, fix as pfix, groundedness as pg
+    from coursekit.generate.page import pedagogy
+    from coursekit.generate.page import page as pageir, tools as ptools
+    from coursekit.generate.quiz import bank as qbank, evaluate as qev, fix as qfix, groundedness as qg, tools as qtools
+    text, m = unit.transcript_path.read_text(), Model()
+    b = qbank.Bank.model_validate_json((root / "quizzes" / unit.slug / "bank.json").read_text())
+    page = pageir.Page.model_validate_json((root / "pages" / unit.slug / "page.json").read_text())
+    qev.evaluate_bank(b, text, m, "m", project_root=root, reads=1)
+    qg.evaluate_bank_groundedness(b, text, m, "m", project_root=root)
+    pev.evaluate_page(page, text, m, "m", project_root=root, reads=1)
+    pg.evaluate_page_groundedness(page, text, m, "m", project_root=root)
+    pedagogy.evaluate_page_pedagogy(page, text, m, "m", project_root=root)
+    concept_delivery.evaluate_page_concepts(page, text, m, "m", project_root=root, concepts=["Arrays"])
+    qs = qtools.QuizTools(qbank.BankDraft.new("t"))
+    qs.draft.bank = b
+    gid, label = next((g.group_id, l) for g in b.groups.values() for l in g.variants)
+    qfix.fix_one(qs, qev.Finding(unit.slug, gid, label, "s", "FLAG", "c"), text, m, "m", critic="C",
+                 project_root=root, max_turns=1)
+    ps = ptools.PageTools(pageir.PageDraft.new("t"))
+    ps.draft.page = page
+    pfix.fix_one_block(ps, qev.Finding(unit.slug, "d", "details", "s", "FLAG", "c"), text, m, "m", critic="C",
+                       project_root=root, max_turns=1)
+    consolidate.build_concept_map_from_text(text, m, "m", week="intro", project_root=root)   # analyze with no knowledge.json
+    return m.seen
+
+
+def test_a_course_that_names_its_unit_shows_the_model_its_word_and_never_week(sessions, monkeypatch):
+    from coursekit.generate.assignment import build as assignment
+    overlay = sessions / ".vtconfig" / "structure.coursekit.yaml"
+    overlay.write_text("unit_noun: session\n" + overlay.read_text(), encoding="utf-8")
+    _analyze(sessions, monkeypatch)
+    intro = _unit(sessions, "intro")
+    _quiet(run_unit, intro, OpenAICompatProvider(client=_Endpoint(), name="f"), "m", QuizGenerator())
+    for kw in ({"generator": "monolithic"}, {"function": "glossary"}, {"function": "overview"}, {"function": "recap"}):
+        _quiet(pagebuild.build_page_unit, _unit(sessions, "intro", "pages"), Model(), "m", **kw)
+    _quiet(pagebuild.build_page_unit, _unit(sessions, "loops", "pages"), Model(), "m", generator="decompose")
+    a = _unit(sessions, "intro", "assignments")
+    _quiet(assignment.build_assignment, a, Model(), "m", a.output_dir)
+
+    briefs = _quiet(_rebuilt_briefs, sessions)
+    assert {k.split(" ", 1)[1].split(":")[0] for k in briefs} == {
+        "analyze", "segment", "generate", "eu", "intro", "glossary", "build", "frame", "section", "close"}
+    for k in ("pages/intro-overview build", "pages/intro-recap build"):         # a model-free page's brief is the page;
+        assert briefs[k].pop("page_type").startswith("week_")         # its type is an IR name, not a word
+    shown = json.dumps([briefs, _quiet(_critiques, sessions, intro)], ensure_ascii=False)
+    assert "week" not in shown.lower()
+    for said in ("The session's teaching material", "this session", "Session context —", "The session teaches",
+                 "a session's key terms", "Concepts this session", "This session — Session 1 — Intro",
+                 "The session's source material", "concept map** for one session"):
+        assert said in shown
+
+
+def test_the_noun_is_week_unless_the_course_says_otherwise(sessions):
+    from coursekit import prompts, settings
+    assert prompts.unit_noun(None) == prompts.unit_noun(sessions) == "week"
+    assert "this week's own subject" in prompts.load("page", "frame", project_root=sessions).body
+    _quiet(settings.set, sessions, "unit_noun", "class")
+    assert prompts.unit_noun(sessions) == "class"
+    body = prompts.load("assignment", "default", project_root=sessions).body
+    assert "a single class is a focused task" in body and "several classes" in body
+    with pytest.raises(outcomes.CoursekitError):
+        settings.set(sessions, "unit_noun", "")
+    assert [prompts.plural(n) for n in ("week", "class", "box", "study", "day", "y")] == \
+        ["weeks", "classes", "boxes", "studies", "days", "ys"]
+
+
+def test_a_courses_overview_pages_use_its_word_for_a_unit(tmp_path):
+    from coursekit.generate import overview
+    from coursekit.generate.page.concept_map import Concept, ConceptMap
+    from tests.test_records_everywhere import _analyze as weekly_analyze, _course as weekly_course
+    root = weekly_course(tmp_path)                       # the transcriber's weeks 7 and 8, in module Data
+    (root / ".vtconfig" / "structure.coursekit.yaml").write_text("unit_noun: block\n", encoding="utf-8")
+    weekly_analyze(root)
+    _, entries = _quiet(overview.plan, root)
+    pages = [e["build"](framing="").model_dump_json() for e in entries if "build" in e]
+    assert "This block — Objects — is part of Data" in pages[0] and "Data spans 1 block(s)" in pages[-1]
+    assert "what this block or module is about" in json.dumps(entries[0]["frame"])
+    recap = overview.build_week_recap("C", "7", "Objects", "", ConceptMap(week="7", concepts=[Concept(name="Arrays")]),
+                                      noun="block")
+    assert recap.blocks["recall-0"].text == "Look back at Arrays in the block's material."

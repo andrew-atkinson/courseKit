@@ -73,7 +73,7 @@ def evaluate_page_pedagogy(page, material: str, provider, model: str, *, project
     """Score one page against the five criteria. An unreadable reply yields -1 for the criteria it
     missed; a failed critic call marks the whole page NOT SCORED (`failed`), never a total of 0."""
     critic = prompts.load(PEDAGOGY_CATEGORY, "pedagogy", project_root=project_root).body
-    user = (f"The week's teaching material:\n<material>\n{material}\n</material>\n\n"
+    user = (f"The {prompts.unit_noun(project_root)}'s teaching material:\n<material>\n{material}\n</material>\n\n"
             f"The full page, in order:\n{_render_page(page)}\n\nScore this page.")
     messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]
     reply = ask_critic(provider, model, messages, temperature=READ_TEMPERATURE, item=f"pedagogy {page.page_id}")

@@ -203,7 +203,8 @@ def plan(unit, *, project_root=None, neighbours=True) -> list[dict]:
     # A concept pass fills a section BODY, so it composes from fewer components than a whole page —
     # no heading (placed for it), no page-opening pullquote, no closing details. The `{palette}` slot
     # in concept_section.md gets this scoped subset (COMP-3); prompts without the slot are unaffected.
-    section_palette = catalog.render_palette(only=_SECTION_KINDS)
+    noun = prompts.unit_noun(project_root)
+    section_palette = catalog.render_palette(only=_SECTION_KINDS, noun=noun)
 
     def sysmsg(name):
         body = prompts.load("page", name, project_root=project_root).body
@@ -213,7 +214,7 @@ def plan(unit, *, project_root=None, neighbours=True) -> list[dict]:
     eu = cm.enduring_understanding or "(none stated)"
     steps = [{"step": "frame", "concept": None, "passes": [(sysmsg("frame"),
               f"Topic: {unit.label or unit.slug}\nEnduring understanding: {eu}\n"
-              f"Concepts this week: {names}")]}]
+              f"Concepts this {noun}: {names}")]}]
 
     # Boundary-correct per-concept material from `analyze` (one contiguous verbatim span per concept, so
     # the example travels with its definition); fall back to the keyword slicer per concept when absent.
@@ -234,7 +235,7 @@ def plan(unit, *, project_root=None, neighbours=True) -> list[dict]:
         steps.append({"step": f"section: {c.name}", "concept": c, "passes": passes, "chars": len(material),
                       "of": len(transcript), "src": "map" if materials.get(c.name) else "slice"})
     steps.append({"step": "close", "concept": None, "passes": [(sysmsg("close"),
-                  f"Concepts this week: {names}\nEnduring understanding: {eu}")]})
+                  f"Concepts this {noun}: {names}\nEnduring understanding: {eu}")]})
     return steps
 
 

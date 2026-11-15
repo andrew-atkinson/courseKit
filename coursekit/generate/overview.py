@@ -30,11 +30,11 @@ def _blocks(pairs) -> dict:
 
 # --------------------------------------------------------------------------- deterministic builders
 def build_week_overview(course_title: str, num, title: str, module: str, cm, *, framing: str = "",
-                        ref: str | None = None) -> Page:
+                        ref: str | None = None, noun: str = "week") -> Page:
     """A week 'Start Here': orientation + the big idea + what-you'll-cover + objectives, all from the
     concept map. `framing` (a model blurb) replaces the default intro when supplied. `ref` is the unit's name
     on disk (`week-7`, `intro`), which names the page; it defaults to `week-<num>`."""
-    intro = framing or ((f"This week — {title} — is part of {module}. " if module else f"This is {title}. ")
+    intro = framing or ((f"This {noun} — {title} — is part of {module}. " if module else f"This is {title}. ")
                         + "Here is what it covers and why it matters.")
     pairs = [("intro", "paragraph", {"text": intro})]
     if cm is not None and cm.enduring_understanding:
@@ -55,7 +55,8 @@ def build_week_overview(course_title: str, num, title: str, module: str, cm, *, 
                 unit_ref=ref, slug=slug, blocks=_blocks(pairs), finalized=True)
 
 
-def build_week_recap(course_title: str, num, title: str, module: str, cm, *, ref: str | None = None) -> Page:
+def build_week_recap(course_title: str, num, title: str, module: str, cm, *, ref: str | None = None,
+                     noun: str = "week") -> Page:
     """A week RECAP: consolidation AFTER the week — the big idea to carry forward, then a
     predict-then-reveal recall of each concept. Assembled from the concept map (the retrieval
     foldouts are the point); the `review`-role heading + the details render as one Recap box."""
@@ -68,7 +69,7 @@ def build_week_recap(course_title: str, num, title: str, module: str, cm, *, ref
     if concepts:
         pairs.append(("recall-h", "heading", {"text": title, "role": "review"}))
         for i, c in enumerate(concepts):
-            answer = c.gist or f"Look back at {c.name} in the week's material."
+            answer = c.gist or f"Look back at {c.name} in the {noun}'s material."
             pairs.append((f"recall-{i}", "details",
                           {"summary": f"Can you explain {c.name}?", "text": answer}))
     ref = ref or (f"week-{num}" if num else None)
@@ -79,10 +80,10 @@ def build_week_recap(course_title: str, num, title: str, module: str, cm, *, ref
                 blocks=_blocks(pairs), finalized=True)
 
 
-def build_module_overview(course_title: str, module: str, weeks, *, framing: str = "") -> Page:
+def build_module_overview(course_title: str, module: str, weeks, *, framing: str = "", noun: str = "week") -> Page:
     """A module overview: its weeks, each with a one-line theme (its enduring understanding).
     `weeks` is a list of (num, title, enduring_understanding)."""
-    intro = framing or f"{module} spans {len(weeks)} week(s). Here is the arc it follows."
+    intro = framing or f"{module} spans {len(weeks)} {noun}(s). Here is the arc it follows."
     items = []
     for num, title, eu in weeks:
         line = f"Week {num}: {title}" if num else title
@@ -123,7 +124,7 @@ def plan(course_path, *, framing: bool = True) -> tuple:
     if not root:
         raise CoursekitError("no .vtconfig course root found (need context.yaml + concept maps)",
                              code="course.no_root", details={"path": str(course_path)})
-    course_title = cfg.course_title or "Course"
+    course_title, noun = cfg.course_title or "Course", prompts.unit_noun(root)
     weeks = (cfg.context or {}).get("weeks") or {}
 
     parsed = []
@@ -143,7 +144,7 @@ def plan(course_path, *, framing: bool = True) -> tuple:
             entries.append({"unit": num, "skip": f"week {num} ({title}): no overview — "
                             f"{'no concept map; run `coursekit analyze`' if cm is None else 'its concept map lists no concepts'}."})
             continue
-        entries.append(entry(num, partial(build_week_overview, course_title, num, title, module, cm),
+        entries.append(entry(num, partial(build_week_overview, course_title, num, title, module, cm, noun=noun),
                              f"Week {num}: {title}", ", ".join(c.name for c in cm.concepts), cm.enduring_understanding,
                              [num]))
     modules: dict[str, list] = {}
@@ -151,7 +152,7 @@ def plan(course_path, *, framing: bool = True) -> tuple:
         if module and cm is not None:
             modules.setdefault(module, []).append((num, title, cm.enduring_understanding))
     for module, wks in modules.items():
-        entries.append(entry(None, partial(build_module_overview, course_title, module, wks),
+        entries.append(entry(None, partial(build_module_overview, course_title, module, wks, noun=noun),
                              module, "; ".join(t for _, t, _ in wks), "", [n for n, _, _ in wks]))
     return root, entries
 

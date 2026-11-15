@@ -12,7 +12,7 @@ core is worth extracting once a third consumer appears — not before (same disc
 
 from pathlib import Path
 
-from coursekit import atomic
+from coursekit import atomic, prompts
 from coursekit.generate.quiz.evaluate import (
     DEFAULT_READS,
     READ_TEMPERATURE,
@@ -69,8 +69,8 @@ def _preview(b) -> str:
 
 
 def _one_read(critic: str, material: str, b, provider, model: str,
-              *, seed: int | None = None) -> tuple[str, str, str]:
-    user = (f"The week's teaching material:\n<material>\n{material}\n</material>\n\n"
+              *, seed: int | None = None, noun: str = "week") -> tuple[str, str, str]:
+    user = (f"The {noun}'s teaching material:\n<material>\n{material}\n</material>\n\n"
             f"The page section to review:\n{_format_block(b)}\n\nEvaluate this section.")
     messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]
     kwargs = {"model": model, "messages": messages, "temperature": READ_TEMPERATURE}
@@ -86,12 +86,12 @@ def evaluate_page(page, material: str, provider, model: str, *, week: str = "",
                   project_root=None, reads: int = DEFAULT_READS, progress=None) -> list[Finding]:
     """Cold-read every content block of a page against the week's material. `progress(msg)`, when
     given, is called after each section — a live heartbeat for a slow local model."""
-    critic = _critic_body(PAGE_CATEGORY, project_root)
+    critic, noun = _critic_body(PAGE_CATEGORY, project_root), prompts.unit_noun(project_root)
     findings = []
     for b in page.blocks.values():
         if b.kind in _SKIP_KINDS:
             continue
-        results = [_one_read(critic, material, b, provider, model) for _ in range(max(1, reads))]
+        results = [_one_read(critic, material, b, provider, model, noun=noun) for _ in range(max(1, reads))]
         verdict, concern, fix, n_flag = _union(results)
         if progress:
             progress(f"  {'⚑' if verdict == 'FLAG' else '·'} {week} {b.block_id} ({b.kind}) — {verdict}")

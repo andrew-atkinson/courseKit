@@ -3,9 +3,9 @@ name: glossary
 category: page
 description: "Glossary companion: extract the key review terms + one-line definitions from a week's material"
 ---
-You are building a GLOSSARY a student can review beside the week's video — nothing else. Not a lesson, not a summary: just the vocabulary that matters, defined clearly.
+You are building a GLOSSARY a student can review beside the {unit_noun}'s video — nothing else. Not a lesson, not a summary: just the vocabulary that matters, defined clearly.
 
-From the material given, extract the key TERMS a student should be able to define after this week — the named concepts, techniques, functions, and vocabulary the material actually introduces. For each, write a one-sentence definition a student can understand, grounded ONLY in what the material says.
+From the material given, extract the key TERMS a student should be able to define after this {unit_noun} — the named concepts, techniques, functions, and vocabulary the material actually introduces. For each, write a one-sentence definition a student can understand, grounded ONLY in what the material says.
 
 With tool calls only:
 

@@ -12,7 +12,7 @@ Reuses the domain-aware review loader (`_critic_body`) and the whole-page render
 import re
 from dataclasses import dataclass, field
 
-from coursekit import atomic
+from coursekit import atomic, prompts
 from coursekit.generate.critic import ask as ask_critic
 from coursekit.generate.page.pedagogy import _render_page
 from coursekit.generate.quiz.evaluate import READ_TEMPERATURE, _critic_body
@@ -62,13 +62,14 @@ def evaluate_page_concepts(page, material: str, provider, model: str, *, project
     the concepts from the material itself. Best-effort: a provider error or an unreadable reply yields
     no concepts, never an exception."""
     critic = _critic_body(CONCEPT_CATEGORY, project_root, name="concept_delivery")
+    noun = prompts.unit_noun(project_root)
     if concepts:
         given = "\n".join(f"- {c}" for c in concepts)
-        task = (f"The week's concepts are already identified — score the page's delivery of each of "
+        task = (f"The {noun}'s concepts are already identified — score the page's delivery of each of "
                 f"these, and only these:\n{given}")
     else:
         task = "Judge how well the page delivers each core concept."
-    user = (f"The week's teaching material:\n<material>\n{material}\n</material>\n\n"
+    user = (f"The {noun}'s teaching material:\n<material>\n{material}\n</material>\n\n"
             f"The full page, in order:\n{_render_page(page)}\n\n{task}")
     messages = [{"role": "system", "content": critic}, {"role": "user", "content": user}]
     reply = ask_critic(provider, model, messages, temperature=READ_TEMPERATURE, item=f"concept delivery {page.page_id}")
