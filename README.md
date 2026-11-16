@@ -90,3 +90,9 @@ The README is the high-level read; the detail lives in [`docs/`](docs/):
 - **[Canvas QTI format](docs/canvasQuizStructure.md)** — the internals behind `qti.py`: the package layout, namespaces, and the "imports empty" trap that cost two rounds to find. Read this before touching the QTI emitter.
 
 For the internals (the course model, the generator seam, the shared spine) and the roadmap, see [`agent/architecture.md`](agent/architecture.md).
+
+## License
+
+Copyright © 2026 Andrew Atkinson. All rights reserved.
+No license is granted yet: the repository is public to be read, and using, copying, modifying, or distributing the software needs written permission ([LICENSE](LICENSE)).
+The notice covers the software and its documentation, not the course content you make with it.
