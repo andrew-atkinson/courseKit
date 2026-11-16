@@ -479,7 +479,17 @@ def test_a_session_course_gets_an_overview_per_session_and_one_for_its_module(se
     assert framed[0]["frame"][-1]["content"].startswith("Title: Session 1 — Intro\n")   # the framing pass's title
     (sessions / ".vtconfig" / "concepts" / "loops.yaml").unlink()
     _, entries = overview.plan(sessions, framing=False)
-    assert entries[1]["skip"].startswith("Session 2 — Loops: no overview — no concept map")
+    assert entries[1]["skip"].startswith("Session 2 — Loops: no overview — no concept map; run `coursekit analyze`")
+    (sessions / "notes" / "loops.md").unlink()                       # declared, but nothing to analyze yet
+    _, entries = overview.plan(sessions, framing=False)
+    assert "no overview — no text yet to analyze" in entries[1]["skip"]
+
+
+def test_analyze_names_a_chosen_unit_that_has_no_text_yet(sessions, capsys):
+    (sessions / "notes" / "loops.md").unlink()
+    assert cli.main(["analyze", str(sessions), "--unit", "loops", "--unit", "intro", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "[skip] loops: no text yet" in out and "[plan] Session 1 — Intro" in out
 
 
 def test_propose_expectations_prints_each_units_own_rule(tmp_path, monkeypatch, capsys):

@@ -387,6 +387,10 @@ def _cmd_analyze(args) -> int:
     units = find_units(args.path)
     if weeks:
         units = [u for u in units if any(pipeline.unit_matches(w, u) for w in weeks)]
+        for w in weeks:                          # a declared unit can still have no text to analyze
+            if not any(pipeline.unit_matches(w, u) for u in units):
+                print(f"  [skip] {w}: no text yet — transcribe its videos, or declare its readings "
+                      "and run `coursekit ingest`")
     if not units:
         print("No unit texts found.")
         return 0
@@ -964,7 +968,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # analyze — week text + knowledge.json → the per-week concept map (uses the model)
     pa = sub.add_parser("analyze",
-                        help="build each week's concept map (.vtconfig/concepts/week-N.yaml) — the "
+                        help="build each unit's concept map (.vtconfig/concepts/<unit>.yaml) from its text — the "
                              "content model generate and evaluate read")
     pa.add_argument("path", nargs="?", default=os.getenv("TRANSCRIPTION"),
                     help="transcript file or directory (default: $TRANSCRIPTION)")

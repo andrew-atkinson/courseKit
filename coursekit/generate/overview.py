@@ -137,12 +137,17 @@ def plan(course_path, *, framing: bool = True) -> tuple:
         return {"unit": unit, "build": build, "title": title, "maps": [cmap.concept_map_path(root, u) for u in units],
                 "frame": _frame_messages(cfg, root, title, topics, eu) if framing else None}
 
-    entries = []
+    entries, with_text = [], None
     for uid, num, title, module, cm in parsed:
         label = f"Week {num}: {title}" if num else title
         if cm is None or not cm.concepts:        # nothing to orient toward without a concept map
-            entries.append({"unit": uid, "skip": f"{label}: no overview — "
-                            f"{'no concept map; run `coursekit analyze`' if cm is None else 'its concept map lists no concepts'}."})
+            if with_text is None:                # the units analyze could read, looked up only when one is skipped
+                from coursekit.discover import find_units
+                with_text = {u.id for u in find_units(root)}
+            why = ("its concept map lists no concepts" if cm is not None
+                   else "no concept map; run `coursekit analyze`" if uid in with_text
+                   else "no text yet to analyze; transcribe its videos, or declare its readings and run `coursekit ingest`")
+            entries.append({"unit": uid, "skip": f"{label}: no overview — {why}."})
             continue
         entries.append(entry(uid, partial(build_week_overview, course_title, num, title, module, cm,
                                           ref=unit_slug(uid), noun=noun),
