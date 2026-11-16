@@ -4,6 +4,8 @@ Offline: build an Assignment, emit, and check the CC shape parses and carries th
 import xml.etree.ElementTree as ET
 import zipfile
 
+import pytest
+
 from coursekit.emit import assignment as ae
 from coursekit.generate.assignment.assignment import Assignment, Rubric, RubricCriterion, RubricRating
 
@@ -222,3 +224,64 @@ def test_no_scheme_emits_unweighted_assignments_group_and_no_course_settings(tmp
         files = {n: z.read(n).decode("utf-8") for n in z.namelist()}
     assert "<group_weight>0.0</group_weight>" in files["course_settings/assignment_groups.xml"]
     assert "course_settings/course_settings.xml" not in files      # no weighting flag when no scheme
+
+
+# ------------------------------------------------------- CORE-6.3: grading nobody accepted is emitted, with a warning
+_GRADING = {"groups": [{"name": "Projects", "weight": 70}, {"name": "Quizzes", "weight": 30}],
+            "placement": {"assignment": "Projects", "quiz": "Quizzes"}}
+
+
+def _graded_course(tmp_path, status):
+    """A course with one assignment, its `grading:` block brought to `status` the way a course gets there."""
+    import yaml
+
+    from coursekit import settings
+    from coursekit.ingest import propose_grading as pg
+    course = tmp_path / status / "My Course"
+    ad = course / "assignments" / "week-3"
+    ad.mkdir(parents=True)
+    (course / ".vtconfig").mkdir()
+    (ad / "assignment.json").write_text(_asg(week_ref="week-3").model_dump_json(), encoding="utf-8")
+    overlay = course / ".vtconfig" / "structure.coursekit.yaml"
+    if status == "unknown":
+        overlay.write_text(yaml.safe_dump({"grading": _GRADING}), encoding="utf-8")       # by hand, no history
+    elif status != "absent":
+        pg.write_grading(course, {**_GRADING, "groups": [{"name": "Projects", "weight": 50},
+                                                         {"name": "Quizzes", "weight": 50}]}
+                         if status == "edited" else _GRADING)                              # proposed
+        if status == "edited":
+            overlay.write_text(yaml.safe_dump({"grading": _GRADING}), encoding="utf-8")   # an editor, not accept
+        if status == "declared":
+            settings.accept(course, ["grading"], by="co-teacher")
+    return course
+
+
+def _emit(course, how):
+    from coursekit import outcomes
+    with outcomes.capture(lambda n: None) as report:
+        out = how(course)
+    with zipfile.ZipFile(out) as z:
+        return {n: z.read(n) for n in z.namelist()}, report.warnings
+
+
+@pytest.mark.parametrize("status, says", [
+    ("proposed", "are coursekit's draft (proposed 20"),
+    ("edited", "were changed since coursekit proposed them on 20"),
+    ("unknown", "have no record of who set them"),
+])
+def test_grading_nobody_accepted_warns_once_and_the_package_is_the_same(tmp_path, status, says):
+    from coursekit.emit import cartridge
+    declared, none = _emit(_graded_course(tmp_path, "declared"), cartridge.write_course_imscc)
+    assert none == [] and b"<group_weight>70.0</group_weight>" in declared["course_settings/assignment_groups.xml"]
+    course = _graded_course(tmp_path, status)
+    for how in (cartridge.write_course_imscc, ae.emit_from_path):       # `emit course` and `emit assignments`
+        files, [w] = _emit(course, how)                                  # exactly one warning
+        assert (w.code, w.details["status"]) == ("grading.not_accepted", status)
+        assert says in w.message and f"`coursekit accept '{course}' grading`" in w.message
+    assert _emit(course, cartridge.write_course_imscc)[0] == declared    # every member, byte for byte
+
+
+def test_no_grading_block_emits_the_default_group_with_no_warning(tmp_path):
+    from coursekit.emit import cartridge
+    files, warnings = _emit(_graded_course(tmp_path, "absent"), cartridge.write_course_imscc)
+    assert warnings == [] and b"<group_weight>0.0</group_weight>" in files["course_settings/assignment_groups.xml"]

@@ -18,12 +18,13 @@ page is `webcontent`, typed `WikiPage`. There is no model — like the other emi
 committed IR and packages it.
 """
 
+import shlex
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from coursekit import atomic, courseconfig, outcomes
+from coursekit import atomic, courseconfig, outcomes, settings
 from coursekit.emit import cc
 
 
@@ -63,17 +64,39 @@ def _default_sources() -> list:
 
 # ------------------------------------------------------------- grading groups (STRC-2)
 
+def _warn_unless_accepted(root, path) -> None:
+    """CORE-6: grading nobody accepted (coursekit's draft, an edit since, or a block with no history) still
+    goes into the package exactly as it is — a reviewable file is worth more than a refusal — but never
+    silently: one warning says whose it is and how to make it the faculty's."""
+    status, last = settings.authority(root, "grading")
+    if status in (None, "declared"):
+        return
+    last = last or {}
+    who, on = last.get("by", "someone"), last.get("at", "")[:10]
+    did = "proposed" if last.get("step") == "proposed" else "accepted"
+    whose = {"proposed": f"are coursekit's draft (proposed {on}), which nobody has accepted yet",
+             "edited": f"were changed since {who} {did} them on {on}, and not yet accepted"
+             }.get(status, "have no record of who set them")
+    outcomes.warn("grading.not_accepted",
+                  f"The grading groups and weights in this package {whose}. They are emitted as they are; review "
+                  f"them, then `coursekit accept {shlex.quote(str(path))} grading` to make them yours.",
+                  section="grading", status=status)
+
+
 def _grading_settings(path, items: list[CartridgeItem], course_title: str) -> dict:
-    """The course-level grading files. With a DECLARED scheme: emit every declared group (with its
+    """The course-level grading files. With a `grading:` block (whoever set it — one nobody accepted is
+    emitted too, with a warning): emit every group in it (with its
     weight) + `course_settings.xml` carrying `group_weighting_scheme=percent` when any weight is set.
     With NO scheme (DERIVE default): the single `"Assignments"` group at weight 0 when any assignment is
     present — byte-identical to the pre-STRC-2 behavior; no `course_settings.xml`."""
     from coursekit.coursestructure import CourseStructure
     from coursekit.emit import assignment as ae
 
-    scheme = CourseStructure.load(path).grading()
+    struct = CourseStructure.load(path)
+    scheme = struct.grading()
     out: dict = {}
     if scheme.has_scheme():
+        _warn_unless_accepted(struct.root, path)
         out["course_settings/assignment_groups.xml"] = ae.assignment_groups_xml(scheme.group_list())
         if scheme.weighted():
             out["course_settings/course_settings.xml"] = cc.course_settings_xml(course_title, weighted=True)

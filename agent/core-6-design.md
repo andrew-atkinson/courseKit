@@ -131,6 +131,10 @@ Each step is its own branch with goldens (G0 the exports, G1 generation and reco
    G0: all 904 files and members identical, and both emit logs. G1: every file and record identical to `main`'s. 13 mutations, all caught.
 3. **The cartridge warns on grading nobody accepted.**
    *Pass:* emitting with grading that is not `declared` warns once, naming its status and `coursekit accept`; the package is byte-identical to emitting the same grading declared; no warning for declared or absent grading; G0 packages identical.
+   **Done 2026-11-16.** `cartridge._grading_settings` calls `_warn_unless_accepted` when the overlay has a `grading:` block: one `outcomes.warn` (`grading.not_accepted`, with the status in its details) saying whose the groups and weights are and giving `coursekit accept` with the path quoted.
+   Both commands that write grading go through it — `emit course` and `emit assignments` — and each warns once.
+   An unreadable history stops the emit with `authority.unreadable`, as it stops `check` and the census: coursekit can't say whose the grading is, and the message says how to fix it.
+   G0: all 904 files and members identical to `main`'s; the emit logs differ only by the warning, once for each of CC101's two commands (its grading reads `unknown`), and not at all for PH101 (no grading block). G1 identical. 12 mutations, all caught.
 4. **Docs.**
    `docs/architecture.md` (the authority of each overlay section), `docs/commands.md` (`accept`), the census guide, `agent/architecture.md`, `docs/architecture-diagram.html`, and the roadmap.
 
