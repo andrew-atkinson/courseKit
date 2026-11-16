@@ -6,6 +6,7 @@ Presented version, combining this file and the docs guide (30 Oct 2026): <https:
 Verified 30 October 2026 against `main`; every diagram render-checked with mermaid-cli 12.
 The 30 Oct pass adds **[the course model](#the-course-model--one-loader-one-index)** (CORE-2: one loader, units with their own identity and stored order, one artifact index that the census, the emitters, and discovery all read), the **CORE-1 spine** (`outcomes` · `schemas` · `settings`, with `coursekit check` and `coursekit config`), the **census**, **assignments** as a third IR, and the built **proposer** (`coursekit propose`).
 The 4–5 Nov pass adds **[who owns the artifact being built](#who-owns-the-artifact-being-built)** (CORE-3, complete) and evaluate and fix reading the index (`course.review_items`).
+The 15 Nov pass (CORE-5, [core-5-design.md](core-5-design.md)) puts every verb on [the course model's unit](#the-course-model--one-loader-one-index): a run's unit, selection, the overlay's and census's words, the cartridge's modules, and what the model is shown.
 The 31 July pass (after 27 July's CLI subcommands + `emit course`) added the **analyze** phase (a per-week concept map), the **output-worth evaluator** (facticity · pedagogy · concept-delivery cold reads), and the targeted **fix** loop that regenerates flagged items in place.
 The 18 Aug pass adds **[the adapter architecture](#the-adapter-architecture--ingeststructure--ir--generation)** — the three-layer ingest/structure · IR · generation model, the one-writer-per-file rule, and the declared course-structure IR (FLOW-7 Phase 1: `coursestructure.py` + manifest-driven discovery).
 The videotranscriber (separate repo at `~/video_transcription`, last commit 18 Aug 2026) still imports nothing from coursekit; only its rows in the [spine table](#dependency-direction) were re-checked in this pass.
@@ -41,7 +42,7 @@ The renderer works the same way: `render_body` works out the inline-code style f
 
 Beyond generation, coursekit **understands, measures, and repairs** its own output — the layer the incumbents' generators don't have.
 
-- **analyze** (`generate/page/concept_map.py` + `consolidate.py`) builds a per-week **concept map** — the teaching concepts, their nested knowledge components, and the one enduring understanding — from the transcriber's `knowledge.json` when present, or the week text when not (same schema, swappable producer). It lands in `.vtconfig/concepts/week-N.yaml` (faculty-editable) and is read by the page generator (as an un-skippable teaching checklist) and by the evaluator (a fixed list to score against, rather than one re-derived each read).
+- **analyze** (`generate/page/concept_map.py` + `consolidate.py`) builds a per-unit **concept map** — the teaching concepts, their nested knowledge components, and the one enduring understanding — from the transcriber's `knowledge.json` when present, or the unit's text when not (same schema, swappable producer). It lands in `.vtconfig/concepts/week-N.yaml` (faculty-editable) and is read by the page generator (as an un-skippable teaching checklist) and by the evaluator (a fixed list to score against, rather than one re-derived each read).
 - **evaluate** is the *output-worth* gate — three cold reads over the committed IR, in a fresh conversation per item so it is not the generator grading itself: **facticity** (is each item correct?), **pedagogy** (does the page scan / signal / engage?), and **concept-delivery** (does it teach each concept?). Report-only.
 - **fix** closes the loop (`generate/quiz/fix.py`, `generate/page/fix.py`): for each flagged quiz variant or page block it hands the model the material, the flawed item, and the reviewer's concern, and takes a correction committed through the SAME tool with the SAME id — overwriting in place via `BankDraft.adopt` / `PageDraft.adopt` — then cold-reads the fix to confirm it now passes.
 
@@ -82,9 +83,14 @@ flowchart LR
   Artifacts live at `<kind>/<slug>/<ir>.json`; an IR file anywhere else is a stray — warned about, never packaged.
 - **Read-only.**
   Every change (a setting, the structure, an artifact's unit) goes through `coursekit/settings.py`, and the course is loaded again — the same path a GUI will take.
-- **Two `Unit` classes until CORE-5.**
-  `course.Unit` is what the course *is*; `discover.Unit` is one generation run over a unit (it carries `output_dir`).
+- **Two `Unit` classes, one identity.**
+  `course.Unit` is what the course *is*; `discover.Unit` is one generation run over a unit (it adds `output_dir`), carrying the model's `id`, `order`, and `label` (CORE-5.1).
   `Course.run_target` is the only place the second is built from the first.
+- **One name on disk.**
+  `course.unit_slug` is the only place a unit's folder and file names come from: `week-3` for a numbered unit (a weekly course's names, kept), else its slugified id (`intro`).
+  Selection (`--unit`) goes through one matcher, `pipeline.unit_matches`: a unit's id, its name on disk, or its title.
+- **One word for the model.**
+  The overlay's `unit_noun` ("week" when absent) is read by `prompts.unit_noun`, filled into `{unit_noun}` / `{unit_nouns}` by `prompts.load` for every prompt, shipped or overridden, and passed to the few briefs coursekit writes in code; a weekly course's briefs are byte-identical to the ones before the noun existed, so no record went outdated.
 
 ## The adapter architecture — ingest/structure · IR · generation
 
@@ -92,7 +98,7 @@ The four-layer view above is *where files live*; this is *who does what to the I
 Three layers over one shared IR:
 
 1. **Ingest / structure adapters.** Turn raw materials into the IR, distinguished by input *modality*, not concept. The **videotranscriber** (media → text; heavy Apple-Silicon stack, its own repo) and **`coursekit/ingest`** (documents → `week-N.md`) are the two built adapters; the **structure proposer** (`coursekit propose`, FLOW-7) is a third — it reads a messy folder tree and *declares* its structure. Multiple entry points, all producing the same IR; they are **peers, not a sequence**.
-2. **The IR.** `context.yaml` + coursekit's overlay (declared structure), `week-N.md` (text), the concept map, and the canonical `bank.json` / `page.json` / `assignment.json`, each with its record beside it, as are the concept maps and overviews; `evaluate` notes each critic's result there, with the version it judged; the census reports each status, `emit` warns on a stale one, and `generate` refuses to overwrite a hand edit without `--force` (CORE-4: [core-4-design.md](core-4-design.md); emitters never read them; `coursekit/atomic.py` is the one way any file is written). The convergence point, loaded as one [course model](#the-course-model--one-loader-one-index).
+2. **The IR.** `context.yaml` + coursekit's overlay (declared structure), each unit's text (`week-N.md` for a numbered unit), the concept map, and the canonical `bank.json` / `page.json` / `assignment.json`, each with its record beside it, as are the concept maps and overviews; `evaluate` notes each critic's result there, with the version it judged; the census reports each status, `emit` warns on a stale one, and `generate` refuses to overwrite a hand edit without `--force` (CORE-4: [core-4-design.md](core-4-design.md); emitters never read them; `coursekit/atomic.py` is the one way any file is written). The convergence point, loaded as one [course model](#the-course-model--one-loader-one-index).
 3. **Generation** (`generate` · `evaluate` · `emit`) — **read-only on the IR**, never writes structure.
 
 **The rule that keeps the modularity: one writer per file, composed on read.**
@@ -244,7 +250,9 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
 - **Three page critics read only each unit's teaching page.**
   Evaluate and fix take every quiz and page from the index (`course.review_items`), glossary and overview siblings included, but the pedagogy, concept-delivery, and page-groundedness critics (`evaluate --all`) still read one `page.json` per unit at its layout path.
   Moving them onto `review_items` would review the siblings too — more model calls and a visible change in their reports, so it is its own decision, not a cleanup.
-- **The code still says `week` in places** where the model says *unit*: a run's unit is the model's unit since CORE-5.1 (`id`, `slug`, `label`), but selection, the overlay's and the census's words, the cartridge, and the prompts move in CORE-5.2 to 5.5 ([core-5-design.md](core-5-design.md)).
+- **`ingest` still finds units by week number.**
+  `_plan_from_structure` walks `iter_weeks`, so a declared unit with no number (`intro`) is skipped without a word; such a unit works everywhere else once its `doc:` names its text.
+- **Two tool descriptions still say "week"** (`add_glossary`, `add_pullquote`): they are module-level schemas, not part of any brief, so giving them the course's noun means building a run's tools per course.
 - **Two writers still overwrite a hand edit:** `analyze` (a concept map) and the overview script (`python -m coursekit.generate.overview`); parked as `CORE-4.6`.
   And the decompose prototype's `--review` isn't recorded as an evaluation.
 - **The census does not count overview pages yet**, though the model indexes them — a visible output change, kept out of the byte-identical CORE-2 steps.

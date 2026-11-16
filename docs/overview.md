@@ -18,10 +18,10 @@ The model *commits* each finished piece through a structured tool call rather th
 
 coursekit is a command-line tool organized as a small pipeline; each phase is a verb, and it is clear which ones use the model.
 
-- **`ingest`** — turns a week's documents (PDF, PowerPoint, Word, ODT, plain text, Markdown) into the consolidated week text the generators read. A folder of readings and slides becomes one source-tagged week document. `--raw` does deterministic extraction only, fully offline.
-- **`propose`** — scans a course tree and *declares* its structure (weeks plus typed sources) into an explicit manifest, instead of guessing structure from filenames. It surfaces any files it couldn't place rather than silently dropping them, and `--model` handles irregular trees that don't encode weeks in their names.
-- **`analyze`** — builds each week's concept map, an instructor-editable list of the concepts a week teaches, which grounds both generation and evaluation.
-- **`generate`** — the model step: turns week text into randomized quizzes and designed pages and, on request, assignments. It can target the whole course, selected weeks, or — with `--source` — a single document for an à-la-carte quiz. A run ends with a cold-read review of what it produced, by default.
+- **`ingest`** — turns a week's documents (PDF, PowerPoint, Word, ODT, plain text, Markdown) into the consolidated unit text the generators read. A folder of readings and slides becomes one source-tagged unit document. `--raw` does deterministic extraction only, fully offline.
+- **`propose`** — scans a course tree and *declares* its structure (units plus typed sources) into an explicit manifest, instead of guessing structure from filenames. It surfaces any files it couldn't place rather than silently dropping them, and `--model` handles irregular trees that don't encode weeks in their names.
+- **`analyze`** — builds each unit's concept map, an instructor-editable list of the concepts a unit teaches, which grounds both generation and evaluation.
+- **`generate`** — the model step: turns unit text into randomized quizzes and designed pages and, on request, assignments. It can target the whole course, selected units, or — with `--source` — a single document for an à-la-carte quiz. A run ends with a cold-read review of what it produced, by default.
 - **`emit`** — packages the canonical JSON into LMS files, with no model involved: a Canvas quiz `.zip` (QTI), standalone or re-rendered page HTML, a Common Cartridge `.imscc` of pages, an `.imscc` of assignments, or one whole-course `.imscc` of all three together in unit modules.
 
 Three offline commands sit alongside them: `check` validates every settings file at once, `config` changes one setting and refuses a value it can't use, and `census` inventories what exists for every unit and what's missing.
@@ -37,7 +37,7 @@ A hardened tool-calling loop copes with an unreliable local model — guardrails
 
 Pages are designed teaching artifacts, not plain text dumps.
 They compose from a catalog of typed content blocks — section headings, pull quotes, columns, cards, callouts, glossaries, code, and collapsible "predict-then-reveal" foldouts — each chosen for a documented pedagogical function (drawn from Cognitive Load Theory and Universal Design for Learning).
-A page can take one of four functions: a full teaching page, a glossary companion (terms beside the video), an orientation/overview page, or an after-the-week recap; the teaching generator auto-selects a monolithic or decomposed strategy by length.
+A page can take one of four functions: a full teaching page, a glossary companion (terms beside the video), an orientation/overview page, or an after-the-unit recap; the teaching generator auto-selects a monolithic or decomposed strategy by length.
 Everything renders to Canvas-safe HTML — restricted to the properties Canvas's sanitizer actually allows — so it survives import intact, including flexbox layout and native collapsible sections.
 Instructor-supplied links, references, and embeds (slideshows, videos, sketches) come in through a per-course supplements file; the model is never allowed to invent a URL.
 
@@ -59,7 +59,7 @@ coursekit doesn't just generate; it *measures* whether the result is pedagogical
 
 - **Facticity** (quizzes and pages) — is each claim or answer correct?
 - **Pedagogy rubric** (pages) — does the page scan, signal its key idea, engage, show worked examples, and prompt retrieval? Scored 0–3 with coaching notes, not a pass/fail.
-- **Concept delivery** (pages) — for each concept the week teaches, is it actually conveyed well: explained, exemplified, pitched right?
+- **Concept delivery** (pages) — for each concept the unit teaches, is it actually conveyed well: explained, exemplified, pitched right?
 - **Groundedness** (pages and quizzes) — is the content drawn from *the source*, or from the model's own prior knowledge? A low-coverage quiz is a warning that the source is too thin to ground it; on pages, contradictions with the material are flagged.
 
 `evaluate --all` runs the whole battery and writes a report per dimension.

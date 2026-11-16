@@ -1,9 +1,9 @@
 # Course pages
 
-A page is the week's **narrative** — the page a student lands on, organising the week's material into a clear teaching outline.
+A page is the unit's **narrative** — the page a student lands on, organising the unit's material into a clear teaching outline.
 It has **two authors**, and keeping them apart is what keeps the page trustworthy:
 
-- **The model** writes the teaching outline from the week's transcript — headings, concept bullets, code, glossary, callouts. It never writes a link.
+- **The model** writes the teaching outline from the unit's transcript — headings, concept bullets, code, glossary, callouts. It never writes a link.
 - **You** supply everything that carries a URL — references, example works, and embeds (p5 sketches, slideshows, videos) — in a small YAML file. These are merged in when the page is _rendered_, so they survive a regeneration of the model's part and their URLs land exactly as you wrote them.
 
 The canonical artifact is `page.json` (typed blocks); the renderer turns it into Canvas-safe HTML.
@@ -12,7 +12,7 @@ The canonical artifact is `page.json` (typed blocks); the renderer turns it into
 
 ```bash
 uv run coursekit generate "/path/to/course export" --pages --unit 3      # one unit
-uv run coursekit generate "/path/to/course export" --pages               # every week
+uv run coursekit generate "/path/to/course export" --pages               # every unit
 ```
 
 Output lands in a `pages/` tree beside the course, alongside `quizzes/`:
@@ -29,7 +29,7 @@ The HTML is named from the week _title_ (`Week 3: Repetition` → `week-3-repeti
 
 ## The supplements file
 
-Your part is a YAML file in `<course root>/.vtconfig/pages/`. **You don't have to guess the exact slug** — it's matched by _week identity_, so for Week 3 any of `week-3.yaml`, `week-3-repetition.yaml`, or `week 3.yaml` works.
+Your part is a YAML file in `<course root>/.vtconfig/pages/`. **You don't have to guess the exact slug** — a numbered unit is matched by its number, so for Week 3 any of `week-3.yaml`, `week-3-repetition.yaml`, or `week 3.yaml` works; any other unit's file is its name on disk (`intro.yaml` for a unit `intro`).
 Name it whatever reads well.
 
 Every key is optional. A minimal file is just a couple of references.
@@ -131,11 +131,11 @@ Each page's evaluations are listed under it too (facticity, groundedness, pedago
 ## What makes a good page
 
 The model is prompted to build a **teaching outline**, not a transcript recap.
-A strong week page tends to run:
+A strong unit page tends to run:
 
-1. A short **REVIEW** — what earlier weeks set up, as a few bullets (only when the week builds on them).
-2. One **section per key concept** — a heading, a few concept bullets, and a code example where the week shows code.
-3. A **glossary** of the week's terms.
+1. A short **REVIEW** — what earlier units set up, as a few bullets (only when the unit builds on them).
+2. One **section per key concept** — a heading, a few concept bullets, and a code example where the unit shows code.
+3. A **glossary** of the unit's terms.
 4. A **callout** for a common pitfall.
 
 Your references and examples render **below** all of that, as their own sections.
@@ -148,33 +148,33 @@ Pick the function with `--function` (pages only):
 
 | `--function` | What it is | Uses the model? | Lands in |
 |---|---|---|---|
-| `teaching` (default) | The full taught week page — one section per concept, grounded by the concept map. | ✓ | `pages/<week>/` |
-| `glossary` | A "terms beside the video" companion — the week's key terms + one-line definitions. | ✓ (extracts terms) | `pages/<week>-glossary/` |
-| `overview` | A week "Start Here" — orientation + the big idea + what you'll cover. | ✗ assembled from the concept map | `pages/<week>-overview/` |
-| `recap` | An after-the-week review — the big idea to carry forward, then a predict-then-reveal recall foldout per concept. | ✗ assembled from the concept map | `pages/<week>-recap/` |
+| `teaching` (default) | The full taught unit page — one section per concept, grounded by the concept map. | ✓ | `pages/<unit>/` |
+| `glossary` | A "terms beside the video" companion — the unit's key terms + one-line definitions. | ✓ (extracts terms) | `pages/<unit>-glossary/` |
+| `overview` | A unit "Start Here" — orientation + the big idea + what you'll cover. | ✗ assembled from the concept map | `pages/<unit>-overview/` |
+| `recap` | An after-the-unit review — the big idea to carry forward, then a predict-then-reveal recall foldout per concept. | ✗ assembled from the concept map | `pages/<unit>-recap/` |
 
-The functions are separate artifacts (they land beside each other in `pages/`), so a week can have all four.
+The functions are separate artifacts (they land beside each other in `pages/`), so a unit can have all four.
 
-**`overview` and `recap` are assembled model-free** from the week's concept map (run `analyze` first so the map exists) — there's nothing for the model to write, so they generate instantly and **skip the post-run review** (no need for `--no-review`). `teaching` and `glossary` do use the model.
+**`overview` and `recap` are assembled model-free** from the unit's concept map (run `analyze` first so the map exists) — there's nothing for the model to write, so they generate instantly and **skip the post-run review** (no need for `--no-review`). `teaching` and `glossary` do use the model.
 Without a concept map, `overview` and `recap` stop with a message saying to run `analyze`, rather than shipping a near-empty page. Examples:
 
 ```bash
-# the week's teaching page (the default) — uses the model
+# the unit's teaching page (the default) — uses the model
 uv run coursekit generate "/path/to/course" --pages --unit 3
 
-# an after-the-week recap page — model-free, built from the concept map
+# an after-the-unit recap page — model-free, built from the concept map
 uv run coursekit generate "/path/to/course" --pages --function recap --unit 3
 
-# a week "Start Here" overview — also model-free
+# a unit "Start Here" overview — also model-free
 uv run coursekit generate "/path/to/course" --pages --function overview --unit 3
 ```
 
-Each renders to `pages/<week>-<function>/<slug>.html` (e.g. `pages/week-3-recap/week-3-recap.html`) alongside its `page.json`; re-render any of them model-free with `emit html` after a theme change.
+Each renders to `pages/<unit>-<function>/<slug>.html` (e.g. `pages/week-3-recap/week-3-recap.html`) alongside its `page.json`; re-render any of them model-free with `emit html` after a theme change.
 
 For a **teaching** page, *which* generator runs — a single monolithic pass or the decomposed per-concept passes — is the program's call, made by measured length (`--generator auto`, the default). Force one with `--generator monolithic|decompose`. Tune the thresholds a course routes on in `<course root>/.vtconfig/page.yaml`:
 
 ```yaml
-mono_char_budget: 24000     # a week longer than this decomposes
+mono_char_budget: 24000     # a unit longer than this decomposes
 mono_concept_budget: 7      # …or one with more concepts than this
 ```
 

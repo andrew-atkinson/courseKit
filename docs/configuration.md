@@ -46,16 +46,29 @@ coursekit writes only its own files there (below); `context.yaml` stays the tran
 | `page.yaml`         | pages   | the page generator's settings                                          |
 | `evaluate.yaml` · `ingest.yaml` · `assignment.yaml` | those commands | their settings ([keys below](#generator-settings--quizyaml--pageyaml)) |
 | `structure.coursekit.yaml` | coursekit | the declared units and their order, typed sources, grading groups, expectations (drafted by `propose`, yours to edit) |
-| `concepts/week-N.yaml` | coursekit | a unit's concept map (written by `analyze`, [yours to edit](evaluating.md#analyze--the-concept-map-that-grounds-everything)) |
+| `concepts/<unit>.yaml` | coursekit | a unit's concept map (written by `analyze`, [yours to edit](evaluating.md#analyze--the-concept-map-that-grounds-everything)) |
 | `domain.md`         | shared  | the [domain profile](domain-profile.md) — applies to every generator   |
 | `voice.md`          | shared  | the instructor [voice profile](#voice-profile--voicemd) — prose generators write in this voice |
 | `style.yaml`        | pages   | the page [theme](design.md) — visual identity + accent + density       |
 | `prompts/<gen>/…md` | shared  | per-course prompt overrides                                            |
-| `pages/<week>.yaml` | pages   | a page's [supplements](pages.md) — references, examples, embeds        |
+| `pages/<unit>.yaml` | pages   | a page's [supplements](pages.md) — references, examples, embeds        |
 
 **Unit order.** Once `structure.coursekit.yaml` lists units, that listing is the order every command follows; until then units sort by number, so unit 3 runs before unit 10.
 The overlay lists them under `units:`; an older one says `weeks:`, which reads the same (one or the other, not both), and `propose` writes `units:` when it redrafts.
 Likewise an expectation's `scope: week` is read as `scope: unit`.
+
+**A unit's name on disk.** A numbered unit keeps the name a weekly course has always had — unit `3`'s concept map is `concepts/week-3.yaml`, its quiz `quizzes/week-3/` — and any other unit is named by its id: a unit `intro` gets `concepts/intro.yaml` and `quizzes/intro/`.
+
+**The course's word for a unit.** The model is told "this week", "the week's material", and so on; a course that meets in sessions, blocks, or classes names its unit once, and every brief, critic, and fixer says that word instead:
+
+```bash
+uv run coursekit config set "/path/to/course" unit_noun session
+```
+
+That writes `unit_noun: session` into `structure.coursekit.yaml`; `config unset … unit_noun` goes back to "week".
+The plural is made by rule — sessions, classes, studies — so a word with an irregular plural reads wrongly where a prompt says the plural.
+The overview, recap, and module pages coursekit writes without a model use the word too, and so does an assignment's default scope ("this session").
+A numbered unit's title still reads "Week 3: …", since that title is the course's own.
 
 ### Generator settings — `quiz.yaml` / `page.yaml`
 
@@ -92,7 +105,7 @@ uv run coursekit config show "/path/to/course"            # everything set so fa
 uv run coursekit config unset "/path/to/course" grading.groups.Projects
 ```
 
-A setting's first part names the file (`quiz`, `page`, `evaluate`, `ingest`, `assignment`, `style`; `pages.<name>` for a page's supplements); `grading`, `expect`, and `units` (or `weeks` in an older overlay) live in the structure overlay.
+A setting's first part names the file (`quiz`, `page`, `evaluate`, `ingest`, `assignment`, `style`; `pages.<name>` for a page's supplements); `grading`, `expect`, `unit_noun`, and `units` (or `weeks` in an older overlay) live in the structure overlay.
 Grading groups are addressed by name.
 `context.yaml` belongs to the transcriber and is never changed by coursekit.
 Rewriting a file drops any comments you added by hand, so keep notes somewhere else.
@@ -122,6 +135,8 @@ To change them for **one course only**, drop a replacement next to that course's
 <course root>/.vtconfig/prompts/quiz/task.md
 <course root>/.vtconfig/prompts/page/system.md
 ```
+
+An override can say `{unit_noun}` and `{unit_nouns}` wherever the shipped prompts do; coursekit fills in the course's word for a unit and its plural.
 
 Naming a _variant_ (`task_prompt: exam` above) and supplying its file (`prompts/quiz/exam.md`) is how a course keeps several briefs and picks between them.
 

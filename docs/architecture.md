@@ -53,11 +53,11 @@ flowchart TB
     ingest["③ <b>coursekit ingest</b>"]
 
     ctx[("② <b>.vtconfig/context.yaml</b><br/>course · weeks · modules")]
-    wk[("② week-N.md<br/>the unit's text")]
+    wk[("② unit text<br/>week-N.md for a numbered unit")]
     ycfg[("② <b>.vtconfig/</b> quiz.yaml · page.yaml<br/>style.yaml · supplements<br/>structure.coursekit.yaml")]
 
     analyze["③ <b>coursekit analyze</b>"]
-    cmap[("② <b>.vtconfig/concepts/</b><br/>week-N.yaml · the concept map")]
+    cmap[("② <b>.vtconfig/concepts/</b><br/>the concept map · one per unit")]
     generate["③ <b>coursekit generate</b>"]
     ir[("② bank.json · page.json<br/>assignment.json · <b>the IR</b>")]
     emit["③ <b>coursekit emit</b>"]
@@ -101,22 +101,22 @@ flowchart TB
 The pieces fall into four layers.
 Two things are worth taking from it: **`.vtconfig/` is just local files in the course's own folder, created by the tools but freely hand-editable by faculty**, and that **coursekit is a set of programs that *drive* an LLM (local or hosted), not a model itself**.
 
-**① What faculty provides.** The raw material for a week: a lecture video, or readings / PDFs / slides (`.docx`, `.odt`), or — for a course already living in Canvas — a prior course export.
+**① What faculty provides.** The raw material for a unit: a lecture video, or readings / PDFs / slides (`.docx`, `.odt`), or — for a course already living in Canvas — a prior course export.
 Nothing here is coursekit-specific; it is what the instructor already has.
 
 **② The course folder on disk.** A plain local directory — the course's own folder, marked by a `.vtconfig/` subfolder — holding two kinds of file:
 
-- **the `.vtconfig/` reference:** `context.yaml` (course · weeks · modules) and the per-tool config (`quiz.yaml`, `page.yaml`, `style.yaml`, the per-week supplements, prompt overrides). The tools create these, but they are **faculty-editable** — a professor changes a theme, tunes a prompt, adds a supplement link, or fixes a week title by hand in an ordinary text editor. It is a *local reference coursekit both writes and reads*, not a hidden store.
-- **the generated files:** `week-N.md` (the unit's text), the `bank.json` / `page.json` / `assignment.json` IR, the emitted artifacts (`.gift`, QTI `.zip`, `.html`, `.imscc`), and the census (`census.json` + `census.md`).
+- **the `.vtconfig/` reference:** `context.yaml` (course · weeks · modules) and the per-tool config (`quiz.yaml`, `page.yaml`, `style.yaml`, the per-unit supplements, prompt overrides). The tools create these, but they are **faculty-editable** — a professor changes a theme, tunes a prompt, adds a supplement link, or fixes a unit title by hand in an ordinary text editor. It is a *local reference coursekit both writes and reads*, not a hidden store.
+- **the generated files:** each unit's text (`week-N.md` for a numbered unit), the `bank.json` / `page.json` / `assignment.json` IR, the emitted artifacts (`.gift`, QTI `.zip`, `.html`, `.imscc`), and the census (`census.json` + `census.md`).
   Beside every artifact coursekit makes, a record says what it was made from and how (CORE-4): `record.json` in each quiz, page, and assignment folder, and `<name>.record.json` beside each overview page and concept map. No emitter reads it.
   `evaluate` notes each critic's result in the record of the artifact it judged, with a fingerprint of the version it read, so a later change shows the evaluation is of an earlier version.
   The census reports each artifact's status from its record, `emit` warns about a stale one, and `generate` won't overwrite one edited by hand without `--force`.
   Every file coursekit writes is written whole or not at all (`coursekit/atomic.py`), so a crash or a full disk leaves the previous file, never half of one.
 
-Everything is plain, versionable files in the course folder — never a database. coursekit **writes** here (week text, concept maps, IR, artifacts, and its own settings) and **reads** here (config); the transcriber writes here too (`context.yaml`, `week-N.md`).
+Everything is plain, versionable files in the course folder — never a database. coursekit **writes** here (unit text, concept maps, IR, artifacts, and its own settings) and **reads** here (config); the transcriber writes here too (`context.yaml`, `week-N.md`).
 That file boundary is why the two tools stay separate repos with disjoint runtimes — the transcriber keeps `mlx-whisper` and its Apple-Silicon stack; coursekit stays pydantic + stdlib — and neither imports the other.
 
-**③ coursekit — a set of programs.** Four phases run locally: **ingest** (documents → `week-N.md`), **analyze** (week text + the transcriber's `knowledge.json` → the per-week concept map), **generate** (week text → `bank.json`/`page.json`), **emit** (IR → Canvas files).
+**③ coursekit — a set of programs.** Four phases run locally: **ingest** (documents → `week-N.md`), **analyze** (unit text + the transcriber's `knowledge.json` → the per-unit concept map), **generate** (unit text → `bank.json`/`page.json`), **emit** (IR → Canvas files).
 Two more verbs sit alongside them as the *output-worth* layer: **evaluate** (cold-read the committed IR for correctness, form, and concept-delivery) and **fix** (regenerate each flagged item in place).
 Four more need no model: **propose** drafts the declared structure, grading groups, and expectations for the faculty to edit; **census** inventories what exists for every unit (presence, not quality); **check** validates every settings file; **config** reads and writes one setting.
 Of the phases, all except `emit` — and ingest's optional shaping pass — **call an LLM, either one you host locally (LM Studio by default) or a hosted API.** coursekit holds no model of its own; it drives whichever provider is configured, which is what lets the whole thing run offline when the LLM is local. (The transcriber is the *media→text* front door; ingest is the *document→text* one — two ways onto the same folder.)
@@ -157,7 +157,7 @@ flowchart TB
         ana["concept_map.py · consolidate.py"]
     end
     vt -. "knowledge.json" .-> kj[("knowledge.json")] --> ana
-    md --> ana -.-> cmap[(".vtconfig/concepts/<br/>week-N.yaml")]
+    md --> ana -.-> cmap[(".vtconfig/concepts/<br/>one map per unit")]
 
     md & ctx & ov --> model["<b>course.py · the course model</b><br/>units · artifact index · read by every verb below"]
 

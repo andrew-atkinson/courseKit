@@ -1,6 +1,6 @@
 # coursekit
 
-**Turn a course's own material into correct, well-taught, Canvas/Moodle-ready content — on a model you run yourself.** Point it at a week's lectures, readings, or slides and it drafts the quizzes and pages, checks them for pedagogical soundness, and packages them for your LMS — without your content ever leaving your machine.
+**Turn a course's own material into correct, well-taught, Canvas/Moodle-ready content — on a model you run yourself.** Point it at your lectures, readings, or slides and it drafts the quizzes and pages, checks them for pedagogical soundness, and packages them for your LMS — without your content ever leaving your machine.
 
 > **Status: working prototype.** Today coursekit is a command-line tool, which means it's a fit for the technically comfortable early adopter. The goal is a friendly app any instructor can use; the interface is where much of the road ahead lies. What's below is real and runs — just from a terminal, for now.
 
@@ -16,7 +16,7 @@
 Each is "you have something → coursekit gives you something."
 
 - **Audit an existing course for pedagogical soundness.** You have a course's material and want to know whether it actually teaches well. coursekit reads each page and quiz and reports back on three axes — is it _correct_ (facticity), does it _scan, signal, and engage_ (form), and does it actually _deliver each concept_ — as coaching, not just a pass/fail.
-- **Turn a week's material into engaging, portable LMS content.** You have a transcript or readings and want quizzes and a teaching page. coursekit drafts randomized quizzes (every student gets a different variant) and a designed course page, then packages them as standard Canvas QTI / Common Cartridge files — portable, reviewable, no API token required.
+- **Turn a unit's material into engaging, portable LMS content.** You have a transcript or readings and want quizzes and a teaching page. coursekit drafts randomized quizzes (every student gets a different variant) and a designed course page, then packages them as standard Canvas QTI / Common Cartridge files — portable, reviewable, no API token required.
 
 On the roadmap (not yet): refreshing and updating existing content in place, building a course from just an outline, and reasoning about the spacing and timing of content across a whole term.
 
@@ -56,7 +56,7 @@ uv run pytest           # 1170 tests, all offline — no model needed (names eac
 
 ## Quick start
 
-The CLI has four phases: **`ingest`** (documents → week text), **`analyze`** (week text → the concept map that grounds generation), **`generate`** (week text → quizzes/pages, the model), **`emit`** (canonical JSON → LMS packages, model-free).
+The CLI has four phases: **`ingest`** (documents → a unit's text), **`analyze`** (unit text → the concept map that grounds generation), **`generate`** (unit text → quizzes/pages, the model), **`emit`** (canonical JSON → LMS packages, model-free).
 
 ```bash
 # see what it would do — free, no model
@@ -83,7 +83,7 @@ The README is the high-level read; the detail lives in [`docs/`](docs/):
 - **[Command reference](docs/commands.md)** — every CLI verb and flag, and which use the model.
 - **[Evaluating and fixing](docs/evaluating.md)** — the audit → repair loop: `analyze` (the concept map), `evaluate` (the cold-read checks), and `fix` (regenerate flagged items in place). The part that makes a local model trustworthy.
 - **[Generating quizzes](docs/quizzes.md)** — the quiz workflow end to end: dry-run, generate, where output lands, and exporting to Canvas as a QTI `.zip`. Plus the six question types and how the hardened loop copes with an unreliable local model.
-- **[Course pages](docs/pages.md)** — generating a week's page, the two-author split (model outline + your supplements), the supplements YAML (references, examples, embeds — including pasted `<iframe>` snippets), and re-rendering model-free.
+- **[Course pages](docs/pages.md)** — generating a unit's page, the two-author split (model outline + your supplements), the supplements YAML (references, examples, embeds — including pasted `<iframe>` snippets), and re-rendering model-free.
 - **[The domain profile](docs/domain-profile.md)** — one `.vtconfig/domain.md` per course that pins every generator to the right knowledge domain (p5.js, not Processing) and _corrects a transcript that drifts_. The main defence against plausible-but-wrong output.
 - **[Page design](docs/design.md)** — the four visual identities (bauhaus, terminal, plotter, studio), the `style.yaml` a course picks a theme with, section roles (where design meets pedagogy), and the guardrails (Canvas allowlist, WCAG, alt-text) that keep a theme shippable.
 - **[Configuration](docs/configuration.md)** — the `.env` environment, choosing a provider, the RAM pre-flight, and the per-course `.vtconfig/` files (`quiz.yaml` / `page.yaml`, prompt overrides).

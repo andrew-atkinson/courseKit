@@ -8,13 +8,13 @@ Three commands, in the order you'd use them: **`analyze`** (understand the conte
 ## `analyze` — the concept map that grounds everything
 
 ```bash
-uv run coursekit analyze "/path/to/course"          # every week
+uv run coursekit analyze "/path/to/course"          # every unit
 uv run coursekit analyze "/path/to/course" --unit 7 # one unit
 uv run coursekit analyze "/path/to/course" --dry-run  # no model; shows what it would read
 ```
 
-`analyze` builds a per-week **concept map** — the teaching concepts, the knowledge components under each, and the one enduring understanding above them — and writes it to `.vtconfig/concepts/week-N.yaml`.
-It reads the transcriber's `knowledge.json` when present, or the week text when not.
+`analyze` builds a per-unit **concept map** — the teaching concepts, the knowledge components under each, and the one enduring understanding above them — and writes it to `.vtconfig/concepts/<unit>.yaml` (`week-3.yaml` for a numbered unit).
+It reads the transcriber's `knowledge.json` when present, or the unit's text when not.
 
 The map is **yours to edit.** Open the YAML and correct anything off — the concepts, the enduring understanding, which material a concept needs.
 Generation and evaluation both read it: the page generator uses it as a checklist it can't skip a concept from, and the evaluator scores against that fixed list instead of re-guessing.
@@ -32,7 +32,7 @@ uv run coursekit evaluate "/path/to/course" --all    # + pedagogy (form) + conce
 
 - **Facticity** — is each item *correct*? Wrong answer keys, definitions that contradict the material, code that won't run.
 - **Pedagogy** (`--all`) — does the page *scan, signal, and engage*? A 0–3 rubric, coaching rather than pass/fail.
-- **Concept-delivery** (`--all`) — does the page actually *teach* each concept the week is meant to cover?
+- **Concept-delivery** (`--all`) — does the page actually *teach* each concept the unit is meant to cover?
 - **Groundedness** (`--all`) — how much of a page or quiz comes from *the source*, rather than the model's own knowledge? A low-coverage quiz means the source is too thin to ground it; on pages, contradictions with the material are flagged.
 
 It writes `quiz-review.md`, `page-review.md`, and (with `--all`) `page-pedagogy.md`, `page-concepts.md`, `page-groundedness.md`, and `quiz-groundedness.md` beside the course.

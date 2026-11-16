@@ -1,28 +1,28 @@
 # Generating quizzes
 
-A quiz is **one question group per concept, × 4 variants** — the number of concepts follows the week's concept map, rather than a fixed five.
+A quiz is **one question group per concept, × 4 variants** — the number of concepts follows the unit's concept map, rather than a fixed five.
 Each concept becomes a Canvas _question group_ that draws one variant at random, so every student gets a different version of the same quiz.
 
-You can override the count at two levels: a `questions:` value in a week's `.vtconfig/concepts/week-N.yaml` fixes the number for **that week**, and `questions:` in the course's `.vtconfig/quiz.yaml` fixes it for **every** week — the per-week value wins.
+You can override the count at two levels: a `questions:` value in a unit's `.vtconfig/concepts/<unit>.yaml` fixes the number for **that unit**, and `questions:` in the course's `.vtconfig/quiz.yaml` fixes it for **every** unit — the per-unit value wins.
 With neither set, the model chooses, guided by the concept map.
 
 ### The enduring-understanding question (opt-in)
 
 Multiple choice can't test an _enduring understanding_ — a transferable, meaning-making idea — so it isn't made into a quiz group by default.
-Set `eu_question: true` in the course's `.vtconfig/quiz.yaml` and each week's quiz gains **one open-response question**: a short transfer task asking the student to apply the week's enduring understanding to a new situation, with a few rubric criteria folded into the prompt.
+Set `eu_question: true` in the course's `.vtconfig/quiz.yaml` and each unit's quiz gains **one open-response question**: a short transfer task asking the student to apply the unit's enduring understanding to a new situation, with a few rubric criteria folded into the prompt.
 It exports as a Canvas essay question and is **graded by hand** (coursekit writes the task and the criteria, never grades the response); the automatic facticity check skips it, since it has no marked answer.
 A fuller version — a standalone Canvas assignment with a structured rubric — is on the roadmap.
 The question is built from the unit's enduring understanding, which comes from its concept map, so run `coursekit analyze` first.
 A unit without one still gets its quiz, and the run prints a warning naming the unit and what's missing — the question is never silently left out.
 A single-document quiz (`generate --source`) gets the question too, from the unit the document belongs to; the rest of that quiz is still shaped by the document alone.
 
-To generate **just** the enduring-understanding question — one focused model call, without regenerating the whole quiz — run it directly against a week that already has a concept map:
+To generate **just** the enduring-understanding question — one focused model call, without regenerating the whole quiz — run it directly against a unit that already has a concept map:
 
 ```bash
 uv run python -m coursekit.generate.quiz.eu "/path/to/course" --unit 3
 ```
 
-It adds the question to that week's existing `bank.json` in place (or writes an EU-only bank if none exists), and re-running replaces the question rather than duplicating it.
+It adds the question to that unit's existing `bank.json` in place (or writes an EU-only bank if none exists), and re-running replaces the question rather than duplicating it.
 
 ### The quiz introduction
 
@@ -31,7 +31,7 @@ The model sees only the unit's title, the topics, the big idea, and whether ther
 It is saved as `intro` in `bank.json`, where you can edit it, and the next `emit` uses your edit.
 The grading line under it is written by coursekit, not the model, so the points and who marks what are always right — for example "7 points marked automatically; the open question (1 point) is marked by your instructor."
 A quiz without an introduction (one made before this, or a run whose intro failed, which prints a warning) gets a plain default.
-To write just the introduction for a week's existing quiz, without regenerating it:
+To write just the introduction for a unit's existing quiz, without regenerating it:
 
 ```bash
 uv run python -m coursekit.generate.quiz.intro "/path/to/course" --unit 7
@@ -59,27 +59,27 @@ Adding a platform is one emitter, not a rewrite.
 uv run coursekit generate "/path/to/course export" --dry-run
 ```
 
-Lists every week it found and where each would be written — a cheap check before spending model time.
+Lists every unit it found and where each would be written — a cheap check before spending model time.
 
 ## Generate
 
 ```bash
 uv run coursekit generate "/path/to/course export" --unit 3      # one unit
-uv run coursekit generate "/path/to/course export" --weeks 3-8   # an inclusive range
-uv run coursekit generate "/path/to/course export"               # every week found
+uv run coursekit generate "/path/to/course export" --weeks 3-8   # an inclusive range of numbered units
+uv run coursekit generate "/path/to/course export"               # every unit found
 ```
 
 `PATH` is a course folder, a folder inside it, or one unit's document.
 Given a folder, it picks up each unit's document (`week-*.md`, or whatever name `structure.coursekit.yaml` declares) and runs them in the course's unit order.
-Expect a few minutes per week on a local model.
+Expect a few minutes per unit on a local model.
 
 **Input is decoupled** — any markdown works.
-If the path happens to sit under a videotranscriber project (marked by a `.vtconfig/` folder), coursekit reads its `context.yaml` to enrich the prompt with week titles and module names.
+If the path happens to sit under a videotranscriber project (marked by a `.vtconfig/` folder), coursekit reads its `context.yaml` to enrich the prompt with unit titles and module names.
 It never requires it.
 
-## Target one document instead of the whole week
+## Target one document instead of the whole unit
 
-A whole-week quiz draws on everything in `week-N.md`. Sometimes you want a quiz on **one source** — a single reading, one slide deck, a PDF — not the week entire:
+A whole-unit quiz draws on everything in the unit's text (`week-N.md` for a numbered unit). Sometimes you want a quiz on **one source** — a single reading, one slide deck, a PDF — not the unit entire:
 
 ```bash
 uv run coursekit generate "/path/to/course" \
@@ -88,10 +88,10 @@ uv run coursekit generate "/path/to/course" \
 
 It extracts that document, writes it as `source.md`, and generates a quiz into a **distinct** slug — `quizzes/week-3-barrett/` — so a targeted quiz never overwrites the whole-week quiz or another document's.
 The unit comes from the declared structure when `structure.coursekit.yaml` lists the document as one of a unit's sources, then from its path (a `week-N` name or ancestor directory); with neither, the slug is just the document name.
-Targeted generation is **quizzes only**, and honours the course's `domain.md`, voice, and `quiz.yaml` exactly as a whole-week run does.
+Targeted generation is **quizzes only**, and honours the course's `domain.md`, voice, and `quiz.yaml` exactly as a whole-unit run does.
 The supported document types are the same as `ingest` (PDF, slides, docx, odt, txt, md).
 
-To quiz every source in a week separately, loop over them:
+To quiz every source in a unit separately, loop over them:
 
 ```bash
 for f in "/path/to/course/week-3"/*/*; do
@@ -153,10 +153,10 @@ The same status shows up where you already look:
 QTI generation is **model-free** — it reads `bank.json`, so you can re-export any time without regenerating questions.
 
 ```bash
-# one .zip per week, written beside each bank.json
+# one .zip per unit, written beside each bank.json
 uv run coursekit emit qti "/path/to/course export/quizzes"
 
-# OR one package containing every week — a single Canvas import
+# OR one package containing every unit — a single Canvas import
 uv run coursekit emit qti "/path/to/course export/quizzes" --bundle
 ```
 
@@ -166,8 +166,8 @@ Then in Canvas: **Import Content → Content Type: "QTI .zip file"** → upload 
 > course-package one brings the quiz in **empty**. (The full story is in
 > [canvasQuizStructure.md](canvasQuizStructure.md).)
 
-Each quiz arrives with one question group per concept (the count set by the week's concept map, or `quiz.yaml`), each drawing 1 of 4 variants, plus a description and grading criteria.
-Both the per-week `.zip` and the `--bundle` package have been imported into a live Canvas course and confirmed working, with the groups randomizing as intended.
+Each quiz arrives with one question group per concept (the count set by the unit's concept map, or `quiz.yaml`), each drawing 1 of 4 variants, plus a description and grading criteria.
+Both the per-unit `.zip` and the `--bundle` package have been imported into a live Canvas course and confirmed working, with the groups randomizing as intended.
 
 ## Good to know
 

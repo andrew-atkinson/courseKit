@@ -148,7 +148,7 @@
       <div class="band-head"><span class="eyebrow">Ingest &amp; structure adapters</span><span class="band-role">source → the canonical files · each one a <b>single writer of its own file</b></span></div>
       <div class="nodes">
         <div class="node vt"><div class="n-name">videotranscriber</div><div class="n-meta">media → text; writes week-N.md, context.yaml, knowledge.json, and voice.md. Heavy media stack (mlx-whisper) — its own repo.</div><span class="tag">separate repo</span></div>
-        <div class="node built"><div class="n-name">ingest</div><div class="n-meta">PDF · slides · docx · odt → week-N.md; a folder of documents becomes one unit's text. A model tidies it unless you pass <code>--raw</code>.</div></div>
+        <div class="node built"><div class="n-name">ingest</div><div class="n-meta">PDF · slides · docx · odt → week-N.md; a folder of documents becomes one unit's text. A unit with no week number isn't ingested yet. A model tidies it unless you pass <code>--raw</code>.</div></div>
         <div class="node built"><div class="n-name">propose</div><div class="n-meta">scans the messy tree → drafts the declared structure, grading groups, and expectations; surfaces unassigned files. No model unless you ask for one.</div></div>
         <div class="node built"><div class="n-name">analyze</div><div class="n-meta">a unit's text → its concept map, using a model; yours to edit afterward.</div></div>
         <div class="node planned pad-r"><div class="n-name">canvas import</div><div class="n-meta">bring an existing course in, so it can be audited too.</div><span class="tag">planned</span></div>
@@ -161,8 +161,8 @@
     <section class="band ir">
       <div class="band-head"><span class="eyebrow">The canonical files</span><span class="band-role">every input converges here · plain files in the course folder, loaded as one <b>course model</b></span></div>
       <div class="nodes">
-        <div class="node built"><div class="n-name">context.yaml <span style="color:var(--vt);font-weight:600">+</span> structure.coursekit.yaml</div><div class="n-meta">the declared structure — units and their order, sources, titles, grading groups, expectations.</div></div>
-        <div class="node built"><div class="n-name">week-N.md</div><div class="n-meta">the unit's consolidated text.</div></div>
+        <div class="node built"><div class="n-name">context.yaml <span style="color:var(--vt);font-weight:600">+</span> structure.coursekit.yaml</div><div class="n-meta">the declared structure — units and their order, the course&rsquo;s word for a unit (week, session, block), sources, titles, grading groups, expectations.</div></div>
+        <div class="node built"><div class="n-name">unit text</div><div class="n-meta">the unit's consolidated text — <code>week-N.md</code> for a numbered unit, or the file its <code>doc:</code> names.</div></div>
         <div class="node built"><div class="n-name">concept map</div><div class="n-meta">the unit's concepts — grounds generation + evaluation.</div></div>
         <div class="node built"><div class="n-name">bank.json · page.json · assignment.json</div><div class="n-meta">the canonical quiz, page, and assignment — the one form every emitter reads.</div></div>
         <div class="node built"><div class="n-name">record.json</div><div class="n-meta">beside each artifact (and each concept map and overview): what it was made from, and what the critics found, so coursekit can tell when it no longer matches the course. <code>generate</code> won&rsquo;t overwrite a hand edit without <code>--force</code>.</div></div>

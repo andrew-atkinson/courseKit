@@ -5,9 +5,9 @@ For the high-level "what it's for and who it's for," see the [README](../README.
 
 The CLI is four phases, in the order work flows through them, plus a review verb and the tests:
 
-- **`ingest`** — turn a week's documents (PDF, slides, `.docx`) into the week text the generators read.
-- **`analyze`** — consolidate a week's concepts into a `.vtconfig/concepts/week-N.yaml` concept map (instructor-editable) that grounds generation and evaluation.
-- **`generate`** — turn that week text into quizzes and pages (the model-driven step).
+- **`ingest`** — turn a week's documents (PDF, slides, `.docx`) into the unit text the generators read.
+- **`analyze`** — consolidate a unit's concepts into a `.vtconfig/concepts/<unit>.yaml` concept map (instructor-editable) that grounds generation and evaluation.
+- **`generate`** — turn that unit text into quizzes and pages (the model-driven step).
 - **`emit`** — package the canonical JSON into Canvas files, model-free — up to a whole-course `.imscc`.
 
 `PATH` is a course folder, a folder inside it, or one unit's document.
@@ -24,29 +24,30 @@ Artifacts land beside the course (`quizzes/` and `pages/` trees), never in this 
 A source's week is its own filename (`week-3.pdf`) or its nearest `week-N` ancestor directory (`.../week-3/readings/Barrett.pdf`).
 When several docs share a week they consolidate into one source-tagged week doc (so a later `--source` quiz can still target one reading); when no file names a week, each doc becomes its own week in sorted order.
 A document that names no week is skipped once any week-numbered content is present (a course-level outline at the root is not week content).
+`ingest` finds a unit by its week number, so it doesn't yet consolidate a unit with no number (`intro`, `loops`) — give such a unit a `doc:` in `structure.coursekit.yaml` pointing at its text, and every other command reads it.
 
 | Structure Commands                      | What it does                                                                                                                                                       | Uses LLM |
 |-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
 | `coursekit check PATH`                  | **Validate** every `.vtconfig` settings file at once — tool settings, `style.yaml`, page supplements, the structure overlay, concept maps, the domain and voice profiles — reporting each problem with its file, key, value, and what's allowed. Run it after editing any of them. Offline. | x        |
 | `coursekit config set PATH KEY VALUE`   | **Change** one setting without editing YAML — e.g. `quiz.eu_question true`, `style.theme terminal`, `grading.groups.Projects.weight 20%`. Validated before it's saved: a bad value is refused and the file is left exactly as it was. Also `config get PATH KEY`, `config unset PATH KEY`, `config show PATH [DOC]`, `config check PATH`. | x        |
-| `coursekit census PATH`                 | **Inventory** the whole course — declared materials + the week source doc + generated artifacts (pages/quizzes/assignments/concept-maps) per week, plus **presence gaps** — into `census.json` (IR) + `census.md` (report). Offline. | x        |
-| `coursekit propose PATH`                | Scan the course tree → **declare** its structure (weeks + typed sources) into `.vtconfig/structure.coursekit.yaml`, and surface any files it couldn't key.         | x        |
+| `coursekit census PATH`                 | **Inventory** the whole course — declared materials + the unit's source doc + generated artifacts (pages/quizzes/assignments/concept-maps) per unit, plus **presence gaps** — into `census.json` (IR) + `census.md` (report). Offline. | x        |
+| `coursekit propose PATH`                | Scan the course tree → **declare** its structure (units + typed sources) into `.vtconfig/structure.coursekit.yaml`, and surface any files it couldn't key.         | x        |
 | `coursekit propose PATH --model`        | Group with a local **model** instead of filename heuristics — for trees that don't encode weeks in names/folders. Validated so it can only group files that exist. | ✓        |
 | `coursekit propose PATH --model --deep` | Also give the model a short content peek of each file (slower; better on topic-named piles).                                                                       | ✓        |
 | `coursekit propose PATH --grading`      | Draft a **grading-groups** block (assignment groups + weight placeholders) from the generated artifacts into the same overlay — STRC-2. Spans assignments + graded quizzes. | x        |
-| `coursekit propose PATH --expectations` | Draft an **expectations** block (what each scope SHOULD contain) from the course's own signals — modal induction + concept-map rules (EU → an EU assessment, dense week → a glossary). FLOW-9 Layer A. | x        |
+| `coursekit propose PATH --expectations` | Draft an **expectations** block (what each scope SHOULD contain) from the course's own signals — modal induction + concept-map rules (EU → an EU assessment, dense unit → a glossary). FLOW-9 Layer A. | x        |
 | `coursekit propose PATH --dry-run`      | Print the proposal without writing the overlay.                                                                                                                    | x        |
 | `coursekit propose PATH --force`        | Redraft that section of an existing overlay (discards your edits to it; the overlay's other sections are kept).                                                    | x        |
 
-`propose` writes coursekit's **own** overlay file — never `context.yaml` — which the tools then read as authoritative (a week doc can be named anything; sources carry a `kind`).
+`propose` writes coursekit's **own** overlay file — never `context.yaml` — which the tools then read as authoritative (a unit's doc can be named anything; sources carry a `kind`).
 It's descriptive: it maps what exists and shows unassigned files rather than dropping them; you edit the overlay freely afterward.
 
 **Grading groups + weighting (`--grading`, STRC-2).** The drafted `grading:` block declares named assignment **groups** with a percentage `weight` and a `placement` map (by content kind — `assignment`/`quiz` — or a specific item slug). The weights start as **equal placeholders you set** to your real scheme. `emit course` then emits weighted `assignment_groups.xml`, places each assignment and graded quiz in its group, and writes the `group_weighting_scheme=percent` flag so Canvas applies the weights. No `grading:` block ⇒ today's behavior (one unweighted "Assignments" group). This is the gradebook **category** weight (Projects 40% / Quizzes 20%), distinct from a rubric's within-assignment criterion weights.
 
 | Analyze Commands                   | What it does                                                                                                                              | Uses LLM |
 |------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| `coursekit analyze PATH`           | Build each week's concept map (from the transcriber's `knowledge.json`, or the week text when absent) → `.vtconfig/concepts/week-N.yaml`. | ✓        |
-| `coursekit analyze PATH --dry-run` | List the weeks and their knowledge-component counts, no model.                                                                            | x        |
+| `coursekit analyze PATH`           | Build each unit's concept map (from the transcriber's `knowledge.json`, or the unit's text when absent) → `.vtconfig/concepts/<unit>.yaml`. | ✓        |
+| `coursekit analyze PATH --dry-run` | List the units and their knowledge-component counts, no model.                                                                            | x        |
 | `coursekit analyze PATH --unit 3`  | One unit, by id or title (`--unit` repeatable; `--week 3` the same; `--weeks 3-8` a range).                                               | ✓        |
 
 **Choosing units.** `--unit` takes a unit's id (`3`, `intro`), its folder name, or its title, ignoring case; a unit the course doesn't have stops the command and lists the ones it has.
@@ -54,23 +55,23 @@ It's descriptive: it maps what exists and shows unassigned files rather than dro
 
 | Generate Commands                                       | What it does                                                                                                                            | Uses LLM |
 |---------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|----------|
-| `coursekit generate PATH`                               | Both quizzes and pages, every week found.                                                                                               | ✓        |
-| `coursekit generate PATH --dry-run`                     | List the weeks it would process.                                                                                                        | x        |
+| `coursekit generate PATH`                               | Both quizzes and pages, every unit found.                                                                                               | ✓        |
+| `coursekit generate PATH --dry-run`                     | List the units it would process.                                                                                                        | x        |
 | `coursekit generate PATH --unit 3`                      | One unit, by id or title (`--unit "Week 3: Repetition"`). Repeatable; `--week 3` the same; `--weeks 3-8` a range.                      | ✓        |
-| `coursekit generate --source DOC`                       | **Targeted quiz** from ONE document — à la carte; no `PATH` needed → `quizzes/<week>-<doc>/`. Quizzes only.                             | ✓        |
+| `coursekit generate --source DOC`                       | **Targeted quiz** from ONE document — à la carte; no `PATH` needed → `quizzes/<unit>-<doc>/`. Quizzes only.                             | ✓        |
 | `coursekit generate PATH --pages`                       | Only pages (`--quizzes` for only quizzes).                                                                                              | ✓        |
-| `coursekit generate PATH --pages --function glossary`   | Page function: `teaching` (default) / `glossary` / `overview` / `recap` (after-the-week recall). `overview` and `recap` are assembled from the concept map — model-free, and skip the post-run review. | ✓ / model-free for overview·recap |
+| `coursekit generate PATH --pages --function glossary`   | Page function: `teaching` (default) / `glossary` / `overview` / `recap` (after-the-unit recall). `overview` and `recap` are assembled from the concept map — model-free, and skip the post-run review. | ✓ / model-free for overview·recap |
 | `coursekit generate PATH --pages --generator decompose` | Force the teaching generator (default `auto` — picks by length).                                                                        | ✓        |
 | `coursekit generate PATH --output-root DIR`             | Write elsewhere instead of with the course.                                                                                             | ✓        |
-| `coursekit generate PATH --max-iters N`                 | Cap model turns per week (default 80).                                                                                                  | ✓        |
+| `coursekit generate PATH --max-iters N`                 | Cap model turns per unit (default 80).                                                                                                  | ✓        |
 | `coursekit generate PATH --no-review`                   | Skip the cold-read quiz review a `generate` runs by default.                                                                            | ✓        |
-| `coursekit generate PATH --assignments`                 | Draft one **assignment** (brief + rubric) per week → `assignments/<week>/`. `--scope "…"` names what it covers (default "this week").   | ✓        |
+| `coursekit generate PATH --assignments`                 | Draft one **assignment** (brief + rubric) per unit → `assignments/<unit>/`. `--scope "…"` names what it covers (default "this week", in the course's [word for a unit](configuration.md#per-course--vtconfig)).   | ✓        |
 
-**`PATH` vs `--source`.** `PATH` is a course directory or a unit's document, and it is **optional** — omitted, it falls back to `$TRANSCRIPTION`. Given a `PATH`, `generate` processes the whole course (every week, or the ones `--week` selects). Given `--source DOC` it quizzes that ONE document à la carte, and **`PATH` is ignored** — point `--source` at any supported file anywhere, even outside a course (output lands beside the doc, or in its course when it sits under one).
+**`PATH` vs `--source`.** `PATH` is a course directory or a unit's document, and it is **optional** — omitted, it falls back to `$TRANSCRIPTION`. Given a `PATH`, `generate` processes the whole course (every unit, or the ones `--unit` selects). Given `--source DOC` it quizzes that ONE document à la carte, and **`PATH` is ignored** — point `--source` at any supported file anywhere, even outside a course (output lands beside the doc, or in its course when it sits under one).
 
 `overview` and `recap` pages are built from the concept map, so a unit without one stops the command with a message saying to run `analyze`, rather than shipping a near-empty page.
 
-Whole-week generation ends with a cold-read review by default (`--no-review` skips it); a `--source` quiz does **not** review by default (you make many, one at a time) — add **`--review`** to cold-read that one quiz right after generating it.
+Whole-unit generation ends with a cold-read review by default (`--no-review` skips it); a `--source` quiz does **not** review by default (you make many, one at a time) — add **`--review`** to cold-read that one quiz right after generating it.
 
 | Emit Commands                      | What it does                                                                      | Uses LLM |
 |------------------------------------|-----------------------------------------------------------------------------------|----------|

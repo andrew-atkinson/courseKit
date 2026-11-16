@@ -1,7 +1,7 @@
 # The course domain profile
 
 A local model knows a lot, fuzzily.
-Asked to organise a week on creative coding, it blends p5.js with Processing because they share an API vocabulary — and a **transcript can drift the same way**.
+Asked to organise a unit on creative coding, it blends p5.js with Processing because they share an API vocabulary — and a **transcript can drift the same way**.
 The domain profile is how a course pins the model to the right domain, tells it **what a page should center on**, and corrects a drifting source.
 
 It is one file — `<course root>/.vtconfig/domain.md` — a short paragraph you write in your own words.
