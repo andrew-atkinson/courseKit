@@ -1,13 +1,14 @@
-"""CORE-6.1 — who set each overlay section. A proposer's draft is `proposed`; only `accept` or `config
+"""CORE-6 — who set each overlay section. A proposer's draft is `proposed`; only `accept` or `config
 set`/`unset` make a section `declared`, recording who and when; an edit made any other way is `edited`
-until accepted; a section with no history is `unknown` (agent/core-6-design.md)."""
+until accepted; a section with no history is `unknown`. The census (6.2) reports its expectations on that
+basis, with the same gaps whoever set them (agent/core-6-design.md)."""
 
 import json
 
 import pytest
 import yaml
 
-from coursekit import cli, settings
+from coursekit import census, cli, settings
 from coursekit.ingest import propose as proposer
 from coursekit.ingest import propose_expectations as pe
 from coursekit.ingest import propose_grading as pg
@@ -154,3 +155,58 @@ def test_check_says_who_set_each_section_and_accept_prints_the_change(root, caps
     assert "grading.groups.Quizzes.weight: 50.0 → 30.0" in capsys.readouterr().out
     assert cli.main(["check", str(root)]) == 0
     assert "grading  declared — accepted by co-teacher on " in capsys.readouterr().out
+
+
+# ------------------------------------------------------------------ CORE-6.2: the census says who set them
+EXPECT = {"defaults": [{"scope": "unit", "artifact": "quiz", "count": 1}]}
+
+
+def _to(root, status):
+    """Bring the course's `expect:` block to `status`, each the way a course really gets there."""
+    if status == "unknown":
+        return settings.write(root, "structure", {"expect": EXPECT})         # by hand, no history
+    pe.write_expectations(root, EXPECT, [])                                   # proposed
+    if status == "declared":
+        settings.accept(root, ["expect"], by="co-teacher")
+    if status == "edited":                                                    # an edit that leaves unit 1's rule alone
+        _edit(root, lambda d: d["expect"].update(overrides={"unit": {"9": {"quiz": 1}}}))
+
+
+@pytest.mark.parametrize("status, line", [
+    ("declared", "Measured against the expectations co-teacher accepted on 20"),
+    ("proposed", "Measured against coursekit's draft expectations (proposed 20"),
+    ("edited", "Measured against expectations changed since coursekit proposed them on 20"),
+    ("unknown", "Measured against the expectations in the overlay, with no record of who set them"),
+])
+def test_the_census_says_who_set_the_expectations_and_the_gaps_are_the_same(root, status, line):
+    (root / "pages" / "week-1").mkdir(parents=True)                           # a unit with a page and no quiz
+    (root / "pages" / "week-1" / "page.json").write_text(json.dumps({"week_ref": "week-1"}), encoding="utf-8")
+    _to(root, status)
+    c = census.build_census(root)
+    assert c.expectation_basis == status
+    assert (c.expectation_set or {}).get("by") == {"declared": "co-teacher", "unknown": None}.get(status, "coursekit")
+    wk1 = next(w for w in c.units if w.unit == "1")
+    assert wk1.gaps == {"quiz": census.Shortfall(has=0, expects=1)} and c.modal_norm == {}   # the same for all four
+    report = census.render_report(c)
+    assert line in report and "- **Week 1** — quiz: has 0, expects 1" in report
+    assert ("coursekit accept PATH expect" in report) == (status != "declared")
+
+
+def test_the_modal_basis_has_no_line_and_no_who(root):
+    (root / "pages" / "week-1").mkdir(parents=True)
+    (root / "pages" / "week-1" / "page.json").write_text(json.dumps({"week_ref": "week-1"}), encoding="utf-8")
+    pg.write_grading(root, GRADING)                                           # an overlay, but no `expect:`
+    c = census.build_census(root)
+    assert (c.expectation_basis, c.expectation_set, census.basis_line(c)) == ("modal", None, None)
+    assert "Measured against" not in census.render_report(c)
+
+
+def test_the_census_command_gives_the_accept_command_until_the_expectations_are_accepted(tmp_path, capsys):
+    root = tmp_path / "My Course"
+    (root / ".vtconfig").mkdir(parents=True)
+    pe.write_expectations(root, EXPECT, [])
+    assert cli.main(["census", str(root)]) == 0
+    assert f"`coursekit accept '{root}' expect`" in capsys.readouterr().out
+    settings.accept(root, ["expect"])
+    assert cli.main(["census", str(root)]) == 0
+    assert "Measured against" not in capsys.readouterr().out                 # accepted: nothing to flag

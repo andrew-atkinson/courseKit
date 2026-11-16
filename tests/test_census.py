@@ -261,7 +261,7 @@ def test_layerB_week_eu_expectation_gap_and_met(tmp_path):
     _quiz(root, "week-1", eu=False)      # a plain quiz — EU missing
     _quiz(root, "week-2", eu=True)       # an EU quiz — met
     c = cen.build_census(root)
-    assert c.expectation_basis == "declared"
+    assert c.expectation_basis == "unknown"              # written by hand, never accepted (CORE-6)
     wk1, wk2 = (next(w for w in c.units if w.unit == n) for n in ("1", "2"))
     assert wk1.expected == {"quiz": 1, "quiz:eu": 1}
     assert wk1.gaps == {"quiz:eu": cen.Shortfall(has=0, expects=1)}
@@ -319,8 +319,8 @@ def test_layerB_scheme_present_suppresses_modal_gaps(tmp_path):
     _page(root, "week-1"); _page(root, "week-2"); _quiz(root, "week-3")   # wk3 has no page
     c = cen.build_census(root)
     wk3 = next(w for w in c.units if w.unit == "3")
-    assert wk3.gaps == {"page": cen.Shortfall(has=0, expects=1)}     # flagged by the declared expectation…
-    assert c.expectation_basis == "declared" and c.modal_norm == {}   # …and the modal norm never ran
+    assert wk3.gaps == {"page": cen.Shortfall(has=0, expects=1)}     # flagged by the `expect:` block…
+    assert c.expectation_basis == "unknown" and c.modal_norm == {}   # …and the modal norm never ran
 
 
 def test_gaps_round_trip_as_data_in_census_json(tmp_path):

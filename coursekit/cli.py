@@ -373,6 +373,8 @@ def _cmd_census(args) -> int:
           f"{t['assignments']} assignments")
     n_gaps = c.gap_count
     print(f"{n_gaps} gap(s) found." if n_gaps else "No gaps found.")
+    if c.expectation_basis not in ("declared", "modal"):
+        print(cen.basis_line(c, shlex.quote(args.path)))
     print(f"\nWrote {jp}\n      {mp}")
     return 0
 

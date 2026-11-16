@@ -123,6 +123,12 @@ Each step is its own branch with goldens (G0 the exports, G1 generation and reco
    G0: all 904 files and members identical, and both emit logs. G1: every file and record identical to `main`'s. Both real courses (read only): every section reads `unknown` — CC101's `grading` and `expect`, PH101's `units`. 9 mutations, all caught.
 2. **The census says who set the expectations.**
    *Pass:* each status gives its basis and report line; the gaps are the same for all of them; on both real courses `census.json` and `census.md` differ from `main` only in the basis and that line.
+   **Done 2026-11-16.** `census._compute_gaps` takes the basis from `settings.authority(root, "expect")` and keeps the last entry's `step`, `by`, and `at` in a new `expectation_set` field, so the report is still written from `census.json` alone.
+   `census.basis_line` is the one sentence under "Gaps" (`Measured against coursekit's draft expectations (proposed 2026-11-16), which nobody has accepted yet — …`); the modal basis has none, since each of its gap lines already names the course's own pattern.
+   `coursekit census` prints the same sentence, with the course's path quoted, until the expectations are accepted.
+   An `expect:` block with no rules is still the modal basis, as before.
+   Both real courses (read only, written to the scratchpad): CC101's `census.json` differs in `expectation_basis` (`declared` → `unknown`) and the new `expectation_set: null`, and its `census.md` in that one sentence; PH101's (modal) differs only in `expectation_set: null`. The gap count is the same on each.
+   G0: all 904 files and members identical, and both emit logs. G1: every file and record identical to `main`'s. 13 mutations, all caught.
 3. **The cartridge warns on grading nobody accepted.**
    *Pass:* emitting with grading that is not `declared` warns once, naming its status and `coursekit accept`; the package is byte-identical to emitting the same grading declared; no warning for declared or absent grading; G0 packages identical.
 4. **Docs.**

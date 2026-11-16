@@ -22,7 +22,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from coursekit import atomic, courseconfig, coursestructure, outcomes, records
+from coursekit import atomic, courseconfig, coursestructure, outcomes, records, settings
 
 _ARTIFACT_LABELS = ("page", "quiz", "assignment", "concept map")
 
@@ -95,8 +95,11 @@ class Census(BaseModel):
     model_config = ConfigDict(extra="forbid")
     course_title: str | None = None
     units: list[UnitCensus] = Field(default_factory=list)       # in the course's order
-    # where each week's `expected` came from: a DECLARED `expect:` block, or the course's own MODAL pattern
-    expectation_basis: Literal["declared", "modal"] = "modal"
+    # where each unit's `expected` came from: the overlay's `expect:` block, by who set it (CORE-6: `declared`
+    # the faculty accepted it; `proposed` coursekit's untouched draft; `edited` changed since, not yet
+    # accepted; `unknown` no history), or the course's own MODAL pattern when there is no block
+    expectation_basis: Literal["declared", "proposed", "edited", "unknown", "modal"] = "modal"
+    expectation_set: dict[str, str] | None = None   # the block's last history entry: its step, by, at
     modal_norm: dict[str, int] = Field(default_factory=dict)  # modal basis: artifact -> generating weeks with it
     generating_units: int = 0                                  # modal basis: the norm's denominator
     modules: list[ScopeCensus] = Field(default_factory=list)  # declared module rules, one entry per module
@@ -219,7 +222,7 @@ def build_census(course_path) -> Census:
         st = records.status(*a.record)
         census.artifacts.append(ArtifactStatus(path=a.path.relative_to(root).as_posix(), kind=a.kind, unit=a.unit,
                                                state=st.state, edited=st.edited, reasons=st.reasons))
-    _compute_gaps(census, struct, placed)
+    _compute_gaps(census, struct, placed, root)
     return census
 
 
@@ -227,11 +230,15 @@ def _wsort(num: str):
     return (0, int(num)) if num.isdigit() else (1, num)
 
 
-def _compute_gaps(census: Census, struct, placed: list[tuple[str, str]]) -> None:
-    # A DECLARED expectation (Layer B) supersedes the induced modal sense: when the course says what it
-    # SHOULD contain, measure against that; otherwise fall back to the course's own pattern.
+def _compute_gaps(census: Census, struct, placed: list[tuple[str, str]], root) -> None:
+    # An `expect:` block (Layer B) supersedes the induced modal sense: when the course says what it
+    # SHOULD contain, measure against that; otherwise fall back to the course's own pattern. Whoever set
+    # the block, the gaps are the same; the basis says who, so a draft is never reported as a decision.
     exp = struct.expectations()
     if exp.has_scheme():
+        status, last = settings.authority(root, "expect")
+        census.expectation_basis = status or "unknown"
+        census.expectation_set = {k: str(last[k]) for k in ("step", "by", "at") if k in last} if last else None
         _expectation_gaps(census, struct, exp)
     else:
         _modal_gaps(census)
@@ -258,10 +265,9 @@ def _modal_gaps(census: Census) -> None:
 
 
 def _expectation_gaps(census: Census, struct, exp) -> None:
-    """Layer B — declared `expected − actual`, per scope. WEEK rules apply to every known week (incl. a
+    """Layer B — the `expect:` block's `expected − actual`, per scope. WEEK rules apply to every known week (incl. a
     declared-but-empty one — the denominator widens, so it becomes a real gap); MODULE rules are met by
     matching artifacts in ANY week of the module; COURSE rules over the whole course."""
-    census.expectation_basis = "declared"
     for w in census.units:
         w.expected = exp.for_unit(w.unit)
         w.gaps = _shortfalls(w.actual, w.expected)
@@ -327,7 +333,8 @@ def render_report(census: Census) -> str:
         lines.append(f"| {w.label} | {len(w.materials) or '—'} | {_cell(w.pages)} | "
                      f"{_cell(w.quizzes)} | {_cell(w.assignments)} | {cm} |")
 
-    lines += ["", "## Gaps", ""] + (_gap_lines(census) or ["No gaps found."])
+    basis = basis_line(census)
+    lines += ["", "## Gaps", ""] + ([basis, ""] if basis else []) + (_gap_lines(census) or ["No gaps found."])
     if census.artifacts:
         lines += ["", "## Status", ""] + _status_lines(census.artifacts)
     if census.unreadable:
@@ -335,6 +342,24 @@ def render_report(census: Census) -> str:
                   "Present (so counted above) but their contents couldn't be read — regenerate or repair them:", ""]
         lines += [f"- `{u}`" for u in census.unreadable]
     return "\n".join(lines) + "\n"
+
+
+def basis_line(census: Census, path: str = "PATH") -> str | None:
+    """Who set the expectations the gaps are measured against, and how to accept them when nobody has;
+    None on the modal basis (each gap line already names the course's own pattern)."""
+    if census.expectation_basis == "modal":
+        return None
+    last = census.expectation_set or {}
+    who, on = last.get("by", "someone"), last.get("at", "")[:10]
+    accept = f"review them, then `coursekit accept {path} expect` to make them yours"
+    if census.expectation_basis == "declared":
+        return f"Measured against the expectations {who} accepted on {on}."
+    if census.expectation_basis == "proposed":
+        return f"Measured against coursekit's draft expectations (proposed {on}), which nobody has accepted yet — {accept}."
+    if census.expectation_basis == "edited":
+        did = "proposed" if last.get("step") == "proposed" else "accepted"
+        return f"Measured against expectations changed since {who} {did} them on {on}, and not yet accepted — {accept}."
+    return f"Measured against the expectations in the overlay, with no record of who set them — {accept}."
 
 
 _LABEL = {"concept-map": "concept map"}   # display wording only — the data key stays `concept-map`
