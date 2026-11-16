@@ -23,6 +23,7 @@ and prints summaries. Reachable as the `coursekit` command (an editable install)
 
 import argparse
 import os
+import shlex
 import sys
 
 from dotenv import load_dotenv
@@ -161,8 +162,8 @@ def _review_pages(args, provider) -> tuple[str | None, dict | None]:
 # ---------------------------------------------------------------- ingest
 
 def _cmd_propose(args) -> int:
-    """Scan a course tree and DECLARE its structure into coursekit's own overlay (FLOW-7). Offline,
-    no model. Prints the proposed weeks + the files it could not key, then writes the overlay unless
+    """Scan a course tree and DRAFT its structure into coursekit's own overlay (FLOW-7), for the faculty to
+    accept. Offline, no model. Prints the proposed units + the files it could not key, then writes the overlay unless
     --dry-run. coursekit writes only its own `.vtconfig/structure.coursekit.yaml`, never context.yaml."""
     from coursekit.ingest import propose as proposer
     if getattr(args, "grading", False):
@@ -201,7 +202,7 @@ def _cmd_propose(args) -> int:
         print("\n(dry run — nothing written)")
         return 0
     dest = proposer.write_overlay(prop, force=args.force)
-    print(f"\nWrote {dest}\nEdit it freely; generate reads it as authoritative.")
+    print(f"\nWrote {dest}\nA draft: edit it, then `coursekit accept {shlex.quote(args.path)} units` to make it yours.")
     return 0
 
 
@@ -223,7 +224,8 @@ def _cmd_propose_grading(args) -> int:
         print("\n(dry run — nothing written)")
         return 0
     dest = pg.write_grading(args.path, grading, force=args.force)
-    print(f"\nWrote {dest}\nSet the weights to your real grading scheme; `emit course` reads them.")
+    print(f"\nWrote {dest}\nA draft: set the weights to your real grading scheme, then "
+          f"`coursekit accept {shlex.quote(args.path)} grading` to make it yours; `emit course` reads them.")
     return 0
 
 
@@ -232,7 +234,7 @@ def _cmd_check(args) -> int:
     model run, and one bad file doesn't hide the next. Offline, no model."""
     from pathlib import Path
 
-    from coursekit import schemas
+    from coursekit import schemas, settings
     from coursekit.outcomes import CoursekitError
     root = courseconfig.find_root(Path(args.path).expanduser())
     if root is None:
@@ -252,7 +254,62 @@ def _cmd_check(args) -> int:
         print(f"\n{len(bad)} of {len(checked)} file(s) have problems.")
     else:
         print(f"\nAll {len(checked)} file(s) are valid.")
+    overlay = root / courseconfig.VTCONFIG_DIR_NAME / settings.DOCS["structure"]
+    if overlay.is_file() and str(overlay) not in bad:
+        try:
+            rows = settings.authorities(root)
+        except CoursekitError as e:
+            print(f"✗ {e.message.replace(vt, '')}")
+            return 1
+        if rows:
+            print("\nWho set the overlay's sections:")
+            for section, status, last in rows:
+                print(f"  {section:<8} {_authority_line(section, status, last, args.path)}")
     return 1 if errors else 0
+
+
+def _authority_line(section: str, status: str, last: dict | None, path: str) -> str:
+    """One overlay section's status, in words, with the command that makes it the faculty's."""
+    when = f" on {(last or {}).get('at', '')[:10]}" if (last or {}).get("at") else ""
+    who = (last or {}).get("by", "someone")
+    hint = f"`coursekit accept {shlex.quote(path)} {section}`"
+    if status == "declared":
+        return f"declared — accepted by {who}{when}"
+    if status == "proposed":
+        return f"proposed by coursekit{when}, untouched — review it, then {hint}"
+    if status == "edited":
+        step = "proposed" if (last or {}).get("step") == "proposed" else "accepted"
+        return f"edited since {who} {step} it{when} — {hint} to make it yours"
+    return f"unknown — no record of who set it; {hint}"
+
+
+def _cmd_accept(args) -> int:
+    """Make overlay sections the faculty's (CORE-6): validate, show what changed since the last entry,
+    and record who accepted each and when. No prompt — running the command is the yes."""
+    from pathlib import Path
+
+    from coursekit import settings
+    from coursekit.outcomes import CoursekitError
+    root = courseconfig.find_root(Path(args.path).expanduser())
+    if root is None:
+        raise CoursekitError("no .vtconfig course root found — run this on a course folder.",
+                             code="course.no_root", details={"path": args.path})
+    results = settings.accept(root, args.sections or None, by=args.by)
+    if not results:
+        print("The overlay has no sections to accept (units, grading, expect).")
+    for r in results:
+        s = r["section"]
+        if not r["accepted"]:
+            print(f"{s}: already yours, unchanged — nothing recorded")
+        elif r["was"] == "proposed":
+            print(f"{s}: accepted coursekit's proposal as it is")
+        elif r["was"] == "unknown":
+            print(f"{s}: accepted (there was no earlier record of who set it)")
+        else:
+            print(f"{s}: accepted, with these changes since the last entry:")
+            for line in r["changes"]:
+                print(f"  {line}")
+    return 0
 
 
 def _cmd_config(args) -> int:
@@ -298,10 +355,10 @@ def _cmd_config(args) -> int:
         if value is None:                                   # "", "null", "~": setting nothing would quietly remove it
             raise CoursekitError(f"`config set {args.key}` needs a value — to remove the setting, use "
                                  f"`config unset {args.key}`", code="settings.bad_value", details={"key": args.key})
-        settings.set(root, args.key, value)
+        settings.set(root, args.key, value, by=args.by)
         print(f"{args.key} = {settings.get(root, args.key)}")
         return 0
-    settings.unset(root, args.key)                          # action == "unset"
+    settings.unset(root, args.key, by=args.by)              # action == "unset"
     print(f"removed {args.key}")
     return 0
 
@@ -342,7 +399,8 @@ def _cmd_propose_expectations(args) -> int:
         print("\n(dry run — nothing written)")
         return 0
     dest = pe.write_expectations(args.path, expect, notes, force=args.force)
-    print(f"\nWrote {dest}\nEdit it to your real intent; the census reads it to report gaps.")
+    print(f"\nWrote {dest}\nA draft: edit it to your real intent, then `coursekit accept {shlex.quote(args.path)} expect` "
+          f"to make it yours; the census reads it to report gaps.")
     return 0
 
 
@@ -929,6 +987,17 @@ def build_parser() -> argparse.ArgumentParser:
     pcf.add_argument("key", nargs="?", help="a setting, e.g. quiz.eu_question or grading.groups.Projects.weight "
                                             "(for show: a document, e.g. style)")
     pcf.add_argument("value", nargs="?", help="the new value, for set (YAML: true, 5, 20%%, [a, b])")
+    pcf.add_argument("--by", metavar="NAME", help="who is making the change, recorded for an overlay section "
+                                                 "(default: your login name)")
+
+    # accept — make overlay sections the faculty's, recording who and when (CORE-6)
+    pac = sub.add_parser("accept", help="make overlay sections yours (units, grading, expect): validate, show "
+                                        "what changed, and record who accepted them and when (offline)")
+    pac.add_argument("path", help="the course root (or any directory under it)")
+    pac.add_argument("sections", nargs="*", metavar="SECTION",
+                     help="units, grading, or expect (default: every section the overlay has)")
+    pac.add_argument("--by", metavar="NAME", help="who is accepting (default: your login name)")
+    pac.set_defaults(func=_cmd_accept)
     pcf.set_defaults(func=_cmd_config)
 
     # census — inventory the whole course (materials + generated artifacts + presence gaps), offline
@@ -947,8 +1016,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # propose — scan the tree → declare structure into coursekit's own overlay (FLOW-7, offline)
     pp = sub.add_parser("propose",
-                        help="scan a course tree → declare its structure (weeks + typed sources) into "
-                             ".vtconfig/structure.coursekit.yaml — offline, no model")
+                        help="scan a course tree → draft its structure (units + typed sources) into "
+                             ".vtconfig/structure.coursekit.yaml for you to accept — offline, no model")
     pp.add_argument("path", help="the course root (or any directory of materials)")
     pp.add_argument("--model", action="store_true",
                     help="group with a local model instead of filename heuristics — for trees that "
@@ -957,10 +1026,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="with --model, give the model a short content peek of each file (slower, "
                          "better on topic-named piles)")
     pp.add_argument("--grading", action="store_true",
-                    help="instead of weeks: draft a grading-groups block (assignment groups + weights "
+                    help="instead of units: draft a grading-groups block (assignment groups + weights "
                          "placeholders) from the generated artifacts — STRC-2 (offline)")
     pp.add_argument("--expectations", action="store_true",
-                    help="instead of weeks: draft an expectations block (what each scope SHOULD contain) "
+                    help="instead of units: draft an expectations block (what each scope SHOULD contain) "
                          "from the course's own signals — FLOW-9 Layer A (offline)")
     pp.add_argument("--dry-run", action="store_true", help="print the proposal without writing the overlay")
     pp.add_argument("--force", action="store_true", help="redraft an existing overlay (discards manual edits)")

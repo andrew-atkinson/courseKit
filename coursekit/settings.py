@@ -15,16 +15,23 @@ Two layers, one per kind of interface:
   structure overlay, so `grading.groups.Projects.weight` works without naming the file. A list of
   named items (grading groups) is addressed by name; other lists by index.
 
+Who set each overlay section is recorded beside it (CORE-6, `agent/core-6-design.md`): a proposer's
+draft is `proposed`; `accept`, `set`, and `unset` record the faculty's, with who and when; an edit made
+any other way reads `edited` until it is accepted, and a section with no history reads `unknown`.
+
 `context.yaml` is the transcriber's file (one writer per file) and is never written here. Comments in a
 file don't survive a write — PyYAML drops them — so a writer that wants a note at the top passes it as
 `header`; anything that must persist belongs in a setting, not a comment.
 """
 
+import getpass
+import json
+from datetime import datetime
 from pathlib import Path
 
 import yaml
 
-from coursekit import atomic, courseconfig, schemas
+from coursekit import atomic, courseconfig, records, schemas
 from coursekit.outcomes import CoursekitError
 
 DOCS = {
@@ -37,6 +44,8 @@ DOCS = {
     "structure": "structure.coursekit.yaml",
 }
 _OVERLAY_SECTIONS = ("units", "weeks", "unit_noun", "grading", "expect")      # top-level keys of the structure overlay
+SECTIONS = ("units", "grading", "expect")    # the overlay sections a proposer drafts and the faculty accepts
+AUTHORITY = "structure.coursekit.authority.json"   # each section's history: who proposed or accepted it, when
 
 
 def _list_fields(model, seen=None) -> frozenset:
@@ -138,9 +147,10 @@ def get(root, key: str):
     return _walk(data, parts, key) if parts else data
 
 
-def set(root, key: str, value) -> dict:            # noqa: A001 — the verb is the API
+def set(root, key: str, value, *, by: str | None = None) -> dict:            # noqa: A001 — the verb is the API
     """Set one setting and save the document (validated as a whole). Creates the file, a missing
-    section, or a missing named list item as needed."""
+    section, or a missing named list item as needed. A setting inside an overlay section records the
+    section as accepted `by` whoever ran it (the login name unless given)."""
     doc, parts = _split(key)
     if not parts:
         raise CoursekitError(f"{key!r} names a whole document — give a setting inside it, e.g. {key}.<setting>",
@@ -160,11 +170,14 @@ def set(root, key: str, value) -> dict:            # noqa: A001 — the verb is 
             raise CoursekitError(f"{key!r} is a whole item — set one of its fields, e.g. {key}.weight",
                                  code="settings.bad_key", details={"key": key})
         _child(parent, last, create=True).update(value)
-    return write(root, doc, data)
+    stored = write(root, doc, data)
+    _accepted_by_change(root, parts[0] if doc == "structure" else None, stored, by)
+    return stored
 
 
-def unset(root, key: str) -> dict:
-    """Remove one setting (or a named list item) and save. Removing what isn't there is an error."""
+def unset(root, key: str, *, by: str | None = None) -> dict:
+    """Remove one setting (or a named list item) and save. Removing what isn't there is an error. Like
+    `set`, a change inside an overlay section records the section as accepted."""
     doc, parts = _split(key)
     data = read(root, doc)
     parent = _walk(data, parts[:-1], key) if parts[:-1] else data
@@ -175,7 +188,9 @@ def unset(root, key: str) -> dict:
         parent.remove(item)
     else:
         raise CoursekitError(f"no setting {key!r}", code="settings.no_such_key", details={"key": key})
-    return write(root, doc, data)
+    stored = write(root, doc, data)
+    _accepted_by_change(root, (parts or [None])[0] if doc == "structure" else None, stored, by)
+    return stored
 
 
 def propose_section(root, section: str, value, *, force: bool = False, header: str = "",
@@ -194,8 +209,128 @@ def propose_section(root, section: str, value, *, force: bool = False, header: s
     for old in replaces:
         data.pop(old, None)
     data[section] = value
-    write(root, "structure", data, header=header)
+    stored = write(root, "structure", data, header=header)
+    if _value(stored, section):
+        _append(root, section, _entry("proposed", "coursekit", _value(stored, section)))
     return path
+
+
+# --------------------------------------------------------------- authority (CORE-6): who set each section
+def _section_of(name) -> str | None:
+    """The overlay section a top-level key belongs to (`weeks` is `units` under its old name)."""
+    name = {"weeks": "units"}.get(name, name)
+    return name if name in SECTIONS else None
+
+
+def _value(data: dict, section: str):
+    return data.get(section) or (data.get("weeks") if section == "units" else None)
+
+
+def _history(root) -> dict:
+    path = Path(root) / courseconfig.VTCONFIG_DIR_NAME / AUTHORITY
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise CoursekitError(f"{path} can't be read ({e}) — it records who set each overlay section; "
+                             f"restore it, or delete it to start the history afresh.",
+                             code="authority.unreadable", details={"path": str(path)})
+    return data if isinstance(data, dict) else {}
+
+
+def _entry(step: str, by: str, value) -> dict:
+    return {"step": step, "by": by, "at": datetime.now().isoformat(timespec="seconds"),
+            "coursekit": records._commit(), "digest": records.digest(value), "section": value}
+
+
+def _append(root, section: str, entry: dict) -> None:
+    history = _history(root)
+    history.setdefault(section, []).append(entry)
+    atomic.write(Path(root) / courseconfig.VTCONFIG_DIR_NAME / AUTHORITY,
+                 json.dumps(history, indent=2, ensure_ascii=False) + "\n")
+
+
+def _accepted_by_change(root, key, stored: dict, by) -> None:
+    """`set`/`unset` changed a setting under `key`: record its section as the faculty's, if it is one."""
+    section = _section_of(key)
+    if section and _value(stored, section):
+        _append(root, section, _entry("accepted", by or getpass.getuser(), _value(stored, section)))
+
+
+def _status(value, last: dict | None) -> str | None:
+    if not value:
+        return None
+    if last is None:
+        return "unknown"
+    if last.get("digest") != records.digest(value):
+        return "edited"
+    return "proposed" if last.get("step") == "proposed" else "declared"
+
+
+def authority(root, section: str) -> tuple[str | None, dict | None]:
+    """Who set an overlay section: (status, the last entry in its history). The status is worked out,
+    never stored — `declared` (the faculty accepted or set it, unchanged since), `proposed` (coursekit's
+    draft, untouched), `edited` (changed since the last entry, not yet accepted), `unknown` (no history:
+    written by hand, or before CORE-6), or None (the section is absent). Raises if the overlay is invalid."""
+    value = _value(read(root, "structure"), section)
+    last = (_history(root).get(section) or [None])[-1]
+    return _status(value, last), last
+
+
+def _flat(value, path: str) -> dict:
+    """A section as {dotted path: leaf}, named list items by their name (as `set` addresses them)."""
+    if isinstance(value, dict):
+        items = list(value.items())
+    elif isinstance(value, list):
+        items = [((str(x["name"]), {k: v for k, v in x.items() if k != "name"})
+                  if isinstance(x, dict) and "name" in x else (str(i), x)) for i, x in enumerate(value)]
+    else:
+        return {path: value}
+    out = {}
+    for k, v in items:
+        out.update(_flat(v, f"{path}.{k}"))
+    return out or {path: value}
+
+
+def changes(section: str, old, new) -> list[str]:
+    """What changed in a section, one line per setting: `grading.groups.Quizzes.weight: 50.0 → 30.0`."""
+    a, b = _flat(old if old is not None else {}, section), _flat(new if new is not None else {}, section)
+    return [f"{k}: {a.get(k, '—')} → {b.get(k, '—')}" for k in sorted(a.keys() | b.keys()) if a.get(k) != b.get(k)]
+
+
+def accept(root, sections=None, *, by: str | None = None) -> list[dict]:
+    """Record overlay sections as the faculty's: validate the overlay (refusing, with nothing written, if
+    it fails), then append an `accepted` entry `by` whoever ran it (the login name unless given) for each
+    named section — every section present when none is named. A section already declared and unchanged
+    gets no entry. Returns, per section: {section, was (its status before), changes, accepted}."""
+    data = read(root, "structure")                          # raises on an invalid overlay
+    present = [s for s in SECTIONS if _value(data, s)]
+    named = [_section_of(s) or s for s in (sections or present)]
+    for s in named:
+        if s not in SECTIONS:
+            raise CoursekitError(f"no overlay section {s!r} — use one of: {', '.join(SECTIONS)}",
+                                 code="authority.unknown_section", details={"section": s})
+        if s not in present:
+            raise CoursekitError(f"the overlay has no `{s}:` section to accept", code="authority.no_section",
+                                 details={"section": s})
+    history, who, out = _history(root), by or getpass.getuser(), []
+    for s in named:
+        value, last = _value(data, s), (history.get(s) or [None])[-1]
+        was = _status(value, last)
+        result = {"section": s, "was": was, "accepted": was != "declared",
+                  "changes": changes(s, (last or {}).get("section"), value) if last else []}
+        if result["accepted"]:
+            _append(root, s, _entry("accepted", who, value))
+        out.append(result)
+    return out
+
+
+def authorities(root) -> list[tuple[str, str, dict | None]]:
+    """(section, status, last entry) for every overlay section present, for `coursekit check`."""
+    data, history = read(root, "structure"), _history(root)
+    return [(s, _status(_value(data, s), (history.get(s) or [None])[-1]), (history.get(s) or [None])[-1])
+            for s in SECTIONS if _value(data, s)]
 
 
 def check(root):
