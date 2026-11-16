@@ -16,14 +16,14 @@ def _struct(context: dict, root: Path | None = None) -> CourseStructure:
 
 def test_empty_context_degrades_to_empty():
     s = _struct({})
-    assert s.iter_weeks() == []
+    assert s.iter_units() == []
     assert not s.has_declared_structure()
     assert s.sources_for("3") == []
 
 
-def test_iter_weeks_sorts_numerically():
-    s = _struct({"weeks": {"week 10": {}, "week 2": {}, "week 1": {}}})
-    assert [n for n, _ in s.iter_weeks()] == ["1", "2", "10"]
+def test_iter_units_sorts_numerically_until_the_overlay_orders_them():
+    s = _struct({"weeks": {"week 10": {}, "intro": {}, "week 2": {}, "week 1": {}}})
+    assert [n for n, _ in s.iter_units()] == ["1", "2", "10", "intro"]
 
 
 def test_has_declared_structure_only_fires_on_doc_or_sources():
@@ -156,7 +156,7 @@ def test_overlay_only_week_appears(tmp_path):
     root = _course_with_files(tmp_path, context_yaml="course_title: C\n",
                               overlay_yaml='weeks: {"week 4": {sources: [{path: x.pdf, kind: reading}]}}\n')
     s = CourseStructure.load(root)
-    assert [n for n, _ in s.iter_weeks()] == ["4"]
+    assert [n for n, _ in s.iter_units()] == ["4"]
     assert s.has_declared_structure()
 
 
@@ -231,3 +231,9 @@ def test_parse_expect_degrades_on_malformed():
     assert not _parse_expect({"defaults": "nonsense"}).has_scheme()
     # a rule missing scope/artifact is skipped, not fatal
     assert _parse_expect({"defaults": [{"artifact": "page"}, {"scope": "week"}]}).unit == {}
+
+
+def test_iter_units_keeps_the_overlays_order_once_it_declares_one(tmp_path):
+    root = _course_with_files(tmp_path, context_yaml='weeks: {"week 1": {}}\n',
+                              overlay_yaml='units: {"week 10": {}, intro: {}, "week 2": {}}\n')
+    assert [n for n, _ in CourseStructure.load(root).iter_units()] == ["10", "intro", "2", "1"]

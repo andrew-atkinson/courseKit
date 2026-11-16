@@ -18,13 +18,13 @@ Artifacts land beside the course (`quizzes/` and `pages/` trees), never in this 
 
 | Ingest Commands               | What it does                                                                                                                                                                                                                | Uses LLM |
 |-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| `coursekit ingest PATH`       | Documents (PDF/docx/odt/pptx/txt/md) → `output/week-N.md`. A week that is a **folder** of many docs (a `week-3/` directory of readings + slides) consolidates into one `week-3.md`, each source under a `## <name>` header. | ✓        |
+| `coursekit ingest PATH`       | Documents (PDF/docx/odt/pptx/txt/md) → `output/week-N.md` (or `output/<unit>.md` for a declared unit with no number). A week that is a **folder** of many docs (a `week-3/` directory of readings + slides) consolidates into one `week-3.md`, each source under a `## <name>` header. | ✓        |
 | `coursekit ingest PATH --raw` | Same, extract only, fully offline.                                                                                                                                                                                          | x        |
 
 A source's week is its own filename (`week-3.pdf`) or its nearest `week-N` ancestor directory (`.../week-3/readings/Barrett.pdf`).
 When several docs share a week they consolidate into one source-tagged week doc (so a later `--source` quiz can still target one reading); when no file names a week, each doc becomes its own week in sorted order.
 A document that names no week is skipped once any week-numbered content is present (a course-level outline at the root is not week content).
-`ingest` finds a unit by its week number, so it doesn't yet consolidate a unit with no number (`intro`, `loops`) — give such a unit a `doc:` in `structure.coursekit.yaml` pointing at its text, and every other command reads it.
+Once `structure.coursekit.yaml` declares a unit's `sources:`, the filenames no longer matter: a unit with no number (`intro`) consolidates into `output/intro.md`, and units ingest in the course's order.
 
 | Structure Commands                      | What it does                                                                                                                                                       | Uses LLM |
 |-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|

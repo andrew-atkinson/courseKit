@@ -37,7 +37,7 @@ def decompose_reasons(sig: PageSignals, *, char_budget: int = MONO_CHAR_BUDGET,
     """Every reason this week overruns a single monolithic pass (empty = monolithic is fine)."""
     reasons = []
     if sig.transcript_chars > char_budget:
-        reasons.append(f"week is {sig.transcript_chars} chars (> {char_budget})")
+        reasons.append(f"the unit is {sig.transcript_chars} chars (> {char_budget})")
     if sig.concept_count > concept_budget:
         reasons.append(f"{sig.concept_count} concepts (> {concept_budget})")
     if pass_budget and sig.largest_span_chars > pass_budget:

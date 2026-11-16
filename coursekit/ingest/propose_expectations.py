@@ -46,13 +46,13 @@ def propose_expectations(path) -> tuple[dict, list[str]]:
         cnt = sum(1 for w in generating if getattr(w, attr))
         if n and cnt * 2 > n:
             defaults.append({"scope": "unit", "artifact": art, "count": 1})
-            notes.append(f"{art}: each week — high confidence (modal: {cnt}/{n} weeks have one)")
+            notes.append(f"{art}: each unit — high confidence (modal: {cnt}/{n} units have one)")
 
     a_weeks = sum(1 for w in generating if w.assignments)
     a_total = sum(w.assignments for w in c.units)
     if a_total and a_weeks * 2 > n:                      # assignments are themselves the norm
         defaults.append({"scope": "unit", "artifact": "assignment", "count": 1})
-        notes.append(f"assignment: each week — modal ({a_weeks}/{n})")
+        notes.append(f"assignment: each unit — modal ({a_weeks}/{n})")
     elif a_total:                                        # sparse → a flagged decision, NOT a fabricated rule
         notes.append(f"assignment: appears {a_total}x (sparse, not the norm) — DECISION NEEDED: declare a "
                      f"cadence (per module / per course / none). Add a rule by hand; coursekit won't guess it.")
@@ -70,7 +70,7 @@ def propose_expectations(path) -> tuple[dict, list[str]]:
         n_concepts = len(getattr(cm, "concepts", []))
         if n_concepts >= GLOSSARY_THRESHOLD:
             overrides_week.setdefault(w.unit, {})["page:glossary"] = 1
-            notes.append(f"week {w.unit}: page:glossary — CLT (dense: {n_concepts} concepts)")
+            notes.append(f"unit {w.unit}: page:glossary — CLT (dense: {n_concepts} concepts)")
 
     # Whether/how EUs are assessed is the faculty's call (instrument + cadence), so a quiz:eu rule is
     # proposed only on declared intent (`eu_question` in quiz.yaml); undeclared → a flagged decision.
@@ -78,19 +78,19 @@ def propose_expectations(path) -> tuple[dict, list[str]]:
     if not eu_weeks:
         pass
     elif eu_intent is None:
-        notes.append(f"enduring understanding: {len(eu_weeks)}/{len(cm_weeks)} concept-mapped weeks mark one "
-                     f"— DECISION NEEDED: decide how EUs are assessed (per-week EU question → set "
+        notes.append(f"enduring understanding: {len(eu_weeks)}/{len(cm_weeks)} concept-mapped units mark one "
+                     f"— DECISION NEEDED: decide how EUs are assessed (per-unit EU question → set "
                      f"`eu_question: true` in quiz.yaml / per-module project / none). coursekit won't guess it.")
     elif not eu_intent:
         notes.append("enduring understanding: `eu_question: false` in quiz.yaml — no quiz:eu rule proposed")
     elif len(eu_weeks) == len(cm_weeks):                  # universal → promote to a week-default
         defaults.append({"scope": "unit", "artifact": "quiz:eu", "count": 1})
-        notes.append("quiz:eu: each week — UbD + declared `eu_question: true` (every concept-mapped week "
+        notes.append("quiz:eu: each unit — UbD + declared `eu_question: true` (every concept-mapped unit "
                      "marks an enduring understanding)")
     else:
         for wk in eu_weeks:                               # otherwise per-week overrides
             overrides_week.setdefault(wk, {})["quiz:eu"] = 1
-            notes.append(f"week {wk}: quiz:eu — UbD + declared `eu_question: true` (marks an enduring "
+            notes.append(f"unit {wk}: quiz:eu — UbD + declared `eu_question: true` (marks an enduring "
                          f"understanding)")
 
     expect: dict = {"defaults": defaults}

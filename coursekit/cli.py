@@ -193,7 +193,7 @@ def _cmd_propose(args) -> int:
         print("No weeks could be keyed from the materials — name them week-N or nest under week-N/,\n"
               "or edit the overlay by hand once it's written.")
     if prop.unassigned:
-        print(f"\nUnassigned — {len(prop.unassigned)} file(s) under no week (assign in the overlay, or ignore):")
+        print(f"\nUnassigned — {len(prop.unassigned)} file(s) under no unit (assign in the overlay, or ignore):")
         for p in prop.unassigned:
             print(f"      {p}")
 
@@ -331,9 +331,9 @@ def _cmd_propose_expectations(args) -> int:
     print("Proposed expectations (a DRAFT — edit freely):")
     for r in expect.get("defaults", []):
         print(f"  each {r['scope']}: {r['count']} {r['artifact']}")
-    for wk, spec in (expect.get("overrides", {}).get("week", {})).items():
+    for unit, spec in (expect.get("overrides", {}).get("unit", {})).items():
         for art, ct in spec.items():
-            print(f"  week {wk}: {ct} {art}")
+            print(f"  unit {unit}: {ct} {art}")
     if notes:
         print("Rationale / decisions:")
         for note in notes:
@@ -363,8 +363,8 @@ def _cmd_ingest(args) -> int:
     print("Ingested:")
     for src, dest in results:
         print(f"  {src.name}  ->  {dest.name}")
-    n_weeks = len({dest for _, dest in results})
-    print(f"\n{n_weeks} week doc(s) from {len(results)} source(s). Now generate with:  "
+    n_units = len({dest for _, dest in results})
+    print(f"\n{n_units} unit doc(s) from {len(results)} source(s). Now generate with:  "
           f"coursekit generate \"<course>\"")
     return 0
 
@@ -372,12 +372,11 @@ def _cmd_ingest(args) -> int:
 # ---------------------------------------------------------------- generate
 
 def _cmd_analyze(args) -> int:
-    """The 'analyze' phase, between ingest and generate: build each week's concept map. Reads the
-    transcriber's `knowledge.json` beside every week doc, consolidates it (the model) into the week's
-    teaching concepts + enduring understanding, and writes `.vtconfig/concepts/week-N.yaml` — the
-    content model both generate and evaluate stand on. Instructor-editable after; re-run when the
-    material changes. Weeks with no knowledge.json are skipped (that course's pages fall back to
-    inline derivation until a map is authored)."""
+    """The 'analyze' phase, between ingest and generate: build each unit's concept map. Reads the
+    transcriber's `knowledge.json` beside every unit's text (or the text itself when there is none),
+    consolidates it (the model) into the unit's teaching concepts + enduring understanding, and writes
+    `.vtconfig/concepts/<unit>.yaml` — the content model both generate and evaluate stand on.
+    Instructor-editable after; re-run when the material changes."""
     if not args.path:
         raise SystemExit("no PATH given and TRANSCRIPTION is not set")
     from coursekit.discover import find_units
@@ -389,15 +388,15 @@ def _cmd_analyze(args) -> int:
     if weeks:
         units = [u for u in units if any(pipeline.unit_matches(w, u) for w in weeks)]
     if not units:
-        print("No week transcripts found.")
+        print("No unit texts found.")
         return 0
 
     if args.dry_run:
-        print("DRY RUN — weeks that would be analyzed:")
+        print("DRY RUN — units that would be analyzed:")
         for u in units:
             wk = cmap.read_week_knowledge(u.transcript_path)
             detail = (f"{len(wk.kcs)} knowledge component(s) from {len(wk.sources)} source(s)"
-                      if wk.kcs else "no knowledge.json — would extract from the week text")
+                      if wk.kcs else "no knowledge.json — would extract from the unit's text")
             print(f"  [plan] {u.label}: {detail}")
         return 0
 
@@ -414,7 +413,7 @@ def _cmd_analyze(args) -> int:
             print(f"  [skip] {label}: no .vtconfig course root to write the map into")
             continue
         kcs = len(cmap.read_week_knowledge(u.transcript_path).kcs)
-        via = f"from {kcs} knowledge components" if kcs else "from the week text (no knowledge.json)"
+        via = f"from {kcs} knowledge components" if kcs else "from the unit's text (no knowledge.json)"
         cmp, out, spans = con.analyze_unit(u, provider, model)
         if spans:
             via += f"; {spans}/{len(cmp.concepts)} material span(s)"
@@ -501,7 +500,7 @@ def _run_assignments(args) -> int:
     if weeks:
         units = [u for u in units if any(unit_matches(w, u) for w in weeks)]
     if not units:
-        print(f"No weeks found under {args.path}.")
+        print(f"No units found under {args.path}.")
         return 1
     if args.dry_run:
         print("Would draft assignments for:")
@@ -936,7 +935,7 @@ def build_parser() -> argparse.ArgumentParser:
     pc.set_defaults(func=_cmd_census)
 
     # ingest — documents → week text
-    pi = sub.add_parser("ingest", help="documents (PDF/docx/odt/pptx/txt/md) → output/week-N.md")
+    pi = sub.add_parser("ingest", help="documents (PDF/docx/odt/pptx/txt/md) → each unit's text (output/week-N.md, output/intro.md)")
     pi.add_argument("path", help="a document, or a directory of them")
     pi.add_argument("--raw", action="store_true",
                     help="extract text only; skip the local-LLM shaping pass (fully offline)")
@@ -973,11 +972,11 @@ def build_parser() -> argparse.ArgumentParser:
     pa.add_argument("--week", action="append", metavar="N", help="a week to analyze, repeatable")
     pa.add_argument("--weeks", metavar="A-B", help="an inclusive week range, e.g. --weeks 3-8")
     pa.add_argument("--dry-run", action="store_true",
-                    help="list the weeks and their knowledge-component counts, without the model")
+                    help="list the units and their knowledge-component counts, without the model")
     pa.set_defaults(func=_cmd_analyze)
 
-    # generate — week text → quizzes and/or pages (uses the model)
-    pg = sub.add_parser("generate", help="week text → quizzes and/or pages (uses the model)")
+    # generate — unit text → quizzes and/or pages (uses the model)
+    pg = sub.add_parser("generate", help="unit text → quizzes and/or pages (uses the model)")
     pg.add_argument("path", nargs="?", default=os.getenv("TRANSCRIPTION"),
                     help="transcript file or directory (default: $TRANSCRIPTION)")
     which = pg.add_mutually_exclusive_group()
@@ -995,7 +994,7 @@ def build_parser() -> argparse.ArgumentParser:
     pg.add_argument("--function", choices=("teaching", "glossary", "overview", "recap"),
                     default="teaching",
                     help="what a PAGE is FOR (pages only): teaching (default) | glossary (a terms "
-                         "companion) | overview (a week 'Start Here') | recap (an after-the-week "
+                         "companion) | overview (a unit 'Start Here') | recap (an after-the-unit "
                          "recall). overview and recap are assembled model-free from the concept map. "
                          "No effect on quizzes.")
     pg.add_argument("--generator", choices=("auto", "monolithic", "decompose"), default="auto",
@@ -1003,16 +1002,16 @@ def build_parser() -> argparse.ArgumentParser:
                          "program picks by measured length) | monolithic | decompose.")
     pg.add_argument("--source", metavar="DOC",
                     help="TARGETED quiz from ONE document (a reading / slide deck / PDF / .md), not the "
-                         "whole week — writes to quizzes/<week>-<doc>/. Quizzes only.")
+                         "whole unit — writes to quizzes/<unit>-<doc>/. Quizzes only.")
     pg.add_argument("--review", dest="review_targeted", action="store_true",
                     help="with --source: cold-read the generated quiz (targeted quizzes don't review "
-                         "by default; whole-week generation reviews unless --no-review)")
+                         "by default; whole-unit generation reviews unless --no-review)")
     pg.add_argument("--dry-run", action="store_true",
                     help="list the units that would be processed, without calling the model")
     pg.add_argument("--max-iters", type=int, default=pipeline.DEFAULT_MAX_ITERS,
-                    help=f"cap model turns per week (default {pipeline.DEFAULT_MAX_ITERS})")
+                    help=f"cap model turns per unit (default {pipeline.DEFAULT_MAX_ITERS})")
     pg.add_argument("--output-root", metavar="DIR",
-                    help="write under DIR/<course>/<week> instead of with the course")
+                    help="write under DIR/<course>/<unit> instead of with the course")
     pg.add_argument("--force", action="store_true",
                     help="regenerate even an artifact edited by hand since coursekit made it (discards the edits)")
     pg.add_argument("--no-review", dest="review", action="store_false",

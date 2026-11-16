@@ -21,32 +21,35 @@ from coursekit.ingest.ingest import _week_of
 from coursekit.outcomes import CoursekitError
 
 
-def _declared_week_of(source: Path, struct) -> str | None:
-    """The week a `--source` belongs to per the DECLARED structure — matched by resolved path, so a
-    source the manifest assigns to a week is placed there even when its path doesn't encode the week."""
+def _declared_unit_of(source: Path, struct) -> str | None:
+    """The unit a `--source` belongs to per the DECLARED structure — matched by resolved path, so a
+    source the manifest assigns to a unit (numbered or not) is placed there even when its path doesn't
+    name it."""
     src = Path(source).expanduser().resolve()
-    for week_num, _ in struct.iter_weeks():
-        for s in struct.sources_for(week_num):
+    for uid, _ in struct.iter_units():
+        for s in struct.sources_for(uid):
             if s.resolve(struct.root).resolve() == src:
-                return week_num
+                return uid
     return None
 
 
 def targeted_slug(source: Path, struct=None) -> str:
-    """A distinct output slug for a targeted quiz: `week-<n>-<doc>` (or just `<doc>` off-week). Distinct
-    from the plain `week-<n>` so a targeted quiz never overwrites the week quiz or another element's.
+    """A distinct output slug for a targeted quiz: `<unit>-<doc>` (`week-3-barrett`, `intro-barrett`; just
+    `<doc>` outside any unit). Distinct from the unit's own `<unit>` so a targeted quiz never overwrites the
+    unit's quiz or another element's.
 
     Week detection prefers the DECLARED structure (FLOW-7) — a source the manifest assigns to a week
     uses THAT week — then falls back to ingest's strict `_week_of` ancestor match (which, unlike the old
     loose per-ancestor `week_key`, won't mistake a bare-numeric ancestor like `.../2024/` for a week)."""
+    from coursekit.course import unit_slug
     wk = unit_of(source, struct)
     doc = slugify(source.stem)
-    return f"week-{wk}-{doc}" if wk else doc
+    return f"{unit_slug(wk)}-{doc}" if wk else doc
 
 
 def unit_of(source: Path, struct=None) -> str | None:
-    """The unit number a `--source` belongs to: the DECLARED structure first, then the path."""
-    wk = _declared_week_of(source, struct) if struct is not None else None
+    """The unit a `--source` belongs to: the DECLARED structure first, then a `week-N` in its path."""
+    wk = _declared_unit_of(source, struct) if struct is not None else None
     return wk if wk is not None else _week_of(source)
 
 

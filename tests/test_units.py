@@ -417,3 +417,90 @@ def test_a_courses_overview_pages_use_its_word_for_a_unit(tmp_path):
     recap = overview.build_week_recap("C", "7", "Objects", "", ConceptMap(week="7", concepts=[Concept(name="Arrays")]),
                                       noun="block")
     assert recap.blocks["recall-0"].text == "Look back at Arrays in the block's material."
+
+
+# ------------------------------------------------------------- CORE-5.7 — the last week-only paths
+def _readings_course(tmp_path):
+    """Two sessions declared by their sources alone (no `doc:`), the overlay listing `loops` first."""
+    root = tmp_path / "readings"
+    (root / ".vtconfig").mkdir(parents=True)
+    (root / ".vtconfig" / "structure.coursekit.yaml").write_text(
+        "units:\n"
+        "  loops: {title: Session 2 — Loops, sources: [{path: texts/loops.txt}]}\n"
+        "  intro: {title: Session 1 — Intro, sources: [{path: texts/intro.txt}, {path: texts/barrett.txt}]}\n",
+        encoding="utf-8")
+    (root / "texts").mkdir()
+    for name in ("loops", "intro", "barrett"):
+        (root / "texts" / f"{name}.txt").write_text(f"{name} repeats things.\n", encoding="utf-8")
+    return root
+
+
+def test_a_session_declared_by_its_sources_alone_is_ingested_where_every_verb_reads_it(tmp_path, capsys):
+    from coursekit.ingest.ingest import ingest
+    root = _readings_course(tmp_path)
+    assert cli.main(["ingest", str(root), "--raw"]) == 0
+    out = capsys.readouterr().out
+    assert out.index("loops.txt") < out.index("intro.txt")              # the overlay's order
+    assert "2 unit doc(s)" in out and "week" not in out.lower()
+    assert "## barrett" in (root / "output" / "intro.md").read_text(encoding="utf-8")
+    assert [(u.id, u.transcript_path) for u in find_units(root)] == \
+        [("loops", root / "output" / "loops.md"), ("intro", root / "output" / "intro.md")]
+    assert {d.name for _, d in ingest(root, raw=True, out_dir=tmp_path / "elsewhere")} == {"loops.md", "intro.md"}
+
+
+def test_a_document_a_session_declares_gets_a_quiz_folder_named_by_that_session(tmp_path):
+    from coursekit.generate.quiz import targeted
+    root = _readings_course(tmp_path)
+    unit, _ = targeted.prepare(root / "texts" / "barrett.txt")
+    assert (unit.id, unit.output_dir) == ("intro", root / "quizzes" / "intro-barrett")
+
+
+def test_a_session_course_gets_an_overview_per_session_and_one_for_its_module(sessions, monkeypatch):
+    from coursekit import records, settings
+    from coursekit.generate import overview
+    _quiet(settings.set, sessions, "unit_noun", "session")     # before analyze: the noun is in its brief too
+    _analyze(sessions, monkeypatch)
+    _, entries = overview.plan(sessions, framing=False)
+    pages = [e["build"]() for e in entries]
+    assert [(e["unit"], p.slug, p.title) for e, p in zip(entries, pages)] == [
+        ("intro", "intro-overview", "Session 1 — Intro"), ("loops", "loops-overview", "Session 2 — Loops"),
+        (None, "module-day-1-overview", "Day 1")]
+    shown = [p.model_dump(mode="json", exclude={"page_type"}) for p in pages]   # the whole page, block ids too; `week_overview` is an IR enum
+    assert "week" not in json.dumps(shown).lower() and "This session — Session 1 — Intro" in json.dumps(shown, ensure_ascii=False)
+    written = _quiet(overview.generate_overviews, sessions)
+    assert [p.name for p in written] == ["intro-overview.html", "loops-overview.html", "module-day-1-overview.html"]
+    with outcomes.capture(sink=lambda n: None):
+        assert {records.status(r.parent, r.name).state for r in (sessions / "overview").glob("*.record.json")} == {"current"}
+    intro = (sessions / "overview" / "intro-overview.record.json").read_text(encoding="utf-8")
+    assert "concepts/intro.yaml" in intro and "concepts/loops.yaml" not in intro   # a page lists only its own map
+    module = (sessions / "overview" / "module-day-1-overview.record.json").read_text(encoding="utf-8")
+    assert "concepts/intro.yaml" in module and "concepts/loops.yaml" in module      # a module's, each of its units'
+    _, framed = overview.plan(sessions, framing=True)
+    assert framed[0]["frame"][-1]["content"].startswith("Title: Session 1 — Intro\n")   # the framing pass's title
+    (sessions / ".vtconfig" / "concepts" / "loops.yaml").unlink()
+    _, entries = overview.plan(sessions, framing=False)
+    assert entries[1]["skip"].startswith("Session 2 — Loops: no overview — no concept map")
+
+
+def test_propose_expectations_prints_each_units_own_rule(tmp_path, monkeypatch, capsys):
+    from coursekit.ingest import propose_expectations as pe
+    root = tmp_path / "course"
+    (root / ".vtconfig").mkdir(parents=True)
+    monkeypatch.setattr(pe, "propose_expectations",
+                        lambda path: ({"overrides": {"unit": {"intro": {"page:glossary": 1}}}}, []))
+    _quiet(cli.main, ["propose", str(root), "--expectations", "--dry-run"])
+    assert "unit intro: 1 page:glossary" in capsys.readouterr().out
+
+
+def test_no_tool_the_model_is_offered_names_a_cadence():
+    from coursekit.generate.assignment import build as assignment
+    from coursekit.generate.page import tools as page_tools
+    from coursekit.generate.quiz import tools as quiz_tools
+    specs = page_tools.TOOL_SPECS + quiz_tools.TOOL_SPECS + assignment.TOOL_SPECS
+    assert specs and "week" not in json.dumps(specs).lower()
+
+
+def test_what_analyze_and_generate_print_for_a_session_course_never_says_week(sessions, capsys):
+    for verb in ("analyze", "generate"):
+        assert cli.main([verb, str(sessions), "--dry-run"]) == 0
+    assert "week" not in capsys.readouterr().out.lower()

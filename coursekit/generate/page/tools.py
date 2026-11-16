@@ -67,7 +67,7 @@ add_code_json = {
 
 add_glossary_json = {
     "name": "add_glossary",
-    "description": "Add a short glossary — key terms and their definitions from this week.",
+    "description": "Add a short glossary — key terms and their definitions from this material.",
     "parameters": {"type": "object", "properties": {
         "block_id": _ID,
         "entries": {"type": "array", "items": {
@@ -108,7 +108,7 @@ add_columns_json = {
 
 add_pullquote_json = {
     "name": "add_pullquote",
-    "description": ("Foreground the week's ONE key idea as a large pull quote. Use at most once per "
+    "description": ("Foreground the ONE key idea as a large pull quote. Use at most once per "
                     "page — it only signals if it is rare. No links."),
     "parameters": {"type": "object", "properties": {
         "block_id": _ID,

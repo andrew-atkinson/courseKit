@@ -84,5 +84,5 @@ def test_run_falls_back_to_text_without_knowledge(tmp_path, monkeypatch, capsys)
     args = cli.build_parser().parse_args(["analyze", str(doc)])
     rc = cli._cmd_analyze(args)
     assert rc == 0
-    assert "from the week text" in capsys.readouterr().out
+    assert "from the unit's text" in capsys.readouterr().out
     assert cmap.concept_map_path(tmp_path, "3").exists()   # fallback still wrote a map

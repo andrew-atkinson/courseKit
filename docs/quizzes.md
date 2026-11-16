@@ -86,7 +86,7 @@ uv run coursekit generate "/path/to/course" \
   --source "/path/to/course/week-3/readings/Barrett.pdf"
 ```
 
-It extracts that document, writes it as `source.md`, and generates a quiz into a **distinct** slug — `quizzes/week-3-barrett/` — so a targeted quiz never overwrites the whole-week quiz or another document's.
+It extracts that document, writes it as `source.md`, and generates a quiz into a **distinct** slug — `quizzes/week-3-barrett/`, or `quizzes/intro-barrett/` for a unit `intro` — so a targeted quiz never overwrites the unit's own quiz or another document's.
 The unit comes from the declared structure when `structure.coursekit.yaml` lists the document as one of a unit's sources, then from its path (a `week-N` name or ancestor directory); with neither, the slug is just the document name.
 Targeted generation is **quizzes only**, and honours the course's `domain.md`, voice, and `quiz.yaml` exactly as a whole-unit run does.
 The supported document types are the same as `ingest` (PDF, slides, docx, odt, txt, md).

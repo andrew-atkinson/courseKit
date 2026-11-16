@@ -100,17 +100,19 @@ def shape(raw_text: str, provider, model: str, *, project_root=None) -> str:
 
 def _plan_from_structure(struct, out_dir) -> list[tuple[Path, list[Path]]]:
     """The consolidation plan straight from the DECLARED structure (FLOW-7 Phase 3) — group by the
-    manifest, not by filename inference. Each week's declared sources are resolved to paths (missing or
-    non-document sources — e.g. a video-only week — are skipped, since coursekit ingests documents), and
-    the week doc goes to the declared `doc` path (or the default) so `ingest` and `find_units` agree."""
+    manifest, not by filename inference. Every declared unit counts, numbered or not (`intro`). Each unit's
+    declared sources are resolved to paths (missing or non-document sources — e.g. a video-only unit — are
+    skipped, since coursekit ingests documents), and the unit's text goes to the declared `doc` path (or the
+    default, `output/<unit>.md`) so `ingest` and `find_units` agree."""
+    from coursekit.course import unit_slug
     base = Path(out_dir).expanduser() if out_dir else None
     plan = []
-    for week_num, _entry in struct.iter_weeks():
-        srcs = [s.resolve(struct.root) for s in struct.sources_for(week_num)]
+    for uid, _entry in struct.iter_units():
+        srcs = [s.resolve(struct.root) for s in struct.sources_for(uid)]
         srcs = [p for p in srcs if p.is_file() and is_supported(p)]
         if not srcs:
             continue
-        dest = (base / f"week-{week_num}.md") if base else struct.unit_doc(week_num)
+        dest = (base / f"{unit_slug(uid)}.md") if base else struct.unit_doc(uid)
         plan.append((dest, srcs))
     return plan
 

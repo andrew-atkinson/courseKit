@@ -243,14 +243,11 @@ class CourseStructure:
         entry = self._weeks.get(f"week {unit_id}") or self._weeks.get(str(unit_id))
         return entry if isinstance(entry, dict) else {}
 
-    def iter_weeks(self) -> list[tuple[str, dict]]:
-        """(week_num, entry) for every declared week, numeric order first."""
-        out = []
-        for key, entry in self._weeks.items():
-            k = courseconfig.week_key(key)
-            if k is not None and isinstance(entry, dict):
-                out.append((k, entry))
-        return sorted(out, key=lambda kv: _week_sort(kv[0]))
+    def iter_units(self) -> list[tuple[str, dict]]:
+        """(unit id, entry) for every declared unit — `3` for `week 3`, `intro` for `intro` — in the course's
+        order: the overlay's once it declares units, else numbered units by number, then the rest as listed."""
+        out = [(courseconfig.week_key(k) or k, e) for k, e in self.iter_declared()]
+        return out if self.declares_order() else sorted(out, key=lambda kv: (0, int(kv[0])) if kv[0].isdigit() else (1, 0))
 
     def iter_declared(self) -> list[tuple[str, dict]]:
         """(key, entry) for every declared unit in DECLARED order — numeric or not (`intro`). The order
@@ -294,13 +291,15 @@ class CourseStructure:
 
     def unit_doc(self, unit_id: str) -> Path | None:
         """The consolidated text discovery should read: the declared `doc:` (resolved against the root) when
-        present, else for a numbered unit the default `output/week-<n>.md` when a root is known, else None."""
+        present, else `output/<the unit's name on disk>.md` (`week-3.md`, `intro.md`) — where `ingest` writes
+        it — when a root is known, else None."""
         doc = self._entry(unit_id).get("doc")
         if doc:
             p = Path(str(doc)).expanduser()
             return p if p.is_absolute() or self.root is None else self.root / p
-        if self.root is not None and str(unit_id).isdigit():
-            return self.root / "output" / f"week-{unit_id}.md"
+        if self.root is not None:
+            from coursekit.course import unit_slug
+            return self.root / "output" / f"{unit_slug(str(unit_id))}.md"
         return None
 
     def sources_for(self, unit_id: str) -> list[Source]:

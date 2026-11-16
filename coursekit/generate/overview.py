@@ -80,17 +80,17 @@ def build_week_recap(course_title: str, num, title: str, module: str, cm, *, ref
                 blocks=_blocks(pairs), finalized=True)
 
 
-def build_module_overview(course_title: str, module: str, weeks, *, framing: str = "", noun: str = "week") -> Page:
-    """A module overview: its weeks, each with a one-line theme (its enduring understanding).
-    `weeks` is a list of (num, title, enduring_understanding)."""
-    intro = framing or f"{module} spans {len(weeks)} {noun}(s). Here is the arc it follows."
+def build_module_overview(course_title: str, module: str, units, *, framing: str = "", noun: str = "week") -> Page:
+    """A module overview: its units, each with a one-line theme (its enduring understanding).
+    `units` is a list of (num, title, enduring_understanding); `num` is empty for an unnumbered unit."""
+    intro = framing or f"{module} spans {len(units)} {noun}(s). Here is the arc it follows."
     items = []
-    for num, title, eu in weeks:
+    for num, title, eu in units:
         line = f"Week {num}: {title}" if num else title
         items.append(f"{line} — {eu}" if eu else line)
     pairs = [("intro", "paragraph", {"text": intro}),
-             ("weeks-h", "heading", {"text": "In this module", "role": "concept"}),
-             ("weeks", "bullets", {"items": items})]
+             ("units-h", "heading", {"text": "In this module", "role": "concept"}),
+             ("units", "bullets", {"items": items})]
     # avoid "module-module-2-…" when the module name already starts with "Module"
     mslug = slugify(module)
     slug = (f"{mslug}-overview" if mslug.startswith("module-") else f"module-{mslug}-overview")
@@ -124,37 +124,45 @@ def plan(course_path, *, framing: bool = True) -> tuple:
     if not root:
         raise CoursekitError("no .vtconfig course root found (need context.yaml + concept maps)",
                              code="course.no_root", details={"path": str(course_path)})
+    from coursekit.course import unit_slug
     course_title, noun = cfg.course_title or "Course", prompts.unit_noun(root)
-    weeks = (cfg.context or {}).get("weeks") or {}
 
-    parsed = []
-    for key, meta in weeks.items():
-        num = courseconfig.week_key(key)
-        cm = cmap.load_concept_map(cmap.concept_map_path(root, num)) if num else None
-        parsed.append((num, (meta or {}).get("title") or key, (meta or {}).get("module") or "", cm))
-    parsed.sort(key=lambda t: int(t[0]) if t[0] and str(t[0]).isdigit() else 999)
+    parsed = []                                  # (unit id, its number or None, title, module, concept map)
+    for uid, meta in _units(cfg):
+        num = uid if uid.isdigit() else None
+        cm = cmap.load_concept_map(cmap.concept_map_path(root, uid))
+        parsed.append((uid, num, meta.get("title") or (f"week {uid}" if num else uid), meta.get("module") or "", cm))
 
-    def entry(unit, build, title, topics, eu, weeks):
-        return {"unit": unit, "build": build, "title": title, "maps": [cmap.concept_map_path(root, n) for n in weeks],
+    def entry(unit, build, title, topics, eu, units):
+        return {"unit": unit, "build": build, "title": title, "maps": [cmap.concept_map_path(root, u) for u in units],
                 "frame": _frame_messages(cfg, root, title, topics, eu) if framing else None}
 
     entries = []
-    for num, title, module, cm in parsed:
+    for uid, num, title, module, cm in parsed:
+        label = f"Week {num}: {title}" if num else title
         if cm is None or not cm.concepts:        # nothing to orient toward without a concept map
-            entries.append({"unit": num, "skip": f"week {num} ({title}): no overview — "
+            entries.append({"unit": uid, "skip": f"{label}: no overview — "
                             f"{'no concept map; run `coursekit analyze`' if cm is None else 'its concept map lists no concepts'}."})
             continue
-        entries.append(entry(num, partial(build_week_overview, course_title, num, title, module, cm, noun=noun),
-                             f"Week {num}: {title}", ", ".join(c.name for c in cm.concepts), cm.enduring_understanding,
-                             [num]))
+        entries.append(entry(uid, partial(build_week_overview, course_title, num, title, module, cm,
+                                          ref=unit_slug(uid), noun=noun),
+                             label, ", ".join(c.name for c in cm.concepts), cm.enduring_understanding, [uid]))
     modules: dict[str, list] = {}
-    for num, title, module, cm in parsed:
+    for uid, num, title, module, cm in parsed:
         if module and cm is not None:
-            modules.setdefault(module, []).append((num, title, cm.enduring_understanding))
-    for module, wks in modules.items():
-        entries.append(entry(None, partial(build_module_overview, course_title, module, wks, noun=noun),
-                             module, "; ".join(t for _, t, _ in wks), "", [n for n, _, _ in wks]))
+            modules.setdefault(module, []).append((uid, num, title, cm.enduring_understanding))
+    for module, us in modules.items():
+        entries.append(entry(None, partial(build_module_overview, course_title, module,
+                                           [(num, title, eu) for _, num, title, eu in us], noun=noun),
+                             module, "; ".join(t for _, _, t, _ in us), "", [u for u, _, _, _ in us]))
     return root, entries
+
+
+def _units(cfg) -> list[tuple[str, dict]]:
+    """The course's declared units, in its order — `context.yaml` and coursekit's overlay composed — read from
+    the config already loaded, so an overview's record lists no file it didn't read."""
+    from coursekit.coursestructure import CourseStructure
+    return CourseStructure(cfg).iter_units()
 
 
 def generate_overviews(course_path, *, provider=None, model=None, framing: bool = True) -> list[Path]:
@@ -164,8 +172,7 @@ def generate_overviews(course_path, *, provider=None, model=None, framing: bool 
     from coursekit import records
     with records.reading() as read:
         root, entries = plan(course_path, framing=bool(framing and provider))
-    every_map = {str(cmap.concept_map_path(root, courseconfig.week_key(k)).resolve())
-                 for k in (courseconfig.load(course_path).context or {}).get("weeks") or {}}
+    every_map = {str(cmap.concept_map_path(root, uid).resolve()) for uid, _ in _units(courseconfig.load(course_path))}
 
     def frame(e) -> str:
         if not e["frame"]:
@@ -189,7 +196,7 @@ def generate_overviews(course_path, *, provider=None, model=None, framing: bool 
         page = e["build"](framing=f)
         written.append(_render_overview(page, out_dir, root))
         mine = {str(m.resolve()) for m in e["maps"]}                # every page reads the course's settings,
-        own = {k: h for k, h in read.items() if k not in every_map or k in mine}   # but only its own weeks' maps
+        own = {k: h for k, h in read.items() if k not in every_map or k in mine}   # but only its own units' maps
         steps = [{"step": "build", "by": "coursekit", "brief": records.digest(_built(e)), "read": own,
                   "options": {"slug": page.slug}}]
         if f:
@@ -217,7 +224,7 @@ def rebuild(rec: dict, step: dict, art_dir):
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Assemble week + module overview pages from course data.")
+    ap = argparse.ArgumentParser(description="Assemble unit + module overview pages from course data.")
     ap.add_argument("course")
     ap.add_argument("--no-framing", action="store_true",
                     help="skip the model framing pass — fully deterministic, no model call")
@@ -232,7 +239,7 @@ def main() -> int:
 
     written = generate_overviews(args.course, provider=provider, model=model, framing=not args.no_framing)
     if not written:
-        print("No overviews written — need context.yaml weeks + concept maps (run analyze first).")
+        print("No overviews written — need the course's units + concept maps (run analyze first).")
         return 1
     print(f"{len(written)} overview page(s) → {written[0].parent}")
     for p in written:

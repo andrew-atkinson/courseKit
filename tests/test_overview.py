@@ -68,12 +68,12 @@ def test_week_recap_without_concepts_stays_minimal():
     assert page.finalized
 
 
-def test_module_overview_lists_its_weeks_with_themes():
+def test_module_overview_lists_its_units_with_themes():
     page = overview.build_module_overview("C", "Chaos and Control",
                                           [("3", "Repetition", "Loops manage repetition."),
                                            ("4", "Randomness", "Controlled chaos.")])
     assert page.page_type == "module_overview" and page.slug == "module-chaos-and-control-overview"
     assert page.title == "Chaos and Control"
-    items = page.blocks["weeks"].items
+    items = page.blocks["units"].items
     assert any("Week 3: Repetition — Loops manage repetition." in i for i in items)
     assert any("Week 4: Randomness — Controlled chaos." in i for i in items)

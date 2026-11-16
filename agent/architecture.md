@@ -250,9 +250,6 @@ Unchanged trigger for the rename (generator #2, not a date), but sharpened:
 - **Three page critics read only each unit's teaching page.**
   Evaluate and fix take every quiz and page from the index (`course.review_items`), glossary and overview siblings included, but the pedagogy, concept-delivery, and page-groundedness critics (`evaluate --all`) still read one `page.json` per unit at its layout path.
   Moving them onto `review_items` would review the siblings too — more model calls and a visible change in their reports, so it is its own decision, not a cleanup.
-- **`ingest` still finds units by week number.**
-  `_plan_from_structure` walks `iter_weeks`, so a declared unit with no number (`intro`) is skipped without a word; such a unit works everywhere else once its `doc:` names its text.
-- **Two tool descriptions still say "week"** (`add_glossary`, `add_pullquote`): they are module-level schemas, not part of any brief, so giving them the course's noun means building a run's tools per course.
 - **Two writers still overwrite a hand edit:** `analyze` (a concept map) and the overview script (`python -m coursekit.generate.overview`); parked as `CORE-4.6`.
   And the decompose prototype's `--review` isn't recorded as an evaluation.
 - **The census does not count overview pages yet**, though the model indexes them — a visible output change, kept out of the byte-identical CORE-2 steps.
