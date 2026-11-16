@@ -137,6 +137,10 @@ Each step is its own branch with goldens (G0 the exports, G1 generation and reco
    G0: all 904 files and members identical to `main`'s; the emit logs differ only by the warning, once for each of CC101's two commands (its grading reads `unknown`), and not at all for PH101 (no grading block). G1 identical. 12 mutations, all caught.
 4. **Docs.**
    `docs/architecture.md` (the authority of each overlay section), `docs/commands.md` (`accept`), the census guide, `agent/architecture.md`, `docs/architecture-diagram.html`, and the roadmap.
+   **Done 2026-11-16.** The statuses and `accept` are documented once, in `docs/configuration.md` ("Whose each overlay section is"); `docs/commands.md` (the census row, the `propose` and grading notes), `docs/overview.md`, and `docs/architecture.md` point to it.
+   There is no separate census guide: the census is documented in the commands guide, which now says its report names who set the expectations.
+   Both architecture docs gain a paragraph and the authority file in a diagram (`docs/architecture.md`: who reads it; `agent/architecture.md`: who writes it); the diagram page's census node and its "faculty decides" caption say the same; `CLAUDE.md`'s "Proposers draft; the faculty decides" names `accept`.
+   The three diagrams changed use only syntax already in those files; they were not rendered in this step (the renderer could not be run), so render them once before relying on them.
 
 *Done when:* a section becomes declared only through `accept` or `config set`, each with who and when on record; a value coursekit drafted, or one changed since it was accepted, is never reported or emitted as the faculty's — the census says so and the cartridge warns; every package and record is byte-identical to `main`'s.
 

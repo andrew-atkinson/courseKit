@@ -107,6 +107,7 @@ Nothing here is coursekit-specific; it is what the instructor already has.
 **② The course folder on disk.** A plain local directory — the course's own folder, marked by a `.vtconfig/` subfolder — holding two kinds of file:
 
 - **the `.vtconfig/` reference:** `context.yaml` (course · weeks · modules) and the per-tool config (`quiz.yaml`, `page.yaml`, `style.yaml`, the per-unit supplements, prompt overrides). The tools create these, but they are **faculty-editable** — a professor changes a theme, tunes a prompt, adds a supplement link, or fixes a unit title by hand in an ordinary text editor. It is a *local reference coursekit both writes and reads*, not a hidden store.
+  One file beside them is coursekit's alone: `structure.coursekit.authority.json`, the history of who proposed or accepted each section of the structure overlay (CORE-6).
 - **the generated files:** each unit's text (`week-N.md` for a numbered unit), the `bank.json` / `page.json` / `assignment.json` IR, the emitted artifacts (`.gift`, QTI `.zip`, `.html`, `.imscc`), and the census (`census.json` + `census.md`).
   Beside every artifact coursekit makes, a record says what it was made from and how (CORE-4): `record.json` in each quiz, page, and assignment folder, and `<name>.record.json` beside each overview page and concept map. No emitter reads it.
   `evaluate` notes each critic's result in the record of the artifact it judged, with a fingerprint of the version it read, so a later change shows the evaluation is of an earlier version.
@@ -118,7 +119,7 @@ That file boundary is why the two tools stay separate repos with disjoint runtim
 
 **③ coursekit — a set of programs.** Four phases run locally: **ingest** (documents → `week-N.md`), **analyze** (unit text + the transcriber's `knowledge.json` → the per-unit concept map), **generate** (unit text → `bank.json`/`page.json`), **emit** (IR → Canvas files).
 Two more verbs sit alongside them as the *output-worth* layer: **evaluate** (cold-read the committed IR for correctness, form, and concept-delivery) and **fix** (regenerate each flagged item in place).
-Four more need no model: **propose** drafts the declared structure, grading groups, and expectations for the faculty to edit; **census** inventories what exists for every unit (presence, not quality); **check** validates every settings file; **config** reads and writes one setting.
+Five more need no model: **propose** drafts the structure, grading groups, and expectations for the faculty to accept; **accept** records a section as the faculty's, with who and when; **census** inventories what exists for every unit (presence, not quality); **check** validates every settings file; **config** reads and writes one setting.
 Of the phases, all except `emit` — and ingest's optional shaping pass — **call an LLM, either one you host locally (LM Studio by default) or a hosted API.** coursekit holds no model of its own; it drives whichever provider is configured, which is what lets the whole thing run offline when the LLM is local. (The transcriber is the *media→text* front door; ingest is the *document→text* one — two ways onto the same folder.)
 
 **④ Delivery — Canvas.** The emitted artifacts import into Canvas (a QTI `.zip`, or an `.imscc` course package).
@@ -129,7 +130,7 @@ The one loop back is optional and one-time: a *prior* Canvas export can seed `co
 
 This opens up layer ③ of the diagram above: each `coursekit …` box there is a labelled boundary here, the IR and packages cylinders split into their actual files, the transcriber reappears as an input, and the LLM shows only as amber highlighting.
 Each labelled boundary is one `coursekit` command and what runs inside it; the files sit outside the boundaries because they live in the course folder, where the next command picks them up.
-`check` and `config` are left out — they validate and set `.vtconfig/` settings through `settings.py`, and touch nothing in this flow.
+`check`, `config`, and `accept` are left out — they validate, set, and accept `.vtconfig/` settings through `settings.py`, and touch nothing in this flow.
 
 ```mermaid
 ---
@@ -152,6 +153,7 @@ flowchart TB
     ing -.-> md[("week-N.md")]
     vt -.-> md
     prop -.-> ov[("structure.coursekit.yaml")]
+    prop -. "notes its draft" .-> auth[("structure.coursekit.authority.json<br/>who set each overlay section")]
 
     subgraph ANALYZE [" coursekit analyze · unit text → concept map "]
         ana["concept_map.py · consolidate.py"]
@@ -223,6 +225,8 @@ flowchart TB
     bank & page & asg & cmap -.- rec
     ev -. "each critic's result" .-> rec
     rec --> cen
+    auth -- "whose expectations" --> cen
+    auth -- "whose grading · warns" --> crt
 
     crs -- "import · the whole course" --> canvas(["<b>Canvas</b>"])
     zip & imscc & aimscc -- "import · one type" --> canvas
@@ -245,5 +249,10 @@ So the course `.imscc` is the whole course in one import, and the QTI `.zip`, th
 **Records.** Every command that writes an artifact writes its record right after it: `generate` and `analyze` start a fresh one, and `fix`, a reorder, and the quiz's later passes add a step.
 Each critic's result is added wherever it runs: `evaluate`, `generate`'s review, and the check `fix` makes before it fixes.
 Three things read them, none of them an emitter: `python -m coursekit.records PATH` and the census report each artifact's status, `emit` warns about a stale one (and packages it anyway), and `generate` refuses to overwrite one edited by hand unless `--force`.
+
+**Whose the structure is.** A section of the overlay (`units`, `grading`, `expect`) is the faculty's decision only once a command records it: `accept`, or `config set` on a key inside it.
+`propose` notes each draft in `structure.coursekit.authority.json`, and `accept` notes who accepted it and when; the status — declared, proposed, edited, or unknown — is worked out by comparing the section on disk with the last entry, never stored.
+Three things read it: `check` lists each section's status, the census says who set the expectations it measures against, and the cartridge warns when it writes grading nobody accepted.
+None of them changes what is used or emitted: the census's gaps and the package are the same whatever the status ([the statuses](configuration.md#whose-each-overlay-section-is)).
 
 A Canvas **API** emitter is the gated third delivery path — it will read the same IRs, so it is one more emitter, not a new pipeline.

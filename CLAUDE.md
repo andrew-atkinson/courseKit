@@ -71,7 +71,9 @@ One exception to re-emitting: GIFT has no `emit` command — `BankDraft.finalize
   coursekit never writes `context.yaml` — its declared structure, grading groups, and expectations go in its own overlay.
   `coursekit/courseconfig.py` is the shared _mechanism_; each tool owns its _file_.
 - **Proposers draft; the faculty decides.**
-  `propose` (structure, `--grading`, `--expectations`) writes a commented draft the faculty owns by editing, and refuses to clobber it without `--force`.
+  `propose` (structure, `--grading`, `--expectations`) writes a commented draft, and refuses to clobber it without `--force`.
+  A section of the overlay becomes the faculty's (declared) only through `coursekit accept` or `config set`, which record who and when; an edit alone never does (`agent/core-6-design.md`).
+  A section nobody accepted is still used, but never reported or emitted as the faculty's decision: `check` and the census say so, and the cartridge warns.
   A pedagogic choice the faculty hasn't made (a cadence, whether/how EUs are assessed) is a flagged DECISION NEEDED, never a pre-filled rule.
   The same goes for a hand edit: `generate` refuses to overwrite an artifact edited since coursekit made it, unless `--force`.
 - **The census is presence, not quality.**

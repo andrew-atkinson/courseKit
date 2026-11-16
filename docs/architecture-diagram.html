@@ -223,7 +223,7 @@
     <div class="spine">
       <span class="eyebrow">Alongside the pipeline — offline, no model</span>
       <div class="nodes" style="margin-top:12px">
-        <div class="node built"><div class="n-name">census</div><div class="n-meta">what exists for every unit and what's missing — presence, not quality — and whether each artifact still matches its course. Writes census.json + census.md.</div></div>
+        <div class="node built"><div class="n-name">census</div><div class="n-meta">what exists for every unit and what's missing — presence, not quality — whether each artifact still matches its course, and who set the expectations it measures against. Writes census.json + census.md.</div></div>
         <div class="node built"><div class="n-name">check</div><div class="n-meta">validates every settings file at once: file, key, value, and what's allowed.</div></div>
         <div class="node built"><div class="n-name">config</div><div class="n-meta">changes one setting without editing YAML, and refuses a value it can't use.</div></div>
         <div class="node built"><div class="n-name">accept</div><div class="n-meta">makes a drafted or hand-edited section of the course's structure yours, recording who and when.</div></div>
@@ -302,7 +302,8 @@
         (which units exist, their titles); the overlay <i>adds</i> typed sources, a <code>doc</code> pointer, grading groups,
         expectations, and the stored unit order. <code>propose</code> writes a draft and won't overwrite it without
         <code>--force</code>, and a pedagogic choice it can't make is flagged <b>DECISION NEEDED</b>, so the
-        <b>faculty decides</b> by editing the draft.</figcaption>
+        <b>faculty decides</b>: edit the draft, then <code>accept</code> records it as yours, with who and when. Until then
+        <code>check</code> and the census say it is still a draft, and the course package warns about grading nobody accepted.</figcaption>
     </figure>
 
     <!-- proposer scope -->

@@ -112,6 +112,9 @@ title: Structure — one writer per file, merged on read
 flowchart LR
     vt2["videotranscriber<br/>separate repo"] -. "writes" .-> ctx2[("context.yaml<br/>identity · weeks · titles")]
     prop["coursekit propose<br/>via settings.py"] -. "writes" .-> ov[("structure.coursekit.yaml<br/>units · sources · doc · grading")]
+    prop -. "notes each draft" .-> auth[("structure.coursekit.authority.json<br/>who proposed · accepted each section")]
+    acc["coursekit accept · config set<br/>via settings.py"] -. "notes who accepted" .-> auth
+    ov & auth --> who["settings.authority<br/>→ check · census · cartridge"]
     ctx2 --> reader["coursestructure<br/>reads · merges"]
     ov --> reader
     reader --> gen["course model → generate · evaluate · emit · census<br/><b>read-only</b>"]
@@ -126,6 +129,13 @@ Precedence is defined: `context.yaml` (the transcriber's) owns *identity* — wh
 This is the pattern the project already uses for **shipped prompts + `.vtconfig/prompts` overrides** and **base domain + course `domain.md`** — structure just joins them.
 FLOW-7 Phase 1 (built) is the *reader* half — `coursestructure.py` composes the declared structure, and the course model builds units from it when present (so a unit doc can be named anything, not only `week-N.md`), else from the docs on disk.
 The *writer* half — the proposer (`coursekit propose`, writing `structure.coursekit.yaml` through `settings.py`, never over a faculty-edited draft without `--force`) — is Phase 2; Phase 3 then pointed `ingest` (grouping) and targeted quizzes (`--source` placement) at the declared structure too, so the manifest is authoritative end-to-end, with filename inference the fallback when nothing is declared.
+
+**Authority (CORE-6, [core-6-design.md](core-6-design.md)).** A proposer's draft is not the faculty's decision until a command records it, so `settings.py` keeps a history beside the overlay: `structure.coursekit.authority.json`, per section (`units`, `grading`, `expect`) a list of entries `{step, by, at, coursekit, digest, section}`.
+`propose_section` appends `proposed`; `accept`, `set`, and `unset` append `accepted` with the login name or `--by`.
+`settings.authority(root, section)` is the one reader: it compares `records.digest` of the parsed section with the last entry's, so reformatting is not an edit, and returns `declared`, `proposed`, `edited`, `unknown` (no history), or None (no section).
+The status is worked out when asked, never stored, as an artifact's is from its record.
+Three callers act on it and none changes what is used: `coursekit check` (`settings.authorities`), the census (`expectation_basis` and `expectation_set`, so `census.md` is still written from `census.json` alone), and the cartridge (`_warn_unless_accepted`: one `outcomes.warn`, the package byte-identical).
+`by` is an opaque label and unknown keys in an entry are ignored, which leaves room for an account beside the name (`UX-9`).
 
 **The proposer is one station, not three.**
 Its job is **input-structure analysis** — read the real materials, declare what exists. Descriptive, grounded in the faculty's own files, low-risk.

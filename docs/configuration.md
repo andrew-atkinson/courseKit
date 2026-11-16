@@ -45,7 +45,8 @@ coursekit writes only its own files there (below); `context.yaml` stays the tran
 | `quiz.yaml`         | quizzes | the quiz generator's settings                                          |
 | `page.yaml`         | pages   | the page generator's settings                                          |
 | `evaluate.yaml` · `ingest.yaml` · `assignment.yaml` | those commands | their settings ([keys below](#generator-settings--quizyaml--pageyaml)) |
-| `structure.coursekit.yaml` | coursekit | the declared units and their order, typed sources, grading groups, expectations (drafted by `propose`, yours to edit) |
+| `structure.coursekit.yaml` | coursekit | the declared units and their order, typed sources, grading groups, expectations (drafted by `propose`, yours once you [accept](#whose-each-overlay-section-is) it) |
+| `structure.coursekit.authority.json` | coursekit | who proposed or accepted each section of that overlay, and when (kept by coursekit; not for editing) |
 | `concepts/<unit>.yaml` | coursekit | a unit's concept map (written by `analyze`, [yours to edit](evaluating.md#analyze--the-concept-map-that-grounds-everything)) |
 | `domain.md`         | shared  | the [domain profile](domain-profile.md) — applies to every generator   |
 | `voice.md`          | shared  | the instructor [voice profile](#voice-profile--voicemd) — prose generators write in this voice |
@@ -69,6 +70,34 @@ That writes `unit_noun: session` into `structure.coursekit.yaml`; `config unset 
 The plural is made by rule — sessions, classes, studies — so a word with an irregular plural reads wrongly where a prompt says the plural.
 The overview, recap, and module pages coursekit writes without a model use the word too, and so does an assignment's default scope ("this session").
 A numbered unit's title still reads "Week 3: …", since that title is the course's own.
+
+### Whose each overlay section is
+
+`structure.coursekit.yaml` has three sections you decide: `units`, `grading`, and `expect`.
+coursekit can draft each one (`coursekit propose`), but a draft is not your decision until you say so.
+So each section has a status, and `coursekit check` shows it with the command that makes the section yours:
+
+| Status     | What it means                                                                  |
+| ---------- | ------------------------------------------------------------------------------ |
+| `proposed` | coursekit's draft, untouched since `propose` wrote it                          |
+| `edited`   | changed in an editor since it was last proposed or accepted                    |
+| `unknown`  | no history: written by hand, or before coursekit kept one                      |
+| `declared` | yours: accepted with `coursekit accept`, or changed with `coursekit config set` |
+
+Edit the overlay however you like, then record it:
+
+```bash
+uv run coursekit accept "/path/to/course" grading
+```
+
+`accept` checks the section, prints what changed since the last entry (`grading.groups.Quizzes.weight: 50.0 → 30.0`), and records who accepted it and when.
+Who is your login name, or `--by NAME` for a co-teacher at the same machine.
+With no section named it accepts every section the overlay has, which clears a course in one command.
+If the overlay fails the check it refuses, and records nothing.
+
+Every command uses a section's values whatever its status; the status changes what coursekit tells you.
+The census says who set the expectations it measures against, and `emit course` and `emit assignments` warn when the grading groups and weights are not declared (the package is the same either way).
+The history lives in `.vtconfig/structure.coursekit.authority.json`; if it is ever damaged, delete it and accept the sections again.
 
 ### Generator settings — `quiz.yaml` / `page.yaml`
 

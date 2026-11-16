@@ -19,12 +19,12 @@ The model *commits* each finished piece through a structured tool call rather th
 coursekit is a command-line tool organized as a small pipeline; each phase is a verb, and it is clear which ones use the model.
 
 - **`ingest`** — turns a week's documents (PDF, PowerPoint, Word, ODT, plain text, Markdown) into the consolidated unit text the generators read. A folder of readings and slides becomes one source-tagged unit document. `--raw` does deterministic extraction only, fully offline.
-- **`propose`** — scans a course tree and *declares* its structure (units plus typed sources) into an explicit manifest, instead of guessing structure from filenames. It surfaces any files it couldn't place rather than silently dropping them, and `--model` handles irregular trees that don't encode weeks in their names.
+- **`propose`** — scans a course tree and *drafts* its structure (units plus typed sources) into an explicit manifest for you to accept, instead of guessing structure from filenames. It surfaces any files it couldn't place rather than silently dropping them, and `--model` handles irregular trees that don't encode weeks in their names.
 - **`analyze`** — builds each unit's concept map, an instructor-editable list of the concepts a unit teaches, which grounds both generation and evaluation.
 - **`generate`** — the model step: turns unit text into randomized quizzes and designed pages and, on request, assignments. It can target the whole course, selected units, or — with `--source` — a single document for an à-la-carte quiz. A run ends with a cold-read review of what it produced, by default.
 - **`emit`** — packages the canonical JSON into LMS files, with no model involved: a Canvas quiz `.zip` (QTI), standalone or re-rendered page HTML, a Common Cartridge `.imscc` of pages, an `.imscc` of assignments, or one whole-course `.imscc` of all three together in unit modules.
 
-Three offline commands sit alongside them: `check` validates every settings file at once, `config` changes one setting and refuses a value it can't use, and `census` inventories what exists for every unit and what's missing.
+Four offline commands sit alongside them: `check` validates every settings file at once, `config` changes one setting and refuses a value it can't use, `accept` records a drafted or hand-edited section of the structure as yours, and `census` inventories what exists for every unit and what's missing.
 A broken settings file or a bad value stops a run with a message naming the file, the key, and what's allowed; it is never quietly ignored.
 
 ## Quizzes
